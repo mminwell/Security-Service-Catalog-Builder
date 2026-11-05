@@ -1,6 +1,6 @@
 # Security-Service-Catalog-Builder
 A tool to help security organizations develop a service catalog
-- V1 Basic data entry form and data base
+- V1 Basic data entry form and service catalog and dropdown data bases 
 - V1.1 Multiple HTML export versions (for example, clients, auditors, or internal use only) field-level selection external versus internal 
 - V1.2 Field-level CSV export option to upload into a GRC, Jira, ServicNow or any other work management software.
 - V2 Leverage security frameworks to help author or identify gaps. 
