@@ -1,91 +1,82 @@
 # Security Service Catalog Builder
 
-**Status: planning.** This repository is the product plan for a tool that helps security organizations develop a service catalog.
+**Status: V1.** A multi-tenant catalog for the security services an organization delivers. Enter each service once, keep internal notes out of public views, and export the audience you choose.
 
-## Overview
+V1 includes the service form, the catalog list, dropdown and field administration, CSV export, workspace isolation, and an audit trail. Framework mapping, audience HTML/Word exports, linked artifacts, and assisted drafting come later.
 
-Security Service Catalog Builder gives a security organization one catalog of the services it delivers. A team enters each service once, then uses that catalog to line services up with security frameworks and regulatory requirements, see where coverage is thin, and produce the version each audience needs.
+## What you can do
 
-Shared dropdown values and public or internal field visibility live with the catalog. Planned outputs include HTML and Word for people, and CSV shaped for Jira, ServiceNow, GRC tools, and other work-management software. Tools, process documents, policies, and standards link to the service they support. Framework content helps author services and identify gaps. Suggestions that come from automation wait for a person to approve them.
+- Sign in and switch between client workspaces. A platform owner can create a workspace; it is seeded with the starter dropdowns and field definitions.
+- Capture a service at three depths: **Core**, **Operations**, and **Governance**. Switching depth hides fields. It does not clear them. Only the six Core fields are required.
+- See a live service ID suggestion (`SVC-001`, or `SEC-SOC-001` when the workspace uses category prefixes). The code stays editable.
+- Read definitions where you pick them: Service Tiers 0–3, CMMI 0–5, capability rating, data classification, NIST CSF 2.0 functions, and every other dropdown that has help text.
+- Watch **Maturity Gap** (target CMMI minus current) and **Next Review** update as you type.
+- Search and filter the catalog, toggle **Full internal view** and **Public preview**, and export either the public columns or the full internal set. Both exports respect the current filters.
+- Edit dropdown labels, hover descriptions, sort order, and retire options without deleting them.
+- Set each field’s public or internal visibility and its Core / Operations / Governance depth per workspace.
+- Open a change history for one service or for the whole workspace.
 
-## Who it's for
+## Architecture
 
-- Security organizations — consultancies, managed security providers, and internal security teams — that keep a catalog of the services they deliver.
-- Practitioners who map that catalog to security frameworks and regulatory requirements and need an honest view of coverage.
-- People who publish the catalog for clients, auditors, or internal use, or who load it into a GRC tool, Jira, ServiceNow, or another work-management system.
+The app is a Next.js App Router project. The same screens run in two modes:
 
-## Key concepts
+| Mode | When | What it stores |
+| --- | --- | --- |
+| Interactive Demo Mode | `NEXT_PUBLIC_SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_ANON_KEY` is empty | Sample workspaces in `localStorage`. A banner says so. |
+| Supabase | Both environment variables are set | Postgres, Supabase Auth, and row-level security |
 
-- **Service.** A security service the organization delivers. Services are captured on a data-entry form and listed in a catalog that can be searched and filtered.
-- **Lookup option.** A dropdown value stored in the database. Each row records the field it belongs to, a code, a label, a sort order, and whether it is active. A small admin page edits these rows.
-- **Field definition.** The definition of a catalog field, including a public or internal visibility flag. Visibility is part of the model from the first version, so every later export can respect it.
-- **Coverage.** How completely a service addresses a framework control: full, partial, or none. Controls with no covering service show up as gaps.
-- **Export profile.** A saved audience — Client, Auditor, or Internal — and the fields that audience receives. Client and Auditor profiles include public fields. The Internal profile includes public and internal fields.
-- **Artifact.** A tool, process document, policy, or standard linked to a service. Each link has an owner and a review date, and a stale flag when the review date has passed.
-- **Tenant.** A client workspace. Each tenant's rows are isolated from every other tenant.
+Demo Mode is what `npm run dev` uses out of the box, and what a Vercel preview uses when those variables are not set. It is seeded with Acme Corp and Meridian Health, fictional catalogs you can edit. Reset demo in the top bar restores that seed.
 
-## Roadmap
+Supabase mode uses `@supabase/ssr` in the browser and in `proxy.ts` (session refresh). The anon key is public by design. The service-role key is not used and must not be committed. Isolation is enforced by row-level security:
 
-Versions ship in this order.
-
-### V1 — Catalog core
-
-- Service data-entry form.
-- Catalog list with search and filter.
-- Dropdown values stored in a database lookup table (`field`, `code`, `label`, `sort_order`, `active`), with a small admin page to edit them.
-- Field definitions with public and internal visibility flags from day one.
-- Basic CSV export.
-
-### V2 — Frameworks
-
-- Load NIST CSF 2.0 first.
-- Map services to controls with coverage (full, partial, or none).
-- Gap view of uncovered controls.
-- Coverage dashboard.
-
-### V3 — Audience exports
-
-- Saved export profiles (Client, Auditor, Internal) that produce HTML and Word.
-- Field-level selection on each profile. Client and Auditor profiles include public fields. The Internal profile includes public and internal fields.
-- CSV column mappings for Jira, ServiceNow, and GRC tools.
-- More frameworks: ISO 27001, SOC 2, CIS v8, HIPAA, and other regulatory requirements.
-
-### V4 — Governance links
-
-- Link tools, process documents, policies, and standards to services.
-- Owners and review dates on those links.
-- Stale flags when a linked item is past its review date.
-
-### V5 — AI assist
-
-- Suggest control mappings.
-- Identify gaps.
-- Draft service descriptions.
-- A person approves every suggestion before it is saved.
-
-## Planned architecture
-
-The product is multi-tenant from the start. Each client workspace is a tenant, and tenant data is isolated with row-level security.
-
-- **Web app.** Next.js, hosted on Vercel.
-- **Database.** Hosted Postgres (Supabase).
-- **Access.** Authentication for users, and an audit trail of changes.
-
-### Core tables
-
-| Table | Purpose |
+| Role | Scope |
 | --- | --- |
-| `tenants` | Client workspaces |
-| `services` | Catalog entries |
-| `lookup_options` | Dropdown values: field, code, label, sort order, and active flag |
-| `field_definitions` | Catalog fields and their public or internal visibility |
-| `export_profiles` | Saved audience exports and the fields each profile includes |
-| `frameworks` | Security frameworks loaded for a tenant |
-| `controls` | Controls that belong to a framework |
-| `service_control_map` | Service-to-control mappings and coverage |
-| `artifacts` | Tools, process documents, policies, and standards |
-| `service_artifact_links` | Links from a service to an artifact |
+| `platform_owner` | Every workspace. Can create workspaces and grant the same role. |
+| `tenant_admin` | One workspace. Services, dropdowns, fields, and members. |
+| `editor` | One workspace. Create and edit services. |
+| `viewer` | One workspace. Read and export. |
 
-## Status
+The first account on an empty project becomes the platform owner and receives a seeded Starter Workspace. Later accounts need a membership. Sample workspaces from `supabase/seed.sql` are visible to a platform owner.
 
-**Status: planning.** The roadmap and architecture above are the agreed direction for Security Service Catalog Builder. This repository holds that plan.
+Computed fields use the same rules in the app and in a Postgres trigger: maturity gap is target minus current, and the next review date follows monthly, quarterly, semi-annual, or annual cadence. **On Change** does not calculate a date.
+
+## Local quickstart
+
+```bash
+npm install
+npm run dev
+```
+
+Open the app, enter any email and a password of at least 8 characters, and you are in Acme Corp. Nothing is sent to a server. Create a workspace from the switcher to see an empty catalog and **Load starter sample services**.
+
+```bash
+npm test
+npm run lint
+npm run build
+```
+
+## Bring your own Supabase and Vercel
+
+The short version is in [docs/byo-supabase-vercel.md](docs/byo-supabase-vercel.md). In short: create a Supabase project, run `supabase/migrations/0001_v1_catalog_core.sql`, optionally run `supabase/seed.sql`, copy the project URL and anon key into the host environment, and deploy. Do this before the build. Next.js inlines `NEXT_PUBLIC_*` values at build time.
+
+Copy `.env.example` to `.env.local` only on your machine. `.env.local` is gitignored.
+
+## Repository layout
+
+- `app/` — screens: sign-in, catalog, service form, lookup admin, field admin
+- `components/` — Birchline interface
+- `lib/catalog/` — fields, starter lookups, computed values, service IDs, CSV, sample catalogs
+- `lib/data/` — Demo Mode store and the Supabase adapter
+- `supabase/migrations/0001_v1_catalog_core.sql` — tables, RLS, audit triggers, provision function, starter data
+- `supabase/seed.sql` — the same starter lookups, plus Acme Corp and Meridian Health
+- `tests/` — computed fields, service IDs, CSV visibility, lookup retirement, depth behavior
+
+`npm run seed:sql` regenerates the starter rows in the SQL files from `lib/catalog/`. The TypeScript seed is what Demo Mode uses.
+
+Intake methods and target audiences are included so those V1 dropdowns are usable. The locked lookup list did not enumerate them. Everything else in the starter set matches that list, including the tier, CMMI, capability, and data-classification descriptions.
+
+## Later versions
+
+The sequence is unchanged. V2 maps services to NIST CSF 2.0 and shows gaps. V3 adds saved audience exports. V4 links tools, runbooks, and policies. V5 may suggest text, and a person approves every save.
+
+A license has not been selected yet.
