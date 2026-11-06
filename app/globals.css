@@ -1017,9 +1017,20 @@ table.catalog tr.clickable:hover td { background: rgba(240, 238, 230, 0.55); }
   padding: 10px 12px;
 }
 .coverage-function {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   text-align: left;
   cursor: pointer;
   color: inherit;
+  padding-right: 16px;
+}
+.coverage-function-copy { min-width: 0; }
+.csf-function-icon {
+  flex: none;
+  display: block;
+  color: var(--gray-700);
 }
 .coverage-function[aria-pressed="true"] { border-color: var(--clay); }
 .coverage-function strong { display: block; font-family: var(--serif); font-weight: 500; font-size: 18px; }

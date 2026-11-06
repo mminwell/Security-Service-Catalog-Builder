@@ -14,6 +14,7 @@ import {
 import { ancestorOfType, CSF_FRAMEWORK } from "@/lib/catalog/framework";
 import { optionByCode } from "@/lib/catalog/lookups";
 import { useCatalog } from "@/components/catalog-provider";
+import { CsfFunctionIcon } from "@/components/icons";
 import { OutcomeAssessmentFields } from "@/components/outcome-mapping";
 import { Badge } from "@/components/widgets";
 
@@ -152,11 +153,14 @@ export function CoverageScreen() {
                 }))
               }
             >
-              <span className="code">{fn.code}</span>
-              <strong>{fn.title}</strong>
-              <span className="coverage-mini">
-                {counts.full} full · {counts.partial} partial · {counts.none} none · {counts.unmapped} unmapped
+              <span className="coverage-function-copy">
+                <span className="code">{fn.code}</span>
+                <strong>{fn.title}</strong>
+                <span className="coverage-mini">
+                  {counts.full} full · {counts.partial} partial · {counts.none} none · {counts.unmapped} unmapped
+                </span>
               </span>
+              <CsfFunctionIcon code={fn.code} />
             </button>
           );
         })}
