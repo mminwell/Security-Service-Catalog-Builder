@@ -1,8 +1,8 @@
 {
   "name": "security-service-catalog-builder",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": true,
-  "description": "Multi-tenant security service catalog with NIST CSF 2.0 outcome mapping and coverage.",
+  "description": "Multi-tenant security service catalog with audience exports, optional geography and privacy fields, and NIST CSF 2.0 coverage.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -12,9 +12,12 @@
     "seed:sql": "tsx scripts/emit-sql.ts"
   },
   "dependencies": {
+    "@pdf-lib/fontkit": "^1.1.1",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.119.0",
+    "fflate": "^0.8.3",
     "next": "^16.4.5",
+    "pdf-lib": "^1.17.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

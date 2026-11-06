@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
+import { ADDITIONAL_FRAMEWORKS } from "../lib/catalog/framework-catalog";
 import { STARTER_FIELDS } from "../lib/catalog/fields";
-import { CSF_ELEMENTS, CSF_FRAMEWORK } from "../lib/catalog/framework";
+import { CSF_ELEMENTS, CSF_FRAMEWORK, type FrameworkRelease } from "../lib/catalog/framework";
 import { builtinLogoForSlug } from "../lib/catalog/logos";
 import { STARTER_LOOKUPS } from "../lib/catalog/lookups";
 import { SAMPLE_TENANTS, STARTER_PACK } from "../lib/catalog/samples";
@@ -87,7 +88,8 @@ function contentLiterals(seed: ServiceSeed): string[] {
 function fieldInsert(conflict: string): string {
   const values = STARTER_FIELDS.map((field) => {
     const lookup = field.lookup_field_key ? quote(field.lookup_field_key) : "null";
-    return `  (null, ${quote(field.field_key)}, ${quote(field.label)}, ${quote(field.help_text)}, ${quote(field.input_type)}, ${lookup}, ${field.is_required ? "true" : "false"}, ${quote(field.visibility)}, ${field.depth_level}, ${field.sort_order}, true, true)`;
+    const active = field.is_active === false ? "false" : "true";
+    return `  (null, ${quote(field.field_key)}, ${quote(field.label)}, ${quote(field.help_text)}, ${quote(field.input_type)}, ${lookup}, ${field.is_required ? "true" : "false"}, ${quote(field.visibility)}, ${field.depth_level}, ${field.sort_order}, ${active}, true)`;
   }).join(",\n");
   return `insert into public.field_definitions (
   tenant_id, field_key, label, help_text, input_type, lookup_field_key,
@@ -170,7 +172,7 @@ ${rows};
 end $$;`;
 }
 
-function frameworkSeed(): string {
+function frameworkSeed(conflict: string): string {
   const framework = CSF_FRAMEWORK;
   const header = `insert into public.frameworks (
   id, code, version, name, published_on, publication, publication_url,
@@ -229,7 +231,7 @@ on conflict (code, version) do update set
   id, framework_id, element_type, code, parent_id, title, statement, sort_order
 ) values
 ${values}
-on conflict (framework_id, code) do update set
+${conflict} do update set
   element_type = excluded.element_type,
   parent_id = excluded.parent_id,
   title = excluded.title,
@@ -279,6 +281,110 @@ where not exists (
   ].join("\n\n");
 }
 
+function optionalCatalogSql(): string {
+  const optional = STARTER_FIELDS.filter((field) => field.field_group);
+  const fieldValues = optional
+    .map((field) => {
+      const lookup = field.lookup_field_key ? quote(field.lookup_field_key) : "null";
+      return `  (null, ${quote(field.field_key)}, ${quote(field.label)}, ${quote(field.help_text)}, ${quote(field.input_type)}, ${lookup}, false, ${quote(field.visibility)}, ${field.depth_level}, ${field.sort_order}, false, true)`;
+    })
+    .join(",\n");
+  const keys = optional.map((field) => quote(field.field_key)).join(", ");
+  const lookupKeys = [
+    ...new Set(optional.map((field) => field.lookup_field_key).filter((key): key is string => Boolean(key))),
+  ];
+  const lookupValues = STARTER_LOOKUPS.filter((row) => lookupKeys.includes(row.field_key))
+    .map((row) => {
+      const description = row.description ? quote(row.description) : "null";
+      const prefix = row.code_prefix ? quote(row.code_prefix) : "null";
+      return `  (null, ${quote(row.field_key)}, ${quote(row.code)}, ${quote(row.label)}, ${description}, ${prefix}, ${row.sort_order}, true)`;
+    })
+    .join(",\n");
+  const lookupKeySql = lookupKeys.map((key) => quote(key)).join(", ");
+  const groupUpdates = (["geography", "privacy"] as const)
+    .map((group) => {
+      const groupKeys = optional.filter((field) => field.field_group === group).map((field) => quote(field.field_key)).join(", ");
+      return `update public.field_definitions
+set field_group = ${quote(group)}
+where field_key in (${groupKeys})
+  and field_group is distinct from ${quote(group)};`;
+    })
+    .join("\n\n");
+  return `-- Optional geography and privacy fields. Inactive until an admin enables the group.
+-- Re-running does not turn a group back off and does not delete stored values.
+
+insert into public.field_definitions (
+  tenant_id, field_key, label, help_text, input_type, lookup_field_key,
+  is_required, visibility, depth_level, sort_order, is_active, is_standard
+) values
+${fieldValues}
+on conflict (field_key) where tenant_id is null do nothing;
+
+insert into public.field_definitions (
+  tenant_id, field_key, label, help_text, input_type, lookup_field_key,
+  is_required, visibility, depth_level, sort_order, is_active, is_standard
+)
+select t.id, s.field_key, s.label, s.help_text, s.input_type, s.lookup_field_key,
+  s.is_required, s.visibility, s.depth_level, s.sort_order, s.is_active, s.is_standard
+from public.tenants t
+join public.field_definitions s
+  on s.tenant_id is null
+ and s.field_key in (${keys})
+where not exists (
+  select 1 from public.field_definitions existing
+  where existing.tenant_id = t.id
+    and existing.field_key = s.field_key
+);
+
+insert into public.lookup_options (
+  tenant_id, field_key, code, label, description, code_prefix, sort_order, is_active
+) values
+${lookupValues}
+on conflict (field_key, code) where tenant_id is null do nothing;
+
+insert into public.lookup_options (
+  tenant_id, field_key, code, label, description, code_prefix, sort_order, is_active
+)
+select t.id, s.field_key, s.code, s.label, s.description, s.code_prefix, s.sort_order, s.is_active
+from public.tenants t
+join public.lookup_options s
+  on s.tenant_id is null
+ and s.field_key in (${lookupKeySql})
+where not exists (
+  select 1 from public.lookup_options existing
+  where existing.tenant_id = t.id
+    and existing.field_key = s.field_key
+    and existing.code = s.code
+);
+
+${groupUpdates}`;
+}
+
+function frameworkRegistrySql(): string {
+  const rows = ADDITIONAL_FRAMEWORKS.map((framework) => frameworkRow(framework)).join(",\n");
+  return `-- Selectable frameworks with no control text. NIST CSF 2.0 is not updated here.
+
+insert into public.frameworks (
+  id, code, version, name, published_on, publication, publication_url,
+  source_title, source_tool, source_url, reference_tool_url, retrieved_on,
+  export_change_log, export_generated_at, export_sha256, content_sha256,
+  id_namespace, excluded_withdrawn_rows, provenance, is_active, content_state, license_note
+) values
+${rows}
+on conflict (code, version) do update set
+  name = excluded.name,
+  publication = excluded.publication,
+  provenance = excluded.provenance,
+  license_note = excluded.license_note,
+  content_state = excluded.content_state,
+  is_active = excluded.is_active
+where public.frameworks.code <> 'NIST-CSF';`;
+}
+
+function frameworkRow(framework: FrameworkRelease): string {
+  return `  (${quote(framework.id)}::uuid, ${quote(framework.code)}, ${quote(framework.version)}, ${quote(framework.name)}, ${framework.published_on ? `${quote(framework.published_on)}::date` : "null"}, ${quote(framework.publication)}, ${quote(framework.publication_url)}, ${quote(framework.source_title)}, ${quote(framework.source_tool)}, ${quote(framework.source_url)}, ${quote(framework.reference_tool_url)}, null, ${quote(framework.export_change_log)}, ${quote(framework.export_generated_at)}, ${quote(framework.export_sha256)}, ${quote(framework.content_sha256)}, ${quote(framework.id_namespace)}, ${framework.excluded_withdrawn_rows}, ${quote(framework.provenance)}, true, ${quote(framework.content_state)}, ${quote(framework.license_note)})`;
+}
+
 const starterData = [
   "-- Platform templates. tenant_id is null. provision_tenant copies these into each workspace.",
   fieldInsert("on conflict (field_key) where tenant_id is null do nothing"),
@@ -306,8 +412,26 @@ writeFileSync(
   frameworkMigrationPath,
   frameworkMigration.replace(
     /-- FRAMEWORK_SEED_BEGIN[\s\S]*?-- FRAMEWORK_SEED_END/,
-    `-- FRAMEWORK_SEED_BEGIN\n${frameworkSeed()}\n-- FRAMEWORK_SEED_END`,
+    `-- FRAMEWORK_SEED_BEGIN\n${frameworkSeed("on conflict (framework_id, code)")}\n-- FRAMEWORK_SEED_END`,
   ),
+);
+
+const v3MigrationPath = "supabase/migrations/0005_v3_exports_frameworks.sql";
+const v3Migration = readFileSync(v3MigrationPath, "utf8");
+if (!v3Migration.includes("-- OPTIONAL_CATALOG_BEGIN") || !v3Migration.includes("-- FRAMEWORK_REGISTRY_END")) {
+  throw new Error("V3 migration is missing catalog markers.");
+}
+writeFileSync(
+  v3MigrationPath,
+  v3Migration
+    .replace(
+      /-- OPTIONAL_CATALOG_BEGIN[\s\S]*?-- OPTIONAL_CATALOG_END/,
+      `-- OPTIONAL_CATALOG_BEGIN\n${optionalCatalogSql()}\n-- OPTIONAL_CATALOG_END`,
+    )
+    .replace(
+      /-- FRAMEWORK_REGISTRY_BEGIN[\s\S]*?-- FRAMEWORK_REGISTRY_END/,
+      `-- FRAMEWORK_REGISTRY_BEGIN\n${frameworkRegistrySql()}\n-- FRAMEWORK_REGISTRY_END`,
+    ),
 );
 
 const seed = `-- Optional sample data for Security Service Catalog Builder.
@@ -317,14 +441,20 @@ const seed = `-- Optional sample data for Security Service Catalog Builder.
 -- supabase/migrations/0002_v1_1_polish.sql
 -- supabase/migrations/0003_v1_2_blueprints_columns_import.sql
 -- supabase/migrations/0004_v2_csf_mappings.sql
+-- supabase/migrations/0005_v3_exports_frameworks.sql
 -- No real client names, credentials, or project URLs.
 -- The CSF 2.0 core is loaded by 0004. The block below repeats it so a later seed stays idempotent.
+-- Optional field groups and the unloaded framework registry are repeated from 0005.
 
 ${fieldInsert("on conflict (field_key) where tenant_id is null do nothing")}
 
 ${lookupInsert("on conflict (field_key, code) where tenant_id is null do nothing")}
 
-${frameworkSeed()}
+${frameworkSeed("on conflict (framework_id, code) where tenant_id is null")}
+
+${optionalCatalogSql()}
+
+${frameworkRegistrySql()}
 
 ${SAMPLE_TENANTS.map((tenant) =>
   sampleBlock(
@@ -339,4 +469,4 @@ ${SAMPLE_TENANTS.map((tenant) =>
 `;
 
 writeFileSync("supabase/seed.sql", seed);
-console.log(`Wrote starter data into ${migrationPath}, ${frameworkMigrationPath}, and supabase/seed.sql`);
+console.log(`Wrote starter data into ${migrationPath}, ${frameworkMigrationPath}, ${v3MigrationPath}, and supabase/seed.sql`);

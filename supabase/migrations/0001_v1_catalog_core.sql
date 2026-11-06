@@ -488,7 +488,12 @@ insert into public.field_definitions (
   (null, $sscb$cost_or_effort_notes$sscb$, $sscb$Cost / Effort Notes$sscb$, $sscb$Sizing, effort, or cost-band notes. Internal.$sscb$, $sscb$textarea$sscb$, null, false, $sscb$internal$sscb$, 3, 410, true, true),
   (null, $sscb$review_cadence$sscb$, $sscb$Review Cadence$sscb$, $sscb$How often this catalog entry should be reviewed. On Change does not calculate a next date.$sscb$, $sscb$dropdown$sscb$, $sscb$review_cadence$sscb$, false, $sscb$public$sscb$, 3, 420, true, true),
   (null, $sscb$last_reviewed_date$sscb$, $sscb$Last Reviewed$sscb$, $sscb$Date this entry was last reviewed.$sscb$, $sscb$date$sscb$, null, false, $sscb$public$sscb$, 3, 430, true, true),
-  (null, $sscb$next_review_date$sscb$, $sscb$Next Review$sscb$, $sscb$Computed from the last reviewed date and the review cadence.$sscb$, $sscb$computed$sscb$, null, false, $sscb$public$sscb$, 3, 440, true, true)
+  (null, $sscb$next_review_date$sscb$, $sscb$Next Review$sscb$, $sscb$Computed from the last reviewed date and the review cadence.$sscb$, $sscb$computed$sscb$, null, false, $sscb$public$sscb$, 3, 440, true, true),
+  (null, $sscb$data_residency_regions$sscb$, $sscb$Data residency regions$sscb$, $sscb$Regions this workspace has recorded for where the service runs or stores data. A recorded region is not a legal residency determination.$sscb$, $sscb$multi_select$sscb$, $sscb$data_residency_region$sscb$, false, $sscb$public$sscb$, 2, 450, false, true),
+  (null, $sscb$hosting_model$sscb$, $sscb$Hosting model$sscb$, $sscb$Where the workspace says this service is hosted. This is an operational note, not a finding about sovereignty or a contract.$sscb$, $sscb$dropdown$sscb$, $sscb$hosting_model$sscb$, false, $sscb$public$sscb$, 2, 460, false, true),
+  (null, $sscb$personal_data_recorded$sscb$, $sscb$Personal data recorded$sscb$, $sscb$Whether this workspace has recorded that the service handles personal data. Yes is not a legal classification and does not mean a privacy law applies.$sscb$, $sscb$dropdown$sscb$, $sscb$personal_data_recorded$sscb$, false, $sscb$public$sscb$, 2, 470, false, true),
+  (null, $sscb$recorded_jurisdictions$sscb$, $sscb$Recorded jurisdictions$sscb$, $sscb$Jurisdictions the workspace has noted for people whose data the service may handle. This is not a finding that a privacy law applies.$sscb$, $sscb$multi_select$sscb$, $sscb$recorded_jurisdiction$sscb$, false, $sscb$public$sscb$, 2, 480, false, true),
+  (null, $sscb$privacy_operations_notes$sscb$, $sscb$Privacy operations notes$sscb$, $sscb$Operational privacy notes for this service. This catalog does not conclude that a law, contract, or framework is met.$sscb$, $sscb$textarea$sscb$, null, false, $sscb$public$sscb$, 3, 490, false, true)
 on conflict (field_key) where tenant_id is null do nothing;
 
 insert into public.lookup_options (
@@ -593,7 +598,31 @@ insert into public.lookup_options (
   (null, $sscb$target_audience$sscb$, $sscb$security_team$sscb$, $sscb$Security Team$sscb$, $sscb$The security organization itself.$sscb$, null, 40, true),
   (null, $sscb$target_audience$sscb$, $sscb$business_owners$sscb$, $sscb$Business Owners$sscb$, $sscb$Owners of business processes and services.$sscb$, null, 50, true),
   (null, $sscb$target_audience$sscb$, $sscb$external_parties$sscb$, $sscb$External Parties$sscb$, $sscb$Suppliers, partners, or other outside parties.$sscb$, null, 60, true),
-  (null, $sscb$target_audience$sscb$, $sscb$customers$sscb$, $sscb$Customers$sscb$, $sscb$The organization’s customers.$sscb$, null, 70, true)
+  (null, $sscb$target_audience$sscb$, $sscb$customers$sscb$, $sscb$Customers$sscb$, $sscb$The organization’s customers.$sscb$, null, 70, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$not_recorded$sscb$, $sscb$Not recorded$sscb$, $sscb$The workspace has not recorded a region.$sscb$, null, 10, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$customer_environment$sscb$, $sscb$Customer environment$sscb$, $sscb$The service runs in the customer’s own environment.$sscb$, null, 20, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$on_premises$sscb$, $sscb$On premises$sscb$, $sscb$The workspace records this service as on premises.$sscb$, null, 30, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$us$sscb$, $sscb$United States$sscb$, $sscb$A United States region the workspace recorded. Not a legal conclusion.$sscb$, null, 40, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$ca$sscb$, $sscb$Canada$sscb$, $sscb$A Canada region the workspace recorded. Not a legal conclusion.$sscb$, null, 50, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$uk$sscb$, $sscb$United Kingdom$sscb$, $sscb$A United Kingdom region the workspace recorded. Not a legal conclusion.$sscb$, null, 60, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$eea$sscb$, $sscb$European Economic Area$sscb$, $sscb$An EEA region the workspace recorded. Not a legal conclusion.$sscb$, null, 70, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$apac$sscb$, $sscb$Asia Pacific$sscb$, $sscb$An Asia Pacific region the workspace recorded. Not a legal conclusion.$sscb$, null, 80, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$latam$sscb$, $sscb$Latin America$sscb$, $sscb$A Latin America region the workspace recorded. Not a legal conclusion.$sscb$, null, 90, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$other$sscb$, $sscb$Other recorded region$sscb$, $sscb$Another region named in the service notes.$sscb$, null, 100, true),
+  (null, $sscb$hosting_model$sscb$, $sscb$not_recorded$sscb$, $sscb$Not recorded$sscb$, $sscb$The workspace has not recorded a hosting model.$sscb$, null, 10, true),
+  (null, $sscb$hosting_model$sscb$, $sscb$customer_environment$sscb$, $sscb$Customer environment$sscb$, $sscb$Hosted in the customer’s environment.$sscb$, null, 20, true),
+  (null, $sscb$hosting_model$sscb$, $sscb$on_premises$sscb$, $sscb$On premises$sscb$, $sscb$Hosted on premises.$sscb$, null, 30, true),
+  (null, $sscb$hosting_model$sscb$, $sscb$single_region$sscb$, $sscb$Single region$sscb$, $sscb$The workspace records a single hosting region.$sscb$, null, 40, true),
+  (null, $sscb$hosting_model$sscb$, $sscb$multi_region$sscb$, $sscb$Multiple regions$sscb$, $sscb$The workspace records more than one hosting region.$sscb$, null, 50, true),
+  (null, $sscb$personal_data_recorded$sscb$, $sscb$not_recorded$sscb$, $sscb$Not recorded$sscb$, $sscb$The workspace has not recorded whether personal data is handled.$sscb$, null, 10, true),
+  (null, $sscb$personal_data_recorded$sscb$, $sscb$no$sscb$, $sscb$No$sscb$, $sscb$The workspace recorded that this service does not handle personal data.$sscb$, null, 20, true),
+  (null, $sscb$personal_data_recorded$sscb$, $sscb$yes$sscb$, $sscb$Yes$sscb$, $sscb$The workspace recorded that this service handles personal data. This is not a legal classification.$sscb$, null, 30, true),
+  (null, $sscb$recorded_jurisdiction$sscb$, $sscb$not_recorded$sscb$, $sscb$Not recorded$sscb$, $sscb$The workspace has not recorded a jurisdiction.$sscb$, null, 10, true),
+  (null, $sscb$recorded_jurisdiction$sscb$, $sscb$us$sscb$, $sscb$United States$sscb$, $sscb$Noted by the workspace. Not a finding that a US privacy law applies.$sscb$, null, 20, true),
+  (null, $sscb$recorded_jurisdiction$sscb$, $sscb$ca$sscb$, $sscb$Canada$sscb$, $sscb$Noted by the workspace. Not a finding that a Canadian privacy law applies.$sscb$, null, 30, true),
+  (null, $sscb$recorded_jurisdiction$sscb$, $sscb$uk$sscb$, $sscb$United Kingdom$sscb$, $sscb$Noted by the workspace. Not a finding that a UK privacy law applies.$sscb$, null, 40, true),
+  (null, $sscb$recorded_jurisdiction$sscb$, $sscb$eea$sscb$, $sscb$European Economic Area$sscb$, $sscb$Noted by the workspace. Not a finding that an EEA privacy law applies.$sscb$, null, 50, true),
+  (null, $sscb$recorded_jurisdiction$sscb$, $sscb$other$sscb$, $sscb$Other$sscb$, $sscb$Another jurisdiction named in the service notes.$sscb$, null, 60, true)
 on conflict (field_key, code) where tenant_id is null do nothing;
 
 insert into public.starter_service_templates (

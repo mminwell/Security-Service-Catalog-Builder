@@ -1,8 +1,10 @@
 import { parseColumnConfig } from "@/lib/catalog/columns";
-import { CSF_ELEMENTS, CSF_FRAMEWORK } from "@/lib/catalog/framework";
+import { materializeFields, STARTER_FIELDS, type FieldGroupId } from "@/lib/catalog/fields";
+import { FRAMEWORK_CATALOG } from "@/lib/catalog/framework-catalog";
+import { CSF_ELEMENTS, CSF_FRAMEWORK, type FrameworkElement } from "@/lib/catalog/framework";
 import { STARTER_LOOKUPS } from "@/lib/catalog/lookups";
 import { builtinLogoForSlug } from "@/lib/catalog/logos";
-import type { LookupOption, OutcomeMapping, ServiceRecord, Tenant } from "@/lib/catalog/types";
+import type { ExportProfile, FieldDefinition, LookupOption, OutcomeMapping, ServiceRecord, Tenant } from "@/lib/catalog/types";
 import { freshDemo, type CatalogDb } from "@/lib/data/model";
 
 const PREVIOUS_CSF_HELP = "Primary NIST CSF 2.0 function. Detailed control mapping comes in a later version.";
@@ -28,9 +30,11 @@ export function loadDemoDb(): CatalogDb {
  * V1 has no `logo_url`, `archived_at`, or `catalog_columns`.
  * A missing logo on Acme Corp or Meridian Health receives the built-in mark.
  * An explicit null logo stays cleared. Edited services, lookups, fields, and
- * saved outcome assessments are kept. The official CSF 2.0 core is attached
- * when the cache has no framework rows. Missing outcome-assessment dropdowns
- * are added without rewriting lookup groups the workspace already edited.
+ * saved outcome assessments are kept. The official CSF 2.0 core is refreshed.
+ * Workspace-imported framework rows and saved export profiles are kept.
+ * Optional geography and privacy fields are added inactive when missing.
+ * Missing outcome-assessment dropdowns are added without rewriting lookup
+ * groups the workspace already edited.
  * Returns null when the payload is not a catalog.
  */
 export function migrateDemoState(raw: unknown): CatalogDb | null {
@@ -41,18 +45,25 @@ export function migrateDemoState(raw: unknown): CatalogDb | null {
       return null;
     }
     const tenants = parsed.tenants.map(normalizeTenant);
-    const lookups = ensureCoverageLookups(parsed.lookups, tenants.map((tenant) => tenant.id));
+    const tenantIds = tenants.map((tenant) => tenant.id);
+    const lookups = ensureOptionalLookups(ensureCoverageLookups(parsed.lookups, tenantIds), tenantIds);
+    const fields = ensureOptionalFields(
+      Array.isArray(parsed.fields) ? parsed.fields.map(normalizeStoredField) : [],
+      tenantIds,
+    );
+    const library = mergeFrameworkLibrary(parsed.elements);
     return {
       session: parsed.session ?? null,
       activeTenantId: typeof parsed.activeTenantId === "string" ? parsed.activeTenantId : null,
       tenants,
       members: Array.isArray(parsed.members) ? parsed.members : [],
-      fields: Array.isArray(parsed.fields) ? parsed.fields.map(normalizeStoredField) : [],
+      fields,
       lookups,
       services: parsed.services.map(normalizeStoredService),
-      frameworks: [{ ...CSF_FRAMEWORK }],
-      elements: CSF_ELEMENTS.map((element) => ({ ...element })),
+      frameworks: library.frameworks,
+      elements: library.elements,
       mappings: normalizeStoredMappings(parsed.mappings),
+      exportProfiles: normalizeProfiles(parsed.exportProfiles, tenantIds),
       audit: Array.isArray(parsed.audit) ? parsed.audit : [],
     };
   } catch {
@@ -99,12 +110,148 @@ function normalizeTenant(input: unknown): Tenant {
   };
 }
 
-function normalizeStoredField(input: unknown): CatalogDb["fields"][number] {
-  const row = (input && typeof input === "object" ? input : {}) as CatalogDb["fields"][number];
-  if (row.field_key === "primary_csf_function" && row.help_text === PREVIOUS_CSF_HELP) {
-    return { ...row, help_text: CURRENT_CSF_HELP };
+function normalizeStoredField(input: unknown): FieldDefinition {
+  const row = (input && typeof input === "object" ? input : {}) as Partial<FieldDefinition>;
+  const group: FieldGroupId | null = row.field_group === "geography" || row.field_group === "privacy" ? row.field_group : null;
+  const next: FieldDefinition = {
+    id: typeof row.id === "string" ? row.id : "",
+    tenant_id: typeof row.tenant_id === "string" ? row.tenant_id : null,
+    field_key: typeof row.field_key === "string" ? row.field_key : "",
+    label: typeof row.label === "string" ? row.label : "",
+    help_text: typeof row.help_text === "string" ? row.help_text : "",
+    input_type: row.input_type ?? "text",
+    lookup_field_key: typeof row.lookup_field_key === "string" ? row.lookup_field_key : null,
+    is_required: Boolean(row.is_required),
+    visibility: row.visibility === "internal" ? "internal" : "public",
+    depth_level: row.depth_level === 2 || row.depth_level === 3 ? row.depth_level : 1,
+    sort_order: typeof row.sort_order === "number" ? row.sort_order : 0,
+    is_active: row.is_active !== false,
+    is_standard: row.is_standard !== false,
+    field_group: group,
+  };
+  if (next.field_key === "primary_csf_function" && next.help_text === PREVIOUS_CSF_HELP) {
+    next.help_text = CURRENT_CSF_HELP;
   }
-  return row;
+  const known = STARTER_FIELDS.find((field) => field.field_key === next.field_key);
+  if (known?.field_group && !next.field_group) next.field_group = known.field_group;
+  return next;
+}
+
+const OPTIONAL_FIELDS = STARTER_FIELDS.filter((field) => field.field_group);
+const OPTIONAL_LOOKUP_KEYS = new Set(
+  OPTIONAL_FIELDS.map((field) => field.lookup_field_key).filter((key): key is string => Boolean(key)),
+);
+
+function ensureOptionalFields(fields: FieldDefinition[], tenantIds: string[]): FieldDefinition[] {
+  const next = fields.slice();
+  for (const tenantId of tenantIds) {
+    if (!tenantId) continue;
+    for (const seed of OPTIONAL_FIELDS) {
+      if (next.some((field) => field.tenant_id === tenantId && field.field_key === seed.field_key)) continue;
+      const [created] = materializeFields(tenantId, (fieldKey) => `field:${tenantId}:${fieldKey}`).filter(
+        (field) => field.field_key === seed.field_key,
+      );
+      if (created) next.push(created);
+    }
+  }
+  return next;
+}
+
+function ensureOptionalLookups(lookups: LookupOption[], tenantIds: string[]): LookupOption[] {
+  const seeds = STARTER_LOOKUPS.filter((row) => OPTIONAL_LOOKUP_KEYS.has(row.field_key));
+  const next = lookups.slice();
+  for (const tenantId of tenantIds) {
+    if (!tenantId) continue;
+    for (const seed of seeds) {
+      if (next.some((option) => option.tenant_id === tenantId && option.field_key === seed.field_key && option.code === seed.code)) {
+        continue;
+      }
+      next.push({
+        id: `lookup:${tenantId}:${seed.field_key}:${seed.code}`,
+        tenant_id: tenantId,
+        field_key: seed.field_key,
+        code: seed.code,
+        label: seed.label,
+        description: seed.description,
+        code_prefix: seed.code_prefix,
+        sort_order: seed.sort_order,
+        is_active: true,
+      });
+    }
+  }
+  return next;
+}
+
+function mergeFrameworkLibrary(input: unknown): { frameworks: CatalogDb["frameworks"]; elements: FrameworkElement[] } {
+  const official = CSF_ELEMENTS.map((element) => ({ ...element, tenant_id: null }));
+  const imported: FrameworkElement[] = [];
+  if (Array.isArray(input)) {
+    for (const item of input) {
+      const element = normalizeImportedElement(item);
+      if (!element) continue;
+      if (element.framework_id === CSF_FRAMEWORK.id) continue;
+      if (!FRAMEWORK_CATALOG.some((framework) => framework.id === element.framework_id)) continue;
+      imported.push(element);
+    }
+  }
+  return {
+    frameworks: FRAMEWORK_CATALOG.map((framework) => ({ ...framework })),
+    elements: [...official, ...imported],
+  };
+}
+
+function normalizeImportedElement(input: unknown): FrameworkElement | null {
+  if (!input || typeof input !== "object") return null;
+  const row = input as Partial<FrameworkElement>;
+  if (typeof row.tenant_id !== "string" || !row.tenant_id) return null;
+  if (typeof row.id !== "string" || typeof row.framework_id !== "string" || typeof row.code !== "string") return null;
+  if (row.element_type !== "function" && row.element_type !== "category" && row.element_type !== "subcategory") return null;
+  if (typeof row.title !== "string" || typeof row.statement !== "string") return null;
+  return {
+    id: row.id,
+    framework_id: row.framework_id,
+    tenant_id: row.tenant_id,
+    element_type: row.element_type,
+    code: row.code,
+    parent_id: typeof row.parent_id === "string" ? row.parent_id : null,
+    title: row.title,
+    statement: row.statement,
+    sort_order: typeof row.sort_order === "number" ? row.sort_order : 0,
+  };
+}
+
+function normalizeProfiles(input: unknown, tenantIds: string[]): ExportProfile[] {
+  if (!Array.isArray(input)) return [];
+  const allowed = new Set(tenantIds);
+  const seen = new Set<string>();
+  const profiles: ExportProfile[] = [];
+  for (const item of input) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Partial<ExportProfile>;
+    if (typeof row.id !== "string" || typeof row.tenant_id !== "string" || typeof row.name !== "string") continue;
+    if (!allowed.has(row.tenant_id)) continue;
+    if (row.audience !== "public" && row.audience !== "internal") continue;
+    if (!Array.isArray(row.field_keys) || row.field_keys.some((key) => typeof key !== "string")) continue;
+    const key = `${row.tenant_id}:${row.name.trim().toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    profiles.push({
+      id: row.id,
+      tenant_id: row.tenant_id,
+      name: row.name.trim(),
+      audience: row.audience,
+      field_keys: row.field_keys,
+      is_default: Boolean(row.is_default),
+      created_at: typeof row.created_at === "string" ? row.created_at : "",
+      updated_at: typeof row.updated_at === "string" ? row.updated_at : "",
+    });
+  }
+  const defaults = new Set<string>();
+  return profiles.map((profile) => {
+    if (!profile.is_default || defaults.has(profile.tenant_id)) return { ...profile, is_default: defaults.has(profile.tenant_id) ? false : profile.is_default };
+    defaults.add(profile.tenant_id);
+    return profile;
+  });
 }
 
 const COVERAGE_SEEDS = STARTER_LOOKUPS.filter((row) => row.field_key === "outcome_coverage");

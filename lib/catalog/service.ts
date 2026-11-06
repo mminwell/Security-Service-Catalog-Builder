@@ -177,13 +177,75 @@ export function withComputed(service: ServiceRecord): ServiceRecord {
   };
 }
 
+const RECORD_KEYS = new Set<string>([
+  "id",
+  "tenant_id",
+  "service_code",
+  "name",
+  "internal_name",
+  "category",
+  "status",
+  "service_tier",
+  "summary",
+  "description",
+  "in_scope",
+  "out_of_scope",
+  "deliverables",
+  "prerequisites",
+  "owner_team",
+  "delivery_team",
+  "business_unit",
+  "service_owner",
+  "delivery_model",
+  "target_audience",
+  "intake_method",
+  "intake_url",
+  "approval_required",
+  "approver",
+  "lead_time",
+  "support_contact",
+  "hours_of_coverage",
+  "sla_response_target",
+  "sla_resolution_target",
+  "primary_csf_function",
+  "capability_rating",
+  "threats_addressed",
+  "data_classification_handled",
+  "kpis_and_metrics",
+  "current_maturity_cmmi",
+  "target_maturity_cmmi",
+  "maturity_gap",
+  "known_gaps_or_risks",
+  "third_party_providers",
+  "cost_model",
+  "cost_or_effort_notes",
+  "current_tooling_notes",
+  "internal_notes",
+  "review_cadence",
+  "last_reviewed_date",
+  "next_review_date",
+  "archived_at",
+  "created_by",
+  "updated_by",
+  "created_at",
+  "updated_at",
+]);
+
 export function readField(service: ServiceRecord, key: string): unknown {
-  const bag = service as unknown as Record<string, unknown>;
-  return bag[key];
+  if (RECORD_KEYS.has(key)) {
+    return (service as unknown as Record<string, unknown>)[key];
+  }
+  return service.custom_fields?.[key];
 }
 
 export function writeField(service: ServiceRecord, key: string, value: unknown): ServiceRecord {
-  if (key === "maturity_gap" || key === "next_review_date") return service;
+  if (key === "maturity_gap" || key === "next_review_date" || key === "custom_fields") return service;
+  if (!RECORD_KEYS.has(key)) {
+    const custom = { ...(service.custom_fields ?? {}) };
+    if (value == null || value === "") delete custom[key];
+    else custom[key] = value;
+    return { ...service, custom_fields: custom };
+  }
   if (key === "current_maturity_cmmi" || key === "target_maturity_cmmi") {
     const parsed = value === "" || value == null ? null : Number(value);
     return { ...service, [key]: Number.isFinite(parsed) ? parsed : null };
@@ -249,7 +311,7 @@ export function normalizeService(service: ServiceRecord): ServiceRecord {
     name: service.name.trim(),
     summary: service.summary?.trim() ?? "",
     target_audience: service.target_audience ?? [],
-    custom_fields: service.custom_fields ?? {},
+    custom_fields: trimCustomFields(service.custom_fields),
     approval_required: Boolean(service.approval_required),
     archived_at: typeof service.archived_at === "string" && service.archived_at.trim() ? service.archived_at : null,
   };
@@ -261,4 +323,18 @@ export function normalizeService(service: ServiceRecord): ServiceRecord {
     }
   }
   return withComputed(trimmed);
+}
+
+function trimCustomFields(value: Record<string, unknown> | null | undefined): Record<string, unknown> {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const next: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(source)) {
+    if (typeof item === "string") {
+      const trimmed = item.trim();
+      if (trimmed) next[key] = trimmed;
+      continue;
+    }
+    if (item != null) next[key] = item;
+  }
+  return next;
 }

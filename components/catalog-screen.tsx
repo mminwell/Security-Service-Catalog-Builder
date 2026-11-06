@@ -11,7 +11,8 @@ import { filterServices } from "@/lib/catalog/filter";
 import { SHOP_FREE_BLUEPRINTS_LABEL } from "@/lib/catalog/shop-label";
 import { EMPTY_FILTERS, type CatalogFilters } from "@/lib/catalog/types";
 import { BlueprintCartArt } from "@/components/blueprint-art";
-import { ExportDialog, FilterChipRow, FilterControl } from "@/components/catalog-tools";
+import { ExportDialog } from "@/components/export-dialog";
+import { FilterChipRow, FilterControl } from "@/components/catalog-tools";
 import { ColumnPicker, useCatalogColumns } from "@/components/column-picker";
 import { useCatalog } from "@/components/catalog-provider";
 import { CartIcon } from "@/components/icons";
@@ -185,7 +186,17 @@ export function CatalogScreen() {
           lookups={api.lookups}
           companyName={tenant.name}
           slug={tenant.slug}
+          logoUrl={tenant.logo_url}
+          profiles={api.exportProfiles}
+          canAdmin={api.canAdmin}
+          elements={api.elements}
+          frameworks={api.frameworks}
+          mappings={api.mappings}
+          tenantId={tenant.id}
           onClose={() => setExportOpen(false)}
+          onSaveProfile={(input) => api.saveExportProfile(input)}
+          onDeleteProfile={(profileId) => api.deleteExportProfile(profileId)}
+          onRecordExport={(meta) => api.recordExport(meta)}
         />
       ) : null}
 

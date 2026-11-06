@@ -114,6 +114,26 @@ export const LOOKUP_GROUPS: LookupGroup[] = [
     title: "Target Audiences",
     blurb: "Multi-select audiences. Practical starter set for the V1 audience field.",
   },
+  {
+    field_key: "data_residency_region",
+    title: "Data residency regions",
+    blurb: "Operational regions a workspace can record. Choosing one does not decide which residency law applies.",
+  },
+  {
+    field_key: "hosting_model",
+    title: "Hosting model",
+    blurb: "Where the workspace says the service is hosted. Not a sovereignty or contract finding.",
+  },
+  {
+    field_key: "personal_data_recorded",
+    title: "Personal data recorded",
+    blurb: "Whether the workspace has recorded that the service handles personal data. Not a legal classification.",
+  },
+  {
+    field_key: "recorded_jurisdiction",
+    title: "Recorded jurisdictions",
+    blurb: "Jurisdictions the workspace has noted. Not a finding that a privacy law applies.",
+  },
 ];
 
 export const STARTER_LOOKUPS: LookupSeed[] = [
@@ -490,6 +510,38 @@ export const STARTER_LOOKUPS: LookupSeed[] = [
     { code: "business_owners", label: "Business Owners", description: "Owners of business processes and services." },
     { code: "external_parties", label: "External Parties", description: "Suppliers, partners, or other outside parties." },
     { code: "customers", label: "Customers", description: "The organization’s customers." },
+  ]),
+  ...rows("data_residency_region", [
+    { code: "not_recorded", label: "Not recorded", description: "The workspace has not recorded a region." },
+    { code: "customer_environment", label: "Customer environment", description: "The service runs in the customer’s own environment." },
+    { code: "on_premises", label: "On premises", description: "The workspace records this service as on premises." },
+    { code: "us", label: "United States", description: "A United States region the workspace recorded. Not a legal conclusion." },
+    { code: "ca", label: "Canada", description: "A Canada region the workspace recorded. Not a legal conclusion." },
+    { code: "uk", label: "United Kingdom", description: "A United Kingdom region the workspace recorded. Not a legal conclusion." },
+    { code: "eea", label: "European Economic Area", description: "An EEA region the workspace recorded. Not a legal conclusion." },
+    { code: "apac", label: "Asia Pacific", description: "An Asia Pacific region the workspace recorded. Not a legal conclusion." },
+    { code: "latam", label: "Latin America", description: "A Latin America region the workspace recorded. Not a legal conclusion." },
+    { code: "other", label: "Other recorded region", description: "Another region named in the service notes." },
+  ]),
+  ...rows("hosting_model", [
+    { code: "not_recorded", label: "Not recorded", description: "The workspace has not recorded a hosting model." },
+    { code: "customer_environment", label: "Customer environment", description: "Hosted in the customer’s environment." },
+    { code: "on_premises", label: "On premises", description: "Hosted on premises." },
+    { code: "single_region", label: "Single region", description: "The workspace records a single hosting region." },
+    { code: "multi_region", label: "Multiple regions", description: "The workspace records more than one hosting region." },
+  ]),
+  ...rows("personal_data_recorded", [
+    { code: "not_recorded", label: "Not recorded", description: "The workspace has not recorded whether personal data is handled." },
+    { code: "no", label: "No", description: "The workspace recorded that this service does not handle personal data." },
+    { code: "yes", label: "Yes", description: "The workspace recorded that this service handles personal data. This is not a legal classification." },
+  ]),
+  ...rows("recorded_jurisdiction", [
+    { code: "not_recorded", label: "Not recorded", description: "The workspace has not recorded a jurisdiction." },
+    { code: "us", label: "United States", description: "Noted by the workspace. Not a finding that a US privacy law applies." },
+    { code: "ca", label: "Canada", description: "Noted by the workspace. Not a finding that a Canadian privacy law applies." },
+    { code: "uk", label: "United Kingdom", description: "Noted by the workspace. Not a finding that a UK privacy law applies." },
+    { code: "eea", label: "European Economic Area", description: "Noted by the workspace. Not a finding that an EEA privacy law applies." },
+    { code: "other", label: "Other", description: "Another jurisdiction named in the service notes." },
   ]),
 ];
 

@@ -12,6 +12,8 @@ import {
   type OutcomeStatus,
 } from "@/lib/catalog/coverage";
 import { ancestorOfType, CSF_FRAMEWORK } from "@/lib/catalog/framework";
+import { elementsInScope, frameworkHasContent, NOT_LOADED_LABEL } from "@/lib/catalog/framework-catalog";
+import { FrameworkImportPanel } from "@/components/framework-import-panel";
 import { optionByCode } from "@/lib/catalog/lookups";
 import { useCatalog } from "@/components/catalog-provider";
 import { CsfFunctionIcon } from "@/components/icons";
@@ -27,7 +29,13 @@ const STATUS_TONE = {
 
 export function CoverageScreen() {
   const api = useCatalog();
-  const elements = api.elements;
+  const [frameworkId, setFrameworkId] = useState(api.framework?.id ?? "");
+  const selected = api.frameworks.find((item) => item.id === frameworkId) ?? api.framework ?? api.frameworks[0] ?? null;
+  const elements = useMemo(
+    () => (selected ? elementsInScope(api.elements, selected, api.activeTenant?.id ?? "") : []),
+    [selected, api.elements, api.activeTenant?.id],
+  );
+  const loaded = selected ? frameworkHasContent(api.elements, selected, api.activeTenant?.id ?? "") : false;
   const services = api.services;
   const [filter, setFilter] = useState<CoverageFilter>({
     query: "",
@@ -67,7 +75,7 @@ export function CoverageScreen() {
   });
   const grouped = groupVisible(visible, elements);
 
-  if (!api.framework || elements.length === 0) {
+  if (!api.framework) {
     return (
       <section className="empty">
         <h1>Coverage</h1>
@@ -79,7 +87,7 @@ export function CoverageScreen() {
     );
   }
 
-  const frameworkName = api.framework.version === "2.0" ? api.framework.name : CSF_FRAMEWORK.name;
+  const frameworkName = selected?.code === "NIST-CSF" ? CSF_FRAMEWORK.name : (selected?.name ?? CSF_FRAMEWORK.name);
   const noServices = services.length === 0;
   const noAssessments = report.counts.full + report.counts.partial + report.counts.none === 0;
 
@@ -87,24 +95,61 @@ export function CoverageScreen() {
     <>
       <div className="page-head">
         <div>
-          <p className="micro">NIST CSF 2.0</p>
+          <p className="micro">{selected?.code === "NIST-CSF" ? "NIST CSF 2.0" : selected?.code}</p>
           <h1>Coverage</h1>
           <p className="lede">
-            {frameworkName}. {report.denominator} subcategory outcomes. {activeServices.length} active{" "}
-            {activeServices.length === 1 ? "service" : "services"}
-            {services.length - activeServices.length > 0
-              ? `, ${services.length - activeServices.length} archived excluded`
-              : ""}
-            .
+            {frameworkName}.{" "}
+            {loaded
+              ? `${report.denominator} subcategory outcomes. ${activeServices.length} active ${activeServices.length === 1 ? "service" : "services"}${
+                  services.length - activeServices.length > 0
+                    ? `, ${services.length - activeServices.length} archived excluded`
+                    : ""
+                }.`
+              : NOT_LOADED_LABEL}
           </p>
         </div>
+        <label>
+          <span className="micro">Framework</span>
+          <select
+            className="select"
+            aria-label="Framework"
+            value={selected?.id ?? ""}
+            onChange={(event) => {
+              setFrameworkId(event.target.value);
+              setFilter({ query: "", functionCode: null, categoryCode: null, status: null });
+            }}
+          >
+            {api.frameworks.map((framework) => (
+              <option key={framework.id} value={framework.id}>
+                {framework.name} {framework.version}
+                {frameworkHasContent(api.elements, framework, api.activeTenant?.id ?? "") ? "" : " — not loaded"}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
+      {!loaded && selected ? (
+        <section className="panel pad">
+          <h2>{NOT_LOADED_LABEL}</h2>
+          <p className="lede">{selected.license_note}</p>
+          <p className="hint">{selected.provenance}</p>
+          <p className="hint">
+            This framework does not change the NIST CSF 2.0 denominator. No control text is invented, and nothing is
+            marked covered from another framework.
+          </p>
+          {api.canAdmin ? <FrameworkImportPanel framework={selected} /> : null}
+        </section>
+      ) : null}
+
+      {loaded ? (
+      <>
       <div className="callout">
         <p>{AGGREGATION_SUMMARY}</p>
         <p className="hint">
-          Denominator: all {report.denominator} subcategory outcomes in the seeded CSF 2.0 core. The four counts add up
-          to that denominator. Dropdown labels can be edited; the assessment codes stay full, partial, and none.
+          Denominator: all {report.denominator} subcategory outcomes in {frameworkName}. The four counts add up to that
+          denominator. Other frameworks are not included. Dropdown labels can be edited; the assessment codes stay full,
+          partial, and none.
         </p>
       </div>
 
@@ -160,7 +205,7 @@ export function CoverageScreen() {
                   {counts.full} full · {counts.partial} partial · {counts.none} none · {counts.unmapped} unmapped
                 </span>
               </span>
-              <CsfFunctionIcon code={fn.code} />
+              {selected?.code === "NIST-CSF" ? <CsfFunctionIcon code={fn.code} /> : null}
             </button>
           );
         })}
@@ -268,6 +313,8 @@ export function CoverageScreen() {
           ))}
         </div>
       )}
+      </>
+      ) : null}
     </>
   );
 }

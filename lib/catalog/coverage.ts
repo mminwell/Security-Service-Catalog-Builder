@@ -64,6 +64,8 @@ export function aggregateCoverage(input: {
   mappings: readonly CoverageMappingRef[];
   services: readonly CoverageServiceRef[];
   tenantId: string;
+  /** When set, other frameworks in `elements` do not change this denominator. */
+  frameworkId?: string;
 }): { outcomes: OutcomeAssessment[]; counts: CoverageCounts; denominator: number } {
   const services = new Map(input.services.filter((service) => service.tenant_id === input.tenantId).map((service) => [service.id, service]));
   const byElement = new Map<string, CoverageMappingRef[]>();
@@ -78,6 +80,7 @@ export function aggregateCoverage(input: {
   const counts = emptyCounts();
   const subcategories = input.elements
     .filter((element) => element.element_type === "subcategory")
+    .filter((element) => !input.frameworkId || element.framework_id === input.frameworkId)
     .slice()
     .sort((a, b) => a.sort_order - b.sort_order);
 
