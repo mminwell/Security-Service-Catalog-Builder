@@ -4,9 +4,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { roleLabel } from "@/lib/catalog/access";
+import { MAX_LOGO_FILE_BYTES } from "@/lib/catalog/logos";
 import type { Role, ServiceCodeMode } from "@/lib/catalog/types";
 import { useCatalog } from "@/components/catalog-provider";
 import { Loading, useDismiss } from "@/components/widgets";
+import { WorkspaceMark } from "@/components/workspace-mark";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const api = useCatalog();
@@ -105,14 +107,22 @@ function WorkspaceSwitcher() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("editor");
+  const [logoUrl, setLogoUrl] = useState("");
+  const [logoError, setLogoError] = useState<string | null>(null);
   const ref = useDismiss(open, () => setOpen(false));
   const tenant = api.activeTenant;
   if (!tenant) return null;
 
   return (
     <div className="switcher" ref={ref}>
-      <button type="button" className="btn btn-secondary" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-        {tenant.name}
+      <button
+        type="button"
+        className="btn btn-secondary switcher-trigger"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <WorkspaceMark name={tenant.name} logoUrl={tenant.logo_url} size={18} />
+        <span className="switcher-name">{tenant.name}</span>
       </button>
       {open ? (
         <div className="switcher-panel">
@@ -128,10 +138,92 @@ function WorkspaceSwitcher() {
                   setOpen(false);
                 }}
               >
-                <strong>{item.name}</strong>
-                <div className="micro">{item.slug}</div>
+                <WorkspaceMark name={item.name} logoUrl={item.logo_url} size={22} />
+                <span>
+                  <strong>{item.name}</strong>
+                  <div className="micro">{item.slug}</div>
+                </span>
               </button>
             ))}
+          </div>
+          <div className="logo-setting">
+            <p className="micro">Company logo</p>
+            <div className="row-actions">
+              <WorkspaceMark name={tenant.name} logoUrl={tenant.logo_url} size={36} />
+              {api.canAdmin ? (
+                <>
+                  <label className="btn btn-secondary">
+                    Upload image
+                    <input
+                      className="file-input"
+                      type="file"
+                      accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+                      aria-label="Upload company logo"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        event.target.value = "";
+                        if (!file) return;
+                        if (file.size > MAX_LOGO_FILE_BYTES) {
+                          setLogoError("Use an image under 80 KB.");
+                          return;
+                        }
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          const result = typeof reader.result === "string" ? reader.result : "";
+                          void api.setTenantLogo(result).then(
+                            () => setLogoError(null),
+                            (err: unknown) => setLogoError(err instanceof Error ? err.message : "Could not update the logo."),
+                          );
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                    />
+                  </label>
+                  {tenant.logo_url ? (
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => {
+                        void api.setTenantLogo(null).then(
+                          () => setLogoError(null),
+                          (err: unknown) => setLogoError(err instanceof Error ? err.message : "Could not update the logo."),
+                        );
+                      }}
+                    >
+                      Remove
+                    </button>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+            {api.canAdmin ? (
+              <form
+                className="stack"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void api.setTenantLogo(logoUrl).then(
+                    () => {
+                      setLogoUrl("");
+                      setLogoError(null);
+                    },
+                    (err: unknown) => setLogoError(err instanceof Error ? err.message : "Could not update the logo."),
+                  );
+                }}
+              >
+                <input
+                  className="input"
+                  value={logoUrl}
+                  placeholder="https://example.com/logo.png"
+                  aria-label="Logo image URL"
+                  onChange={(event) => setLogoUrl(event.target.value)}
+                />
+                <button type="submit" className="btn btn-secondary" disabled={logoUrl.trim().length === 0}>
+                  Use URL
+                </button>
+              </form>
+            ) : null}
+            {logoError ? <p className="field-error">{logoError}</p> : null}
+            {api.canAdmin ? <p className="hint">PNG, JPEG, GIF, WebP, or SVG under 80 KB, or an image URL.</p> : null}
           </div>
           <p className="micro">Service IDs</p>
           <div className="segmented" role="radiogroup" aria-label="Service ID style" style={{ margin: "8px 0 12px" }}>

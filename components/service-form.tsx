@@ -17,7 +17,7 @@ import {
 } from "@/lib/catalog/service";
 import { DEPTH_META, type DepthLevel, type FieldDefinition, type ServiceRecord } from "@/lib/catalog/types";
 import { useCatalog } from "@/components/catalog-provider";
-import { AuditDrawer, Badge, DepthToggle, FieldHelp, InfoTip, LookupSelect, VisibilityBadge } from "@/components/widgets";
+import { AuditDrawer, Badge, ConfirmDialog, DepthToggle, FieldHelp, InfoTip, LookupSelect } from "@/components/widgets";
 
 export function ServiceForm({ serviceId }: { serviceId: string }) {
   const api = useCatalog();
@@ -34,6 +34,8 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
   const [saved, setSaved] = useState(false);
   const [history, setHistory] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [prompt, setPrompt] = useState<null | "discard" | "archive" | "restore" | "delete">(null);
 
   const suggestion = useMemo(() => {
     if (!draft || !api.activeTenant) return "";
@@ -64,10 +66,89 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
   });
   const percent = completenessPercent(shown, api.fields);
   const readOnly = !api.canWrite;
+  const isNew = serviceId === "new";
   const historyEntries = api.audit.filter((entry) => entry.row_id === draft.id);
+
+  function requestCancel() {
+    if (dirty) {
+      setPrompt("discard");
+      return;
+    }
+    router.push("/catalog");
+  }
+
+  async function commitArchive(archived: boolean) {
+    if (!existing) return;
+    setSaving(true);
+    try {
+      const savedRecord = await api.archiveService(existing.id, archived);
+      setDraft(savedRecord);
+      setDirty(false);
+      setSaved(false);
+      setPrompt(null);
+    } catch {
+      setPrompt(null);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function commitDelete() {
+    if (!existing) return;
+    setSaving(true);
+    try {
+      await api.deleteService(existing.id);
+      router.push("/catalog");
+    } catch {
+      setPrompt(null);
+      setSaving(false);
+    }
+  }
+
+  function actionBar(placement: "top" | "bottom") {
+    return (
+      <div className="row-actions" style={placement === "bottom" ? { marginTop: 24 } : undefined}>
+        {placement === "top" ? <Badge tone={completenessTone(percent)}>{percent}% complete</Badge> : null}
+        {isNew ? null : (
+          <button type="button" className="btn btn-secondary" onClick={() => setHistory(true)}>
+            Change history
+          </button>
+        )}
+        <button type="button" className="btn btn-secondary" onClick={requestCancel}>
+          Cancel
+        </button>
+        {!isNew && api.canWrite ? (
+          shown.archived_at ? (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => (dirty ? setPrompt("restore") : void commitArchive(false))}
+            >
+              Restore
+            </button>
+          ) : (
+            <button type="button" className="btn btn-secondary" onClick={() => setPrompt("archive")}>
+              Archive
+            </button>
+          )
+        ) : null}
+        {!isNew && api.canAdmin ? (
+          <button type="button" className="btn btn-danger" onClick={() => setPrompt("delete")}>
+            Delete
+          </button>
+        ) : null}
+        {readOnly ? null : (
+          <button type="button" className="btn btn-primary" onClick={() => void save()} disabled={saving}>
+            {saving ? "Saving…" : "Save service"}
+          </button>
+        )}
+      </div>
+    );
+  }
 
   function update(field: FieldDefinition, value: unknown) {
     setSaved(false);
+    setDirty(true);
     setDraft((current) => (current ? writeField(current, field.field_key, value) : current));
     if (field.field_key === "service_code") setCodeTouched(true);
   }
@@ -82,6 +163,8 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
     try {
       await api.saveService(normalized);
       setSaved(true);
+      setDirty(false);
+      setDraft(normalized);
       if (serviceId === "new") router.replace(`/services/${normalized.id}`);
     } catch {
       setSaved(false);
@@ -107,28 +190,33 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
           <p className="micro">
             <Link href="/catalog">Catalog</Link>
             {" · "}
-            {serviceId === "new" ? "New service" : shown.service_code}
+            {isNew ? "New service" : shown.service_code}
           </p>
-          <h1>{shown.name.trim() || "New service"}</h1>
+          <h1>{shown.name.trim() || (isNew ? "New service" : "Service")}</h1>
           <p className="lede">
             Switching depth only hides fields. Values you already entered stay saved, including fields that are not on
             screen. Level 2 and Level 3 fields are never required.
           </p>
         </div>
-        <div className="row-actions">
-          <Badge tone={completenessTone(percent)}>{percent}% complete</Badge>
-          <button type="button" className="btn btn-secondary" onClick={() => setHistory(true)}>
-            Change history
-          </button>
-          {readOnly ? null : (
-            <button type="button" className="btn btn-primary" onClick={() => void save()} disabled={saving}>
-              {saving ? "Saving…" : "Save service"}
-            </button>
-          )}
-        </div>
+        {actionBar("top")}
       </div>
 
       {readOnly ? <div className="callout">You have view access in this workspace. The form is read only.</div> : null}
+      {shown.archived_at ? (
+        <div className="callout" role="status">
+          <strong>Archived.</strong> This service is hidden from the active catalog.
+          {api.canWrite ? (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ marginLeft: 12 }}
+              onClick={() => (dirty ? setPrompt("restore") : void commitArchive(false))}
+            >
+              Restore
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       {saved ? <div className="saved-banner">Saved. Deeper fields you cannot see right now were kept.</div> : null}
 
       <DepthToggle value={depth} onChange={setDepth} />
@@ -149,6 +237,7 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
                 onChange={(value) => update(field, value)}
                 showSuggestion={!codeTouched}
                 onUseSuggestion={() => {
+                  setDirty(true);
                   setCodeTouched(false);
                   setDraft((current) => (current ? { ...current, service_code: suggestion } : current));
                 }}
@@ -158,20 +247,56 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
         </section>
       ))}
 
-      {readOnly ? null : (
-        <div className="row-actions" style={{ marginTop: 24 }}>
-          <button type="button" className="btn btn-primary" onClick={() => void save()} disabled={saving}>
-            {saving ? "Saving…" : "Save service"}
-          </button>
-        </div>
-      )}
+      {actionBar("bottom")}
 
-      {history ? (
+      {history && !isNew ? (
         <AuditDrawer
           title={shown.service_code || "Service history"}
           entries={historyEntries}
           fields={api.fields}
           onClose={() => setHistory(false)}
+        />
+      ) : null}
+
+      {prompt === "discard" ? (
+        <ConfirmDialog
+          title="Discard unsaved changes?"
+          message="You will return to the catalog."
+          confirmLabel="Discard"
+          onConfirm={() => router.push("/catalog")}
+          onCancel={() => setPrompt(null)}
+        />
+      ) : null}
+      {prompt === "archive" ? (
+        <ConfirmDialog
+          title="Archive service?"
+          message={
+            dirty
+              ? `Archive ${shown.service_code} — ${shown.name}? Unsaved edits will be discarded. It leaves the active catalog until you restore it.`
+              : `Archive ${shown.service_code} — ${shown.name}? It leaves the active catalog until you restore it.`
+          }
+          confirmLabel="Archive"
+          onConfirm={() => void commitArchive(true)}
+          onCancel={() => setPrompt(null)}
+        />
+      ) : null}
+      {prompt === "restore" ? (
+        <ConfirmDialog
+          title="Restore service?"
+          message="Unsaved edits will be discarded, and the service returns to the active catalog."
+          confirmLabel="Restore"
+          onConfirm={() => void commitArchive(false)}
+          onCancel={() => setPrompt(null)}
+        />
+      ) : null}
+      {prompt === "delete" ? (
+        <ConfirmDialog
+          title="Delete service?"
+          message={`Permanently delete ${shown.service_code} — ${shown.name}? This cannot be undone.`}
+          confirmLabel="Delete"
+          tone="danger"
+          onConfirm={() => void commitDelete()}
+          onCancel={() => setPrompt(null)}
         />
       ) : null}
     </>
@@ -208,7 +333,6 @@ function FieldControl({
       <div className="field-label">
         <label htmlFor={inputId}>{field.label}</label>
         {field.is_required ? <span className="req">Required</span> : null}
-        <VisibilityBadge visibility={field.visibility} />
         <InfoTip label={field.label}>
           <FieldHelp field={field} lookups={api.lookups} selectedCode={selectedCode} />
         </InfoTip>

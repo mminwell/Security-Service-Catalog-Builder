@@ -130,6 +130,7 @@ export function blankService(tenantId: string, id: string, serviceCode = ""): Se
     review_cadence: null,
     last_reviewed_date: null,
     next_review_date: null,
+    archived_at: null,
     custom_fields: {},
     created_by: null,
     updated_by: null,
@@ -250,6 +251,7 @@ export function normalizeService(service: ServiceRecord): ServiceRecord {
     target_audience: service.target_audience ?? [],
     custom_fields: service.custom_fields ?? {},
     approval_required: Boolean(service.approval_required),
+    archived_at: typeof service.archived_at === "string" && service.archived_at.trim() ? service.archived_at : null,
   };
   for (const key of TEXT_KEYS) {
     const value = trimmed[key];

@@ -21,6 +21,7 @@ export type Tenant = {
   slug: string;
   name: string;
   service_code_mode: ServiceCodeMode;
+  logo_url: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -110,6 +111,7 @@ export type ServiceRecord = {
   review_cadence: string | null;
   last_reviewed_date: string | null;
   next_review_date: string | null;
+  archived_at: string | null;
   custom_fields: Record<string, unknown>;
   created_by: string | null;
   updated_by: string | null;
@@ -135,22 +137,27 @@ export type SessionUser = {
   email: string;
 };
 
+export type FilterOp = "eq" | "contains" | "includes" | "before" | "after" | "on" | "gte" | "lte";
+
+export type FilterRule = {
+  id: string;
+  fieldKey: string;
+  op: FilterOp;
+  value: string;
+};
+
+export type CatalogScope = "active" | "archived";
+
 export type CatalogFilters = {
   query: string;
-  category: string;
-  status: string;
-  service_tier: string;
-  owner_team: string;
-  capability_rating: string;
+  scope: CatalogScope;
+  rules: FilterRule[];
 };
 
 export const EMPTY_FILTERS: CatalogFilters = {
   query: "",
-  category: "",
-  status: "",
-  service_tier: "",
-  owner_team: "",
-  capability_rating: "",
+  scope: "active",
+  rules: [],
 };
 
 export const DEMO_USER_ID = "00000000-0000-4000-8000-000000000001";

@@ -1,6 +1,6 @@
 # Security Service Catalog Builder
 
-**Status: V1.** A multi-tenant catalog for the security services an organization delivers. Enter each service once, keep internal notes out of public views, and export the audience you choose.
+**Status: V1.1.** A multi-tenant catalog for the security services an organization delivers. Enter each service once, keep internal notes out of public views, and export the audience you choose.
 
 V1 includes the service form, the catalog list, dropdown and field administration, CSV export, workspace isolation, and an audit trail. Framework mapping, audience HTML/Word exports, linked artifacts, and assisted drafting come later.
 
@@ -11,9 +11,10 @@ V1 includes the service form, the catalog list, dropdown and field administratio
 - See a live service ID suggestion (`SVC-001`, or `SEC-SOC-001` when the workspace uses category prefixes). The code stays editable.
 - Read definitions where you pick them: Service Tiers 0–3, CMMI 0–5, capability rating, data classification, NIST CSF 2.0 functions, and every other dropdown that has help text.
 - Watch **Maturity Gap** (target CMMI minus current) and **Next Review** update as you type.
-- Search and filter the catalog, toggle **Full internal view** and **Public preview**, and export either the public columns or the full internal set. Both exports respect the current filters.
+- Search the catalog and stack filters on any active field, including a view of archived services. Export **Public CSV** or **Full CSV** from one Export dialog. Full exports ask you to confirm before downloading internal-use-only data, and both files can carry a corporate distribution marking on row 1.
 - Edit dropdown labels, hover descriptions, sort order, and retire options without deleting them.
-- Set each field’s public or internal visibility and its Core / Operations / Governance depth per workspace.
+- Set each field’s public or internal visibility and its Core / Operations / Governance depth per workspace. Retire a field without deleting stored values. Service code and name stay active.
+- Archive a service, restore it, or permanently delete it when you are a workspace admin. Add a company logo in the workspace switcher.
 - Open a change history for one service or for the whole workspace.
 
 ## Architecture
@@ -68,8 +69,9 @@ Copy `.env.example` to `.env.local` only on your machine. `.env.local` is gitign
 - `lib/catalog/` — fields, starter lookups, computed values, service IDs, CSV, sample catalogs
 - `lib/data/` — Demo Mode store and the Supabase adapter
 - `supabase/migrations/0001_v1_catalog_core.sql` — tables, RLS, audit triggers, provision function, starter data
+- `supabase/migrations/0002_v1_1_polish.sql` — workspace `logo_url` and service `archived_at`
 - `supabase/seed.sql` — the same starter lookups, plus Acme Corp and Meridian Health
-- `tests/` — computed fields, service IDs, CSV visibility, lookup retirement, depth behavior
+- `tests/` — computed fields, service IDs, CSV visibility and distribution markings, filters, archive, field retirement, depth behavior
 
 `npm run seed:sql` regenerates the starter rows in the SQL files from `lib/catalog/`. The TypeScript seed is what Demo Mode uses.
 

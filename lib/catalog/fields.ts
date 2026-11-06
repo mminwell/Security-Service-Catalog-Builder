@@ -487,3 +487,10 @@ export function materializeFields(tenantId: string | null, idFor: (fieldKey: str
 export const REQUIRED_FIELD_KEYS = STARTER_FIELDS.filter((field) => field.is_required).map(
   (field) => field.field_key,
 );
+
+const IDENTITY_FIELD_KEYS = new Set(["service_code", "name"]);
+
+/** Service code and name stay active so a catalog entry cannot become nameless or codeless. */
+export function isIdentityField(fieldKey: string): boolean {
+  return IDENTITY_FIELD_KEYS.has(fieldKey);
+}

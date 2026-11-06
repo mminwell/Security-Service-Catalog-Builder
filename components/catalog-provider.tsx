@@ -12,6 +12,8 @@ import {
 } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { canAdminister, canProvision, canWriteServices } from "@/lib/catalog/access";
+import { isIdentityField } from "@/lib/catalog/fields";
+import { normalizeLogoInput } from "@/lib/catalog/logos";
 import type {
   FieldDefinition,
   LookupOption,
@@ -26,23 +28,29 @@ import {
   addMember as addMemberRow,
   createTenant as createTenantRow,
   loadSampleServices as loadSampleRows,
+  deleteService as deleteServiceRecord,
   resetDemo,
   roleFor,
   saveField as saveFieldRow,
   saveLookup as saveLookupRow,
   saveService as saveServiceRow,
+  setServiceArchived,
   setServiceCodeMode as setModeRow,
+  setTenantLogo as setTenantLogoRow,
   signInDemo,
   signOutDemo,
   switchTenant as switchTenantRow,
   type CatalogDb,
 } from "@/lib/data/model";
 import {
+  deleteServiceRow,
   hydrateFromSupabase,
   insertLookup,
   persistField,
   persistLookup,
   persistService,
+  persistServiceArchived,
+  persistTenantLogo,
   persistTenantMode,
 } from "@/lib/data/remote";
 import { loadDemoDb, persistDemoDb, writeActiveTenantId } from "@/lib/data/storage";
@@ -87,6 +95,9 @@ type CatalogApi = {
   }) => Promise<void>;
   saveField: (field: FieldDefinition) => Promise<void>;
   addMember: (email: string, role: Role) => Promise<void>;
+  setTenantLogo: (logoUrl: string | null) => Promise<void>;
+  archiveService: (serviceId: string, archived: boolean) => Promise<ServiceRecord>;
+  deleteService: (serviceId: string) => Promise<void>;
   resetDemoData: () => void;
 };
 
@@ -108,6 +119,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       try {
         if (mode === "demo") {
           const next = loadDemoDb();
+          persistDemoDb(next);
           if (!cancelled) setDb(next);
           return;
         }
@@ -335,6 +347,9 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       saveField: (field: FieldDefinition) =>
         guard(async () => {
           if (!db) return;
+          if (isIdentityField(field.field_key) && field.is_active === false) {
+            throw new Error("Service code and name stay active so every service remains identifiable.");
+          }
           if (mode === "demo") {
             commit(saveFieldRow(db, field));
             return;
@@ -359,6 +374,53 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
             p_role: memberRole,
           });
           if (rpcError) throw new Error(rpcError.message);
+          await reload();
+        }),
+      setTenantLogo: (logoUrl: string | null) =>
+        guard(async () => {
+          if (!db || !tenantId) throw new Error("Choose a workspace.");
+          const normalized = normalizeLogoInput(logoUrl);
+          if (mode === "demo") {
+            commit(setTenantLogoRow(db, normalized));
+            return;
+          }
+          const supabase = supabaseRef.current;
+          if (!supabase) throw new Error("Supabase is not connected.");
+          await persistTenantLogo(supabase, tenantId, normalized);
+          await reload();
+        }),
+      archiveService: (serviceId: string, archived: boolean) =>
+        guard(async () => {
+          if (!db) throw new Error("The catalog is still loading.");
+          if (mode === "demo") {
+            const next = setServiceArchived(db, serviceId, archived);
+            commit(next);
+            const saved = next.services.find((service) => service.id === serviceId);
+            if (!saved) throw new Error("That service is not in this workspace.");
+            return saved;
+          }
+          const supabase = supabaseRef.current;
+          if (!supabase) throw new Error("Supabase is not connected.");
+          const now = new Date().toISOString();
+          await persistServiceArchived(supabase, serviceId, archived ? now : null);
+          await reload();
+          const current = db.services.find((service) => service.id === serviceId);
+          if (!current) throw new Error("That service is not in this workspace.");
+          return { ...current, archived_at: archived ? now : null, updated_at: now };
+        }),
+      deleteService: (serviceId: string) =>
+        guard(async () => {
+          if (!db) throw new Error("The catalog is still loading.");
+          if (!canAdminister(role)) {
+            throw new Error("Only a workspace admin can permanently delete a service.");
+          }
+          if (mode === "demo") {
+            commit(deleteServiceRecord(db, serviceId));
+            return;
+          }
+          const supabase = supabaseRef.current;
+          if (!supabase) throw new Error("Supabase is not connected.");
+          await deleteServiceRow(supabase, serviceId);
           await reload();
         }),
       resetDemoData: () => {

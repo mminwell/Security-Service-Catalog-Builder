@@ -13,7 +13,7 @@ Leave the service-role key where it is.
 
 ## 2. Apply the schema
 
-Open **SQL Editor → New query**. Paste the full contents of `supabase/migrations/0001_v1_catalog_core.sql` and run it.
+Open **SQL Editor → New query**. Paste the full contents of `supabase/migrations/0001_v1_catalog_core.sql` and run it. Then run `supabase/migrations/0002_v1_1_polish.sql` so workspaces can store a logo and services can be archived.
 
 That creates `tenants`, `tenant_members`, `field_definitions`, `lookup_options`, `services`, and `audit_log`, turns on row-level security, and loads the starter dropdowns and field definitions (rows with a null `tenant_id` are the template copied into each new workspace).
 

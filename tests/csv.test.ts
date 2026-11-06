@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { exportColumns, servicesToCsv } from "@/lib/catalog/csv";
+import { distributionMarking, exportColumns, servicesToCsv } from "@/lib/catalog/csv";
 import { materializeFields } from "@/lib/catalog/fields";
 import { STARTER_LOOKUPS } from "@/lib/catalog/lookups";
 import { filterServices } from "@/lib/catalog/filter";
@@ -51,14 +51,15 @@ const services = [
 
 describe("CSV export visibility", () => {
   it("keeps internal fields out of the public file and in the full file", () => {
-    const filtered = filterServices(services, {
-      query: "",
-      category: "",
-      status: "active",
-      service_tier: "",
-      owner_team: "",
-      capability_rating: "",
-    });
+    const filtered = filterServices(
+      services,
+      {
+        query: "",
+        scope: "active",
+        rules: [{ id: "status", fieldKey: "status", op: "eq", value: "active" }],
+      },
+      fields,
+    );
     const publicCsv = servicesToCsv(filtered, fields, lookups, "public").replace(/^\uFEFF/, "");
     const fullCsv = servicesToCsv(filtered, fields, lookups, "all").replace(/^\uFEFF/, "");
 
@@ -99,6 +100,34 @@ describe("CSV export visibility", () => {
     );
     expect(csv).toContain('"Detection, ""priority"""');
     expect(csv).toContain('"Line one\nLine two"');
+  });
+
+  it("writes the corporate distribution marking on row 1 when requested", () => {
+    const publicMark = distributionMarking("Meridian Health", "public");
+    const fullMark = distributionMarking(" meridian health ", "all");
+    expect(publicMark).toBe("MERIDIAN HEALTH \u2014 APPROVED FOR CLIENT/LIMITED DISTRIBUTION");
+    expect(fullMark).toBe("MERIDIAN HEALTH \u2014 DO NOT DISTRIBUTE EXTERNALLY");
+
+    const withMark = servicesToCsv(services, fields, lookups, "public", { marking: publicMark }).replace(/^\uFEFF/, "");
+    const lines = withMark.split("\r\n");
+    expect(lines[0]).toBe(publicMark);
+    expect(lines[1]).toContain("Service Code");
+    expect(withMark).not.toContain("DO NOT DISTRIBUTE EXTERNALLY");
+    expect(withMark).not.toContain(secret);
+
+    const without = servicesToCsv(services, fields, lookups, "public").replace(/^\uFEFF/, "");
+    expect(without.split("\r\n")[0]).toContain("Service Code");
+    expect(without).not.toContain("APPROVED FOR CLIENT");
+
+    const full = servicesToCsv(services, fields, lookups, "all", { marking: fullMark }).replace(/^\uFEFF/, "");
+    expect(full.split("\r\n")[0]).toBe(fullMark);
+    expect(full).toContain(secret);
+  });
+
+  it("quotes a marking that contains a comma", () => {
+    const marking = distributionMarking("Acme, Corp", "public");
+    const csv = servicesToCsv(services.slice(0, 1), fields, lookups, "public", { marking }).replace(/^\uFEFF/, "");
+    expect(csv.split("\r\n")[0]).toBe('"ACME, CORP \u2014 APPROVED FOR CLIENT/LIMITED DISTRIBUTION"');
   });
 
   it("public columns are only public fields", () => {

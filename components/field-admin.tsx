@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { isIdentityField } from "@/lib/catalog/fields";
 import { DEPTH_META, type DepthLevel, type FieldDefinition, type Visibility } from "@/lib/catalog/types";
 import { useCatalog } from "@/components/catalog-provider";
-import { VisibilityBadge } from "@/components/widgets";
+import { Badge, VisibilityBadge } from "@/components/widgets";
 
 export function FieldAdmin() {
   const api = useCatalog();
@@ -16,7 +17,9 @@ export function FieldAdmin() {
   }
   const groups = ([1, 2, 3] as const).map((level) => ({
     level,
-    fields: api.fields.filter((field) => field.depth_level === level).sort((a, b) => a.sort_order - b.sort_order),
+    fields: api.fields
+      .filter((field) => field.depth_level === level)
+      .sort((a, b) => Number(b.is_active) - Number(a.is_active) || a.sort_order - b.sort_order),
   }));
 
   return (
@@ -26,9 +29,9 @@ export function FieldAdmin() {
           <p className="micro">Admin</p>
           <h1>Fields</h1>
           <p className="lede">
-            Visibility and depth are per workspace. Marking a field internal removes it from public preview and the
-            public CSV. Changing depth hides it on shallower forms and does not clear values already stored on a
-            service.
+            Visibility and depth are per workspace. Marking a field internal keeps it out of the public CSV. Retire a
+            field to hide it from the service form, filters, completeness, and exports without deleting values already
+            stored on a service. Service code and name stay active.
           </p>
         </div>
       </div>
@@ -62,10 +65,12 @@ function FieldRow({ field }: { field: FieldDefinition }) {
     });
   }
 
+  const locked = isIdentityField(field.field_key);
   return (
-    <div className="field-admin">
+    <div className={field.is_active ? "field-admin" : "field-admin retired"}>
       <div>
         <p className="code">{field.field_key}</p>
+        {field.is_active ? null : <Badge tone="neutral">Retired</Badge>}
         <input className="input" aria-label={`${field.field_key} label`} value={label} onChange={(event) => setLabel(event.target.value)} onBlur={() => save()} />
         <textarea
           className="textarea"
@@ -118,6 +123,19 @@ function FieldRow({ field }: { field: FieldDefinition }) {
           onBlur={() => save()}
         />
       </label>
+      <div>
+        {locked ? (
+          <span className="micro">Core ID</span>
+        ) : (
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => save({ is_active: !field.is_active })}
+          >
+            {field.is_active ? "Retire" : "Reactivate"}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

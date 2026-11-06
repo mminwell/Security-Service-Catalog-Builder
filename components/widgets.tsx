@@ -14,6 +14,45 @@ export function VisibilityBadge({ visibility }: { visibility: Visibility }) {
   return <Badge tone={visibility === "internal" ? "accent" : "neutral"}>{visibilityLabel(visibility)}</Badge>;
 }
 
+export function ConfirmDialog({
+  title,
+  message,
+  confirmLabel,
+  tone = "primary",
+  onConfirm,
+  onCancel,
+}: {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  tone?: "primary" | "danger";
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="modal-backdrop confirm-layer" role="presentation" onMouseDown={onCancel}>
+      <div
+        className="modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <h2 id="confirm-title">{title}</h2>
+        <p className="lede">{message}</p>
+        <div className="row-actions" style={{ marginTop: 16 }}>
+          <button type="button" className="btn btn-secondary" onClick={onCancel}>
+            Cancel
+          </button>
+          <button type="button" className={tone === "danger" ? "btn btn-danger" : "btn btn-primary"} onClick={onConfirm}>
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Loading({ label = "Loading catalog…" }: { label?: string }) {
   return (
     <div className="loading" role="status">
