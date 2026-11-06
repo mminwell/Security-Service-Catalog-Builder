@@ -12,8 +12,9 @@ const out = "/opt/cursor/artifacts/v3-samples";
 mkdirSync(out, { recursive: true });
 
 const db = freshDemo();
-const tenant = db.tenants.find((item) => item.slug === "acme-corp");
-if (!tenant) throw new Error("Acme Corp is missing from the demo seed.");
+const found = db.tenants.find((item) => item.slug === "acme-corp");
+if (!found) throw new Error("Acme Corp is missing from the demo seed.");
+const tenant = found;
 const fields = db.fields.filter((field) => field.tenant_id === tenant.id);
 const lookups = db.lookups.filter((option) => option.tenant_id === tenant.id);
 const services = db.services
