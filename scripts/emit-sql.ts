@@ -192,6 +192,7 @@ const seed = `-- Optional sample data for Security Service Catalog Builder.
 -- Safe to run more than once. Apply the migrations first:
 -- supabase/migrations/0001_v1_catalog_core.sql
 -- supabase/migrations/0002_v1_1_polish.sql
+-- supabase/migrations/0003_v1_2_blueprints_columns_import.sql
 -- No real client names, credentials, or project URLs.
 
 ${fieldInsert("on conflict (field_key) where tenant_id is null do nothing")}

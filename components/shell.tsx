@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { roleLabel } from "@/lib/catalog/access";
+import { cartIdsFor, subscribeCart } from "@/lib/catalog/cart-store";
 import { MAX_LOGO_FILE_BYTES } from "@/lib/catalog/logos";
 import type { Role, ServiceCodeMode } from "@/lib/catalog/types";
 import { useCatalog } from "@/components/catalog-provider";
+import { CartIcon } from "@/components/icons";
 import { Loading, useDismiss } from "@/components/widgets";
 import { WorkspaceMark } from "@/components/workspace-mark";
 
@@ -14,6 +16,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const api = useCatalog();
   const pathname = usePathname();
   const router = useRouter();
+  const cartCount = useSyncExternalStore(
+    subscribeCart,
+    () => cartIdsFor(api.activeTenant?.id ?? null).length,
+    () => 0,
+  );
 
   useEffect(() => {
     if (api.ready && !api.session) router.replace("/login");
@@ -52,6 +59,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         <nav className="nav" aria-label="Primary">
           <Link href="/catalog" aria-current={pathname.startsWith("/catalog") ? "page" : undefined}>
             Catalog
+          </Link>
+          <Link href="/blueprints" aria-current={pathname.startsWith("/blueprints") ? "page" : undefined}>
+            <CartIcon />
+            Shop Blueprints
+            {cartCount > 0 ? <span className="cart-badge">{cartCount}</span> : null}
           </Link>
           {api.canAdmin ? (
             <>

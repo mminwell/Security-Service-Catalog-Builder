@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { parseColumnConfig } from "@/lib/catalog/columns";
 import { withComputed } from "@/lib/catalog/service";
 import type {
   AuditEntry,
@@ -197,6 +198,87 @@ export async function persistServiceArchived(
   if (error) throw new Error(error.message);
 }
 
+export async function persistCatalogColumns(
+  supabase: SupabaseClient,
+  tenantId: string,
+  keys: string[],
+): Promise<void> {
+  const { error } = await supabase.from("tenants").update({ catalog_columns: { keys } }).eq("id", tenantId);
+  if (error) throw new Error(error.message);
+}
+
+export async function importLookupRows(
+  supabase: SupabaseClient,
+  tenantId: string,
+  fieldKey: string,
+  rows: Array<{ code: string; label: string; description: string | null; code_prefix: string | null }>,
+): Promise<{ created: number; updated: number }> {
+  const { data, error } = await supabase.rpc("import_lookup_options", {
+    p_tenant: tenantId,
+    p_field_key: fieldKey,
+    p_rows: rows,
+  });
+  if (error) throw new Error(error.message);
+  const payload = (data ?? {}) as { created?: number; updated?: number };
+  return { created: Number(payload.created ?? 0), updated: Number(payload.updated ?? 0) };
+}
+
+export async function checkoutBlueprintRows(supabase: SupabaseClient, tenantId: string, rows: ServiceRecord[]): Promise<number> {
+  const payload = rows.map((service) => ({
+    id: service.id,
+    service_code: service.service_code,
+    name: service.name,
+    internal_name: service.internal_name,
+    category: service.category,
+    status: service.status,
+    service_tier: service.service_tier,
+    summary: service.summary,
+    description: service.description,
+    in_scope: service.in_scope,
+    out_of_scope: service.out_of_scope,
+    deliverables: service.deliverables,
+    prerequisites: service.prerequisites,
+    owner_team: service.owner_team,
+    delivery_team: service.delivery_team,
+    business_unit: service.business_unit,
+    service_owner: service.service_owner,
+    delivery_model: service.delivery_model,
+    target_audience: service.target_audience,
+    intake_method: service.intake_method,
+    intake_url: service.intake_url,
+    approval_required: service.approval_required,
+    approver: service.approver,
+    lead_time: service.lead_time,
+    support_contact: service.support_contact,
+    hours_of_coverage: service.hours_of_coverage,
+    sla_response_target: service.sla_response_target,
+    sla_resolution_target: service.sla_resolution_target,
+    primary_csf_function: service.primary_csf_function,
+    capability_rating: service.capability_rating,
+    threats_addressed: service.threats_addressed,
+    data_classification_handled: service.data_classification_handled,
+    kpis_and_metrics: service.kpis_and_metrics,
+    current_maturity_cmmi: service.current_maturity_cmmi,
+    target_maturity_cmmi: service.target_maturity_cmmi,
+    known_gaps_or_risks: service.known_gaps_or_risks,
+    third_party_providers: service.third_party_providers,
+    cost_model: service.cost_model,
+    cost_or_effort_notes: service.cost_or_effort_notes,
+    current_tooling_notes: service.current_tooling_notes,
+    internal_notes: service.internal_notes,
+    review_cadence: service.review_cadence,
+    last_reviewed_date: service.last_reviewed_date,
+    custom_fields: service.custom_fields ?? {},
+  }));
+  const { data, error } = await supabase.rpc("checkout_blueprint_services", {
+    p_tenant: tenantId,
+    p_rows: payload,
+  });
+  if (error) throw new Error(error.message);
+  const result = (data ?? {}) as { count?: number };
+  return Number(result.count ?? rows.length);
+}
+
 export async function deleteServiceRow(supabase: SupabaseClient, serviceId: string): Promise<void> {
   const { error } = await supabase.from("services").delete().eq("id", serviceId);
   if (error) throw new Error(error.message);
@@ -209,6 +291,7 @@ function asTenant(row: Record<string, unknown>): Tenant {
     name: String(row.name),
     service_code_mode: row.service_code_mode === "category_prefix" ? "category_prefix" : "sequential",
     logo_url: typeof row.logo_url === "string" && row.logo_url.trim() ? row.logo_url : null,
+    catalog_columns: parseColumnConfig(row.catalog_columns),
     is_active: Boolean(row.is_active),
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),

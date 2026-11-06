@@ -185,6 +185,11 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
 
   return (
     <>
+      {isNew ? (
+        <p className="scratch-banner">
+          Don&apos;t start from scratch — <Link href="/blueprints">browse pre-built security service blueprints →</Link>
+        </p>
+      ) : null}
       <div className="page-head">
         <div>
           <p className="micro">

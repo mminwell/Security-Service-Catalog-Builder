@@ -12,8 +12,11 @@ import {
 } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { canAdminister, canProvision, canWriteServices } from "@/lib/catalog/access";
+import { planBlueprintCheckout } from "@/lib/catalog/checkout";
 import { isIdentityField } from "@/lib/catalog/fields";
+import { optionByCode } from "@/lib/catalog/lookups";
 import { normalizeLogoInput } from "@/lib/catalog/logos";
+import { localToday } from "@/lib/catalog/present";
 import type {
   FieldDefinition,
   LookupOption,
@@ -28,13 +31,16 @@ import {
   addMember as addMemberRow,
   createTenant as createTenantRow,
   loadSampleServices as loadSampleRows,
+  checkoutServices,
   deleteService as deleteServiceRecord,
+  importLookups as importLookupRowsModel,
   resetDemo,
   roleFor,
   saveField as saveFieldRow,
   saveLookup as saveLookupRow,
   saveService as saveServiceRow,
   setServiceArchived,
+  setCatalogColumns as setCatalogColumnsRow,
   setServiceCodeMode as setModeRow,
   setTenantLogo as setTenantLogoRow,
   signInDemo,
@@ -43,9 +49,12 @@ import {
   type CatalogDb,
 } from "@/lib/data/model";
 import {
+  checkoutBlueprintRows,
   deleteServiceRow,
   hydrateFromSupabase,
+  importLookupRows,
   insertLookup,
+  persistCatalogColumns,
   persistField,
   persistLookup,
   persistService,
@@ -98,6 +107,17 @@ type CatalogApi = {
   setTenantLogo: (logoUrl: string | null) => Promise<void>;
   archiveService: (serviceId: string, archived: boolean) => Promise<ServiceRecord>;
   deleteService: (serviceId: string) => Promise<void>;
+  importLookups: (
+    fieldKey: string,
+    rows: Array<{ code: string; label: string; description: string | null; code_prefix: string | null }>,
+  ) => Promise<{ created: number; updated: number }>;
+  checkoutBlueprints: (input: {
+    blueprintIds: string[];
+    status: string;
+    ownerTeam: string;
+    deliveryTeam: string | null;
+  }) => Promise<void>;
+  saveCatalogColumns: (keys: string[]) => Promise<void>;
   resetDemoData: () => void;
 };
 
@@ -421,6 +441,58 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           const supabase = supabaseRef.current;
           if (!supabase) throw new Error("Supabase is not connected.");
           await deleteServiceRow(supabase, serviceId);
+          await reload();
+        }),
+      importLookups: (fieldKey, rows) =>
+        guard(async () => {
+          if (!db || !tenantId) throw new Error("Choose a workspace.");
+          if (mode === "demo") {
+            const result = importLookupRowsModel(db, fieldKey, rows);
+            commit(result.db);
+            return { created: result.created, updated: result.updated };
+          }
+          const supabase = supabaseRef.current;
+          if (!supabase) throw new Error("Supabase is not connected.");
+          const result = await importLookupRows(supabase, tenantId, fieldKey, rows);
+          await reload();
+          return result;
+        }),
+      checkoutBlueprints: (input) =>
+        guard(async () => {
+          if (!db || !tenantId || !activeTenant) throw new Error("Choose a workspace.");
+          const tenantLookups = db.lookups.filter((option) => option.tenant_id === tenantId);
+          const planned = planBlueprintCheckout({
+            tenantId,
+            blueprintIds: input.blueprintIds,
+            mode: activeTenant.service_code_mode,
+            status: input.status || "draft",
+            ownerTeam: input.ownerTeam,
+            deliveryTeam: input.deliveryTeam,
+            existingCodes: db.services.filter((service) => service.tenant_id === tenantId).map((service) => service.service_code),
+            prefixForCategory: (category) => optionByCode(tenantLookups, "category", category)?.code_prefix ?? null,
+            reviewedOn: localToday(),
+            now: new Date().toISOString(),
+          });
+          if (planned.length === 0) throw new Error("Nothing in the cart matches a blueprint.");
+          if (mode === "demo") {
+            commit(checkoutServices(db, planned));
+            return;
+          }
+          const supabase = supabaseRef.current;
+          if (!supabase) throw new Error("Supabase is not connected.");
+          await checkoutBlueprintRows(supabase, tenantId, planned);
+          await reload();
+        }),
+      saveCatalogColumns: (keys) =>
+        guard(async () => {
+          if (!db || !tenantId) throw new Error("Choose a workspace.");
+          if (mode === "demo") {
+            commit(setCatalogColumnsRow(db, keys));
+            return;
+          }
+          const supabase = supabaseRef.current;
+          if (!supabase) throw new Error("Supabase is not connected.");
+          await persistCatalogColumns(supabase, tenantId, keys);
           await reload();
         }),
       resetDemoData: () => {

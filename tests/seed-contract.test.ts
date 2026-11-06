@@ -7,6 +7,7 @@ import { SAMPLE_TENANTS } from "@/lib/catalog/samples";
 const sql = [
   readFileSync("supabase/migrations/0001_v1_catalog_core.sql", "utf8"),
   readFileSync("supabase/migrations/0002_v1_1_polish.sql", "utf8"),
+  readFileSync("supabase/migrations/0003_v1_2_blueprints_columns_import.sql", "utf8"),
   readFileSync("supabase/seed.sql", "utf8"),
 ].join("\n");
 
@@ -76,6 +77,9 @@ describe("starter catalog contract", () => {
     expect(sql).toContain("Meridian Health");
     expect(sql).toContain("logo_url");
     expect(sql).toContain("archived_at");
+    expect(sql).toContain("catalog_columns");
+    expect(sql).toContain("import_lookup_options");
+    expect(sql).toContain("checkout_blueprint_services");
     expect(sql).toContain("data:image/svg+xml");
     expect(sql).not.toMatch(/mminwell|supabase\.co|service_role/i);
   });

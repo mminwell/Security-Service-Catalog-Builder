@@ -1,3 +1,4 @@
+import { parseColumnConfig } from "@/lib/catalog/columns";
 import { builtinLogoForSlug } from "@/lib/catalog/logos";
 import type { ServiceRecord, Tenant } from "@/lib/catalog/types";
 import { freshDemo, type CatalogDb } from "@/lib/data/model";
@@ -17,9 +18,11 @@ export function loadDemoDb(): CatalogDb {
 }
 
 /**
- * Accept a V1 demo cache that has no `logo_url` or `archived_at`.
+ * Accept a V1 or V1.1 demo cache.
+ * V1 has no `logo_url`, `archived_at`, or `catalog_columns`.
  * A missing logo on Acme Corp or Meridian Health receives the built-in mark.
- * An explicit null logo stays cleared. Returns null when the payload is not a catalog.
+ * An explicit null logo stays cleared. Edited services, lookups, and fields are kept.
+ * Returns null when the payload is not a catalog.
  */
 export function migrateDemoState(raw: unknown): CatalogDb | null {
   try {
@@ -75,6 +78,7 @@ function normalizeTenant(input: unknown): Tenant {
     name: typeof row.name === "string" ? row.name : "",
     service_code_mode: row.service_code_mode === "category_prefix" ? "category_prefix" : "sequential",
     logo_url,
+    catalog_columns: parseColumnConfig(row.catalog_columns),
     is_active: row.is_active !== false,
     created_at: typeof row.created_at === "string" ? row.created_at : "",
     updated_at: typeof row.updated_at === "string" ? row.updated_at : "",

@@ -26,6 +26,78 @@ export function activeFilterCount(filters: CatalogFilters): number {
   return filters.rules.length + (filters.scope === "archived" ? 1 : 0);
 }
 
+export type FilterComposer = {
+  popupOpen: boolean;
+  composing: boolean;
+  draftField: string;
+  draftOp: FilterOp;
+  draftValue: string;
+};
+
+export const CLOSED_COMPOSER: FilterComposer = {
+  popupOpen: false,
+  composing: false,
+  draftField: "",
+  draftOp: "eq",
+  draftValue: "",
+};
+
+/**
+ * The Filter pop-up adds the rule in progress and switches Active / Archived.
+ * Further rules are started from the catalog page, beside Clear all.
+ */
+export function filterPopupActionLabels(): readonly string[] {
+  return ["Add"];
+}
+
+/** Open the composer immediately, with an empty draft, and no extra in-popup step. */
+export function requestAdditionalFilter(composer: FilterComposer = CLOSED_COMPOSER): FilterComposer {
+  return {
+    ...composer,
+    popupOpen: true,
+    composing: true,
+    draftField: "",
+    draftOp: "eq",
+    draftValue: "",
+  };
+}
+
+export function openFilterPopup(composer: FilterComposer): FilterComposer {
+  return { ...composer, popupOpen: true, composing: true };
+}
+
+export function closeFilterPopup(composer: FilterComposer): FilterComposer {
+  return { ...composer, popupOpen: false };
+}
+
+/** Commit a draft rule and close the pop-up so the new chip renders on the page. */
+export function commitDraftRule(
+  filters: CatalogFilters,
+  composer: FilterComposer,
+  id: string,
+): { filters: CatalogFilters; composer: FilterComposer } | null {
+  const value = composer.draftValue.trim();
+  if (!composer.composing || !composer.draftField || value.length === 0) return null;
+  return {
+    filters: {
+      ...filters,
+      rules: [...filters.rules, { id, fieldKey: composer.draftField, op: composer.draftOp, value }],
+    },
+    composer: { ...CLOSED_COMPOSER },
+  };
+}
+
+export function removeFilterRule(filters: CatalogFilters, id: string): CatalogFilters {
+  return { ...filters, rules: filters.rules.filter((rule) => rule.id !== id) };
+}
+
+export function clearFilterRules(filters: CatalogFilters): { filters: CatalogFilters; composer: FilterComposer } {
+  return {
+    filters: { query: filters.query, scope: "active", rules: [] },
+    composer: { ...CLOSED_COMPOSER, composing: true },
+  };
+}
+
 export function valueKind(field: FieldDefinition): ValueKind {
   if (field.input_type === "boolean") return "boolean";
   if (field.input_type === "multi_select") return "multi";
