@@ -1,0 +1,108 @@
+import { describe, expect, it } from "vitest";
+import { exportColumns, servicesToCsv } from "@/lib/catalog/csv";
+import { materializeFields } from "@/lib/catalog/fields";
+import { STARTER_LOOKUPS } from "@/lib/catalog/lookups";
+import { filterServices } from "@/lib/catalog/filter";
+import { buildService } from "@/lib/catalog/service";
+import type { LookupOption } from "@/lib/catalog/types";
+
+const fields = materializeFields("tenant", (key) => `field:${key}`);
+const lookups: LookupOption[] = STARTER_LOOKUPS.map((seed) => ({
+  id: seed.code,
+  tenant_id: "tenant",
+  field_key: seed.field_key,
+  code: seed.code,
+  label: seed.label,
+  description: seed.description,
+  code_prefix: seed.code_prefix,
+  sort_order: seed.sort_order,
+  is_active: true,
+}));
+
+const secret = "Holiday paging coverage is thin.";
+const services = [
+  buildService("tenant", {
+    service_code: "SVC-001",
+    name: "Enterprise Security Monitoring",
+    category: "secops",
+    status: "active",
+    service_tier: "tier_0",
+    summary: "Detect threats.",
+    owner_team: "soc",
+    capability_rating: "full",
+    internal_name: "SOC watch",
+    internal_notes: secret,
+    current_maturity_cmmi: 3,
+    target_maturity_cmmi: 4,
+    cost_model: "no_charge_core",
+  }),
+  buildService("tenant", {
+    service_code: "SVC-002",
+    name: "Planned architecture review",
+    category: "sec_architecture",
+    status: "planned",
+    service_tier: "tier_2",
+    summary: "Not offered yet.",
+    owner_team: "sec_engineering",
+    capability_rating: "none",
+    internal_notes: "Do not publish this note.",
+  }),
+];
+
+describe("CSV export visibility", () => {
+  it("keeps internal fields out of the public file and in the full file", () => {
+    const filtered = filterServices(services, {
+      query: "",
+      category: "",
+      status: "active",
+      service_tier: "",
+      owner_team: "",
+      capability_rating: "",
+    });
+    const publicCsv = servicesToCsv(filtered, fields, lookups, "public").replace(/^\uFEFF/, "");
+    const fullCsv = servicesToCsv(filtered, fields, lookups, "all").replace(/^\uFEFF/, "");
+
+    expect(publicCsv).toContain("Enterprise Security Monitoring");
+    expect(publicCsv).toContain("Security Operations & Monitoring");
+    expect(publicCsv).not.toContain("SVC-002");
+    expect(publicCsv).not.toContain(secret);
+    expect(publicCsv).not.toContain("Internal Notes");
+    expect(publicCsv).not.toContain("Current Maturity");
+    expect(publicCsv).not.toContain("Cost Model");
+    expect(publicCsv).not.toContain("SOC watch");
+
+    expect(fullCsv).toContain(secret);
+    expect(fullCsv).toContain("Internal Notes");
+    expect(fullCsv).toContain("SOC watch");
+    expect(fullCsv).toContain("No Charge / Core Funded");
+    expect(fullCsv.split("\r\n")[0]?.split(",").length).toBeGreaterThan(
+      publicCsv.split("\r\n")[0]?.split(",").length ?? 0,
+    );
+  });
+
+  it("escapes commas and quotes", () => {
+    const csv = servicesToCsv(
+      [
+        buildService("tenant", {
+          service_code: "SVC-009",
+          name: 'Detection, "priority"',
+          category: "secops",
+          status: "active",
+          service_tier: "tier_1",
+          summary: "Line one\nLine two",
+          owner_team: "soc",
+        }),
+      ],
+      fields,
+      lookups,
+      "public",
+    );
+    expect(csv).toContain('"Detection, ""priority"""');
+    expect(csv).toContain('"Line one\nLine two"');
+  });
+
+  it("public columns are only public fields", () => {
+    expect(exportColumns(fields, "public").every((field) => field.visibility === "public")).toBe(true);
+    expect(exportColumns(fields, "all").some((field) => field.visibility === "internal")).toBe(true);
+  });
+});
