@@ -11,11 +11,26 @@ export function exportColumns(fields: FieldDefinition[], visibility: CsvVisibili
     .sort((a, b) => a.sort_order - b.sort_order);
 }
 
+export type CsvExportOptions = {
+  /** When set, row 1 is this corporate distribution marking and the header moves to row 2. */
+  marking?: string | null;
+};
+
+export function distributionMarking(companyName: string, visibility: CsvVisibility): string {
+  const name = companyName.trim().toLocaleUpperCase();
+  const suffix =
+    visibility === "public"
+      ? "APPROVED FOR CLIENT/LIMITED DISTRIBUTION"
+      : "DO NOT DISTRIBUTE EXTERNALLY";
+  return `${name} \u2014 ${suffix}`;
+}
+
 export function servicesToCsv(
   services: ServiceRecord[],
   fields: FieldDefinition[],
   lookups: LookupOption[],
   visibility: CsvVisibility,
+  options?: CsvExportOptions,
 ): string {
   const columns = exportColumns(fields, visibility);
   const header = columns.map((column) => csvEscape(column.label)).join(",");
@@ -25,7 +40,9 @@ export function servicesToCsv(
       .map((column) => csvEscape(formatExportValue(shown, column, lookups)))
       .join(",");
   });
-  return `\uFEFF${[header, ...lines].join("\r\n")}`;
+  const marking = options?.marking?.trim();
+  const rows = marking ? [csvEscape(marking), header, ...lines] : [header, ...lines];
+  return `\uFEFF${rows.join("\r\n")}`;
 }
 
 export function csvEscape(value: string): string {

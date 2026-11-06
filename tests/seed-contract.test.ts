@@ -6,6 +6,7 @@ import { SAMPLE_TENANTS } from "@/lib/catalog/samples";
 
 const sql = [
   readFileSync("supabase/migrations/0001_v1_catalog_core.sql", "utf8"),
+  readFileSync("supabase/migrations/0002_v1_1_polish.sql", "utf8"),
   readFileSync("supabase/seed.sql", "utf8"),
 ].join("\n");
 
@@ -73,6 +74,9 @@ describe("starter catalog contract", () => {
     expect(SAMPLE_TENANTS.map((tenant) => tenant.name)).toEqual(["Acme Corp", "Meridian Health"]);
     expect(sql).toContain("Acme Corp");
     expect(sql).toContain("Meridian Health");
+    expect(sql).toContain("logo_url");
+    expect(sql).toContain("archived_at");
+    expect(sql).toContain("data:image/svg+xml");
     expect(sql).not.toMatch(/mminwell|supabase\.co|service_role/i);
   });
 });

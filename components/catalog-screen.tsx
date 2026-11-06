@@ -3,9 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { downloadName, servicesToCsv } from "@/lib/catalog/csv";
 import { filterServices } from "@/lib/catalog/filter";
-import { activeOptions, optionLabel } from "@/lib/catalog/lookups";
+import { optionLabel } from "@/lib/catalog/lookups";
 import {
   capabilityTone,
   cmmiTone,
@@ -17,43 +16,55 @@ import {
   statusTone,
 } from "@/lib/catalog/present";
 import { completenessPercent } from "@/lib/catalog/service";
-import { EMPTY_FILTERS, type CatalogFilters } from "@/lib/catalog/types";
+import { EMPTY_FILTERS, type CatalogFilters, type ServiceRecord } from "@/lib/catalog/types";
+import { ExportDialog, FilterControl } from "@/components/catalog-tools";
 import { useCatalog } from "@/components/catalog-provider";
 import { AuditDrawer, Badge } from "@/components/widgets";
+import { WorkspaceMark } from "@/components/workspace-mark";
+
+const COLUMNS: Array<{ id: string; label: string; fieldKey?: string }> = [
+  { id: "code", label: "Code", fieldKey: "service_code" },
+  { id: "name", label: "Service", fieldKey: "name" },
+  { id: "category", label: "Category", fieldKey: "category" },
+  { id: "status", label: "Status", fieldKey: "status" },
+  { id: "tier", label: "Tier", fieldKey: "service_tier" },
+  { id: "owner", label: "Owner team", fieldKey: "owner_team" },
+  { id: "capability", label: "Capability", fieldKey: "capability_rating" },
+  { id: "review", label: "Next review", fieldKey: "next_review_date" },
+  { id: "internal", label: "Internal name", fieldKey: "internal_name" },
+  { id: "cmmi", label: "CMMI", fieldKey: "current_maturity_cmmi" },
+  { id: "gap", label: "Gap", fieldKey: "maturity_gap" },
+  { id: "complete", label: "Completeness" },
+];
 
 export function CatalogScreen() {
   const api = useCatalog();
   const router = useRouter();
   const [filters, setFilters] = useState<CatalogFilters>(EMPTY_FILTERS);
-  const [preview, setPreview] = useState<"internal" | "public">("internal");
   const [history, setHistory] = useState(false);
-  const filtered = useMemo(() => filterServices(api.services, filters), [api.services, filters]);
-  const showInternal = preview === "internal";
-
-  function setFilter<K extends keyof CatalogFilters>(key: K, value: CatalogFilters[K]) {
-    setFilters((current) => ({ ...current, [key]: value }));
-  }
-
-  function exportCsv(visibility: "public" | "all") {
-    const csv = servicesToCsv(filtered, api.fields, api.lookups, visibility);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = downloadName(api.activeTenant?.slug ?? "catalog", visibility);
-    anchor.click();
-    URL.revokeObjectURL(url);
-  }
+  const [exportOpen, setExportOpen] = useState(false);
+  const filtered = useMemo(
+    () => filterServices(api.services, filters, api.fields),
+    [api.services, api.fields, filters],
+  );
+  const activeKeys = useMemo(
+    () => new Set(api.fields.filter((field) => field.is_active).map((field) => field.field_key)),
+    [api.fields],
+  );
+  const columns = COLUMNS.filter((column) => !column.fieldKey || activeKeys.has(column.fieldKey));
+  const tenant = api.activeTenant;
 
   return (
     <>
       <div className="page-head">
         <div>
           <p className="micro">Catalog</p>
-          <h1>{api.activeTenant?.name}</h1>
+          <div className="identity">
+            {tenant ? <WorkspaceMark name={tenant.name} logoUrl={tenant.logo_url} size={40} /> : null}
+            <h1>{tenant?.name}</h1>
+          </div>
           <p className="lede">
-            Search and filter the services in this workspace. Public preview hides internal fields. Completeness counts
-            every active field, not only the ones on screen.
+            Search and filter the services in this workspace. Completeness counts every active field.
           </p>
         </div>
         <div className="row-actions">
@@ -69,19 +80,13 @@ export function CatalogScreen() {
       </div>
 
       <div className="toolbar">
-        <div className="segmented" role="radiogroup" aria-label="Catalog visibility">
-          <button type="button" role="radio" aria-checked={preview === "internal"} onClick={() => setPreview("internal")}>
-            Full internal view
-          </button>
-          <button type="button" role="radio" aria-checked={preview === "public"} onClick={() => setPreview("public")}>
-            Public preview
-          </button>
-        </div>
-        <button type="button" className="btn btn-secondary" onClick={() => exportCsv("public")} disabled={filtered.length === 0}>
-          Export public CSV
-        </button>
-        <button type="button" className="btn btn-secondary" onClick={() => exportCsv("all")} disabled={filtered.length === 0}>
-          Export full CSV
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => setExportOpen(true)}
+          disabled={filtered.length === 0}
+        >
+          Export
         </button>
       </div>
 
@@ -91,26 +96,10 @@ export function CatalogScreen() {
           placeholder="Search code, name, or summary"
           value={filters.query}
           aria-label="Search services"
-          onChange={(event) => setFilter("query", event.target.value)}
+          onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))}
         />
-        <FilterSelect label="Category" value={filters.category} fieldKey="category" onChange={(value) => setFilter("category", value)} />
-        <FilterSelect label="Status" value={filters.status} fieldKey="status" onChange={(value) => setFilter("status", value)} />
-        <FilterSelect label="Service tier" value={filters.service_tier} fieldKey="service_tier" onChange={(value) => setFilter("service_tier", value)} />
-        <FilterSelect label="Owner team" value={filters.owner_team} fieldKey="team" onChange={(value) => setFilter("owner_team", value)} />
-        <FilterSelect
-          label="Capability"
-          value={filters.capability_rating}
-          fieldKey="capability_rating"
-          onChange={(value) => setFilter("capability_rating", value)}
-        />
+        <FilterControl filters={filters} fields={api.fields} lookups={api.lookups} onChange={setFilters} />
       </div>
-
-      {preview === "public" ? (
-        <p className="hint" style={{ marginBottom: 12 }}>
-          Public preview hides internal columns such as internal name, CMMI, maturity gap, cost, and internal notes.
-          The public CSV uses the same rule across every public field.
-        </p>
-      ) : null}
 
       {api.services.length === 0 ? (
         <section className="empty">
@@ -131,7 +120,7 @@ export function CatalogScreen() {
         </section>
       ) : filtered.length === 0 ? (
         <section className="empty">
-          <h2>No services match these filters.</h2>
+          <h2>{filters.scope === "archived" ? "No archived services match." : "No services match these filters."}</h2>
           <button type="button" className="btn btn-secondary" style={{ marginTop: 12 }} onClick={() => setFilters(EMPTY_FILTERS)}>
             Clear filters
           </button>
@@ -141,92 +130,36 @@ export function CatalogScreen() {
           <table className="catalog">
             <thead>
               <tr>
-                <th>Code</th>
-                <th>Service</th>
-                <th>Category</th>
-                <th>Status</th>
-                <th>Tier</th>
-                <th>Owner team</th>
-                <th>Capability</th>
-                <th>Next review</th>
-                {showInternal ? <th>Internal name</th> : null}
-                {showInternal ? <th>CMMI</th> : null}
-                {showInternal ? <th>Gap</th> : null}
-                <th>Completeness</th>
+                {columns.map((column) => (
+                  <th key={column.id}>{column.label}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.map((service) => {
-                const percent = completenessPercent(service, api.fields);
-                const tone = completenessTone(percent);
-                return (
-                  <tr key={service.id} className="clickable" onClick={() => router.push(`/services/${service.id}`)}>
-                    <td className="code">{service.service_code}</td>
-                    <td>
-                      <Link className="service-name" href={`/services/${service.id}`} onClick={(event) => event.stopPropagation()}>
-                        {service.name}
-                      </Link>
+              {filtered.map((service) => (
+                <tr key={service.id} className="clickable" onClick={() => router.push(`/services/${service.id}`)}>
+                  {columns.map((column) => (
+                    <td key={column.id}>
+                      <CatalogCell columnId={column.id} service={service} />
                     </td>
-                    <td>{optionLabel(api.lookups, "category", service.category)}</td>
-                    <td>
-                      <Badge tone={statusTone(service.status)}>
-                        {optionLabel(api.lookups, "status", service.status) || "—"}
-                      </Badge>
-                    </td>
-                    <td>{shortTier(optionLabel(api.lookups, "service_tier", service.service_tier)) || "—"}</td>
-                    <td>{optionLabel(api.lookups, "team", service.owner_team) || "—"}</td>
-                    <td>
-                      {service.capability_rating ? (
-                        <Badge tone={capabilityTone(service.capability_rating)}>
-                          {optionLabel(api.lookups, "capability_rating", service.capability_rating)}
-                        </Badge>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td>
-                      {service.next_review_date ? (
-                        <Badge tone={reviewTone(service.next_review_date)}>{formatDate(service.next_review_date)}</Badge>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    {showInternal ? <td>{service.internal_name || "—"}</td> : null}
-                    {showInternal ? (
-                      <td>
-                        {service.current_maturity_cmmi == null ? (
-                          "—"
-                        ) : (
-                          <Badge tone={cmmiTone(service.current_maturity_cmmi)}>{service.current_maturity_cmmi}</Badge>
-                        )}
-                      </td>
-                    ) : null}
-                    {showInternal ? (
-                      <td>
-                        {service.maturity_gap == null ? (
-                          "—"
-                        ) : (
-                          <Badge tone={service.maturity_gap > 0 ? "warning" : "success"}>
-                            <span title={gapText(service.maturity_gap)}>{service.maturity_gap}</span>
-                          </Badge>
-                        )}
-                      </td>
-                    ) : null}
-                    <td>
-                      <div className="meter" title="Filled fields divided by all active field definitions">
-                        <div className={`meter-track ${tone === "success" ? "" : tone}`}>
-                          <span style={{ width: `${percent}%` }} />
-                        </div>
-                        <span className="code">{percent}%</span>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                  ))}
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       )}
+
+      {exportOpen && tenant ? (
+        <ExportDialog
+          services={filtered}
+          fields={api.fields}
+          lookups={api.lookups}
+          companyName={tenant.name}
+          slug={tenant.slug}
+          onClose={() => setExportOpen(false)}
+        />
+      ) : null}
 
       {history ? (
         <AuditDrawer title="Workspace history" entries={api.audit} fields={api.fields} onClose={() => setHistory(false)} />
@@ -235,27 +168,68 @@ export function CatalogScreen() {
   );
 }
 
-function FilterSelect({
-  label,
-  value,
-  fieldKey,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  fieldKey: string;
-  onChange: (value: string) => void;
-}) {
+function CatalogCell({ columnId, service }: { columnId: string; service: ServiceRecord }) {
   const api = useCatalog();
-  const options = activeOptions(api.lookups, fieldKey);
+  if (columnId === "code") return <span className="code">{service.service_code}</span>;
+  if (columnId === "name") {
+    return (
+      <span className="name-cell">
+        <Link className="service-name" href={`/services/${service.id}`} onClick={(event) => event.stopPropagation()}>
+          {service.name}
+        </Link>
+        {service.archived_at ? <Badge tone="neutral">Archived</Badge> : null}
+      </span>
+    );
+  }
+  if (columnId === "category") return <>{optionLabel(api.lookups, "category", service.category)}</>;
+  if (columnId === "status") {
+    return (
+      <Badge tone={statusTone(service.status)}>{optionLabel(api.lookups, "status", service.status) || "—"}</Badge>
+    );
+  }
+  if (columnId === "tier") return <>{shortTier(optionLabel(api.lookups, "service_tier", service.service_tier)) || "—"}</>;
+  if (columnId === "owner") return <>{optionLabel(api.lookups, "team", service.owner_team) || "—"}</>;
+  if (columnId === "capability") {
+    return service.capability_rating ? (
+      <Badge tone={capabilityTone(service.capability_rating)}>
+        {optionLabel(api.lookups, "capability_rating", service.capability_rating)}
+      </Badge>
+    ) : (
+      <>{"—"}</>
+    );
+  }
+  if (columnId === "review") {
+    return service.next_review_date ? (
+      <Badge tone={reviewTone(service.next_review_date)}>{formatDate(service.next_review_date)}</Badge>
+    ) : (
+      <>{"—"}</>
+    );
+  }
+  if (columnId === "internal") return <>{service.internal_name || "—"}</>;
+  if (columnId === "cmmi") {
+    return service.current_maturity_cmmi == null ? (
+      <>{"—"}</>
+    ) : (
+      <Badge tone={cmmiTone(service.current_maturity_cmmi)}>{service.current_maturity_cmmi}</Badge>
+    );
+  }
+  if (columnId === "gap") {
+    return service.maturity_gap == null ? (
+      <>{"—"}</>
+    ) : (
+      <Badge tone={service.maturity_gap > 0 ? "warning" : "success"}>
+        <span title={gapText(service.maturity_gap)}>{service.maturity_gap}</span>
+      </Badge>
+    );
+  }
+  const percent = completenessPercent(service, api.fields);
+  const tone = completenessTone(percent);
   return (
-    <select className="select" aria-label={label} value={value} onChange={(event) => onChange(event.target.value)}>
-      <option value="">{label}</option>
-      {options.map((option) => (
-        <option key={option.id} value={option.code}>
-          {option.label}
-        </option>
-      ))}
-    </select>
+    <div className="meter" title="Filled fields divided by all active field definitions">
+      <div className={`meter-track ${tone === "success" ? "" : tone}`}>
+        <span style={{ width: `${percent}%` }} />
+      </div>
+      <span className="code">{percent}%</span>
+    </div>
   );
 }

@@ -115,6 +115,7 @@ export async function persistService(supabase: SupabaseClient, service: ServiceR
     internal_notes: service.internal_notes,
     review_cadence: service.review_cadence,
     last_reviewed_date: service.last_reviewed_date,
+    archived_at: service.archived_at,
     custom_fields: service.custom_fields ?? {},
     created_at: service.created_at,
     created_by: service.created_by,
@@ -162,6 +163,7 @@ export async function persistField(supabase: SupabaseClient, field: FieldDefinit
       visibility: field.visibility,
       depth_level: field.depth_level,
       is_required: field.is_required,
+      is_active: field.is_active,
       sort_order: field.sort_order,
     })
     .eq("id", field.id);
@@ -177,12 +179,36 @@ export async function persistTenantMode(
   if (error) throw new Error(error.message);
 }
 
+export async function persistTenantLogo(
+  supabase: SupabaseClient,
+  tenantId: string,
+  logoUrl: string | null,
+): Promise<void> {
+  const { error } = await supabase.from("tenants").update({ logo_url: logoUrl }).eq("id", tenantId);
+  if (error) throw new Error(error.message);
+}
+
+export async function persistServiceArchived(
+  supabase: SupabaseClient,
+  serviceId: string,
+  archivedAt: string | null,
+): Promise<void> {
+  const { error } = await supabase.from("services").update({ archived_at: archivedAt }).eq("id", serviceId);
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteServiceRow(supabase: SupabaseClient, serviceId: string): Promise<void> {
+  const { error } = await supabase.from("services").delete().eq("id", serviceId);
+  if (error) throw new Error(error.message);
+}
+
 function asTenant(row: Record<string, unknown>): Tenant {
   return {
     id: String(row.id),
     slug: String(row.slug),
     name: String(row.name),
     service_code_mode: row.service_code_mode === "category_prefix" ? "category_prefix" : "sequential",
+    logo_url: typeof row.logo_url === "string" && row.logo_url.trim() ? row.logo_url : null,
     is_active: Boolean(row.is_active),
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
@@ -270,6 +296,7 @@ function asService(row: Record<string, unknown>): ServiceRecord {
     review_cadence: textOrNull(row.review_cadence),
     last_reviewed_date: textOrNull(row.last_reviewed_date),
     next_review_date: textOrNull(row.next_review_date),
+    archived_at: textOrNull(row.archived_at),
     custom_fields:
       row.custom_fields && typeof row.custom_fields === "object" && !Array.isArray(row.custom_fields)
         ? (row.custom_fields as Record<string, unknown>)

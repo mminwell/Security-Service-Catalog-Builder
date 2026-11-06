@@ -1,18 +1,163 @@
-import type { CatalogFilters, ServiceRecord } from "@/lib/catalog/types";
+import { optionLabel } from "@/lib/catalog/lookups";
+import { readField, withComputed } from "@/lib/catalog/service";
+import type {
+  CatalogFilters,
+  FieldDefinition,
+  FilterOp,
+  FilterRule,
+  LookupOption,
+  ServiceRecord,
+} from "@/lib/catalog/types";
 
-export function filterServices(services: ServiceRecord[], filters: CatalogFilters): ServiceRecord[] {
+export type ValueKind = "text" | "lookup" | "multi" | "boolean" | "date" | "number";
+
+const OP_WORD: Record<FilterOp, string> = {
+  eq: "is",
+  contains: "contains",
+  includes: "includes",
+  before: "before",
+  after: "after",
+  on: "on",
+  gte: "at least",
+  lte: "at most",
+};
+
+export function activeFilterCount(filters: CatalogFilters): number {
+  return filters.rules.length + (filters.scope === "archived" ? 1 : 0);
+}
+
+export function valueKind(field: FieldDefinition): ValueKind {
+  if (field.input_type === "boolean") return "boolean";
+  if (field.input_type === "multi_select") return "multi";
+  if (field.input_type === "dropdown") return "lookup";
+  if (field.input_type === "date" || field.field_key === "next_review_date") return "date";
+  if (field.field_key === "maturity_gap") return "number";
+  return "text";
+}
+
+export function operatorsFor(field: FieldDefinition): Array<{ op: FilterOp; label: string }> {
+  const kind = valueKind(field);
+  if (kind === "text") return [{ op: "contains", label: "Contains" }];
+  if (kind === "multi") return [{ op: "includes", label: "Includes" }];
+  if (kind === "boolean" || kind === "lookup") return [{ op: "eq", label: "Is" }];
+  if (kind === "date") {
+    return [
+      { op: "on", label: "On" },
+      { op: "before", label: "Before" },
+      { op: "after", label: "After" },
+    ];
+  }
+  return [
+    { op: "eq", label: "Equals" },
+    { op: "gte", label: "At least" },
+    { op: "lte", label: "At most" },
+  ];
+}
+
+export function defaultOperator(field: FieldDefinition): FilterOp {
+  return operatorsFor(field)[0]?.op ?? "eq";
+}
+
+export function describeRule(
+  rule: FilterRule,
+  field: FieldDefinition | undefined,
+  lookups: LookupOption[],
+): string {
+  const label = field?.label ?? rule.fieldKey;
+  let shown = rule.value;
+  if (field && valueKind(field) === "boolean") {
+    shown = rule.value === "true" ? "Yes" : "No";
+  } else if (field?.lookup_field_key) {
+    shown = optionLabel(lookups, field.lookup_field_key, rule.value) || rule.value;
+  }
+  return `${label} ${OP_WORD[rule.op]} ${shown}`;
+}
+
+export function filterServices(
+  services: ServiceRecord[],
+  filters: CatalogFilters,
+  fields: FieldDefinition[] = [],
+): ServiceRecord[] {
   const query = filters.query.trim().toLowerCase();
+  const byKey = new Map(fields.map((field) => [field.field_key, field]));
   return services.filter((service) => {
-    if (filters.category && service.category !== filters.category) return false;
-    if (filters.status && service.status !== filters.status) return false;
-    if (filters.service_tier && service.service_tier !== filters.service_tier) return false;
-    if (filters.owner_team && service.owner_team !== filters.owner_team) return false;
-    if (filters.capability_rating && service.capability_rating !== filters.capability_rating) return false;
+    const archived = Boolean(service.archived_at);
+    if ((filters.scope === "archived") !== archived) return false;
+    const shown = withComputed(service);
+    for (const rule of filters.rules) {
+      const field = byKey.get(rule.fieldKey);
+      if (field && !field.is_active) continue;
+      if (!ruleMatches(shown, rule, field)) return false;
+    }
     if (!query) return true;
-    const haystack = [service.service_code, service.name, service.internal_name, service.summary, service.service_owner]
+    const haystack = [shown.service_code, shown.name, shown.internal_name, shown.summary, shown.service_owner]
       .filter(Boolean)
       .join(" ")
       .toLowerCase();
     return haystack.includes(query);
   });
+}
+
+export function ruleMatches(service: ServiceRecord, rule: FilterRule, field?: FieldDefinition): boolean {
+  const value = readField(service, rule.fieldKey);
+  const kind = field ? valueKind(field) : kindFromOp(rule.op);
+  if (kind === "text" || rule.op === "contains") {
+    const text = value == null ? "" : Array.isArray(value) ? value.map(String).join(" ") : String(value);
+    const needle = rule.value.trim().toLowerCase();
+    return needle.length > 0 && text.toLowerCase().includes(needle);
+  }
+  if (kind === "multi" || rule.op === "includes") {
+    return Array.isArray(value) && value.map(String).includes(rule.value);
+  }
+  if (kind === "boolean") {
+    return (value === true ? "true" : "false") === rule.value;
+  }
+  if (kind === "date") {
+    const left = dateKey(value);
+    const right = dateKey(rule.value);
+    if (!left || !right) return false;
+    if (rule.op === "before") return left < right;
+    if (rule.op === "after") return left > right;
+    return left === right;
+  }
+  if (kind === "number") {
+    const left = asNumber(value);
+    const right = asNumber(rule.value);
+    if (left == null || right == null) return false;
+    if (rule.op === "gte") return left >= right;
+    if (rule.op === "lte") return left <= right;
+    return left === right;
+  }
+  if (Array.isArray(value)) return value.map(String).includes(rule.value);
+  return value != null && String(value) === rule.value;
+}
+
+function kindFromOp(op: FilterOp): ValueKind {
+  switch (op) {
+    case "contains":
+      return "text";
+    case "includes":
+      return "multi";
+    case "before":
+    case "after":
+    case "on":
+      return "date";
+    case "gte":
+    case "lte":
+      return "number";
+    default:
+      return "lookup";
+  }
+}
+
+function dateKey(value: unknown): string | null {
+  if (typeof value !== "string" || value.length < 10) return null;
+  const key = value.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(key) ? key : null;
+}
+
+function asNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) return Number(value);
+  return null;
 }

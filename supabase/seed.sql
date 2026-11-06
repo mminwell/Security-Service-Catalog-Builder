@@ -1,6 +1,8 @@
 -- Optional sample data for Security Service Catalog Builder.
 -- Fictional workspaces only: Acme Corp and Meridian Health.
--- Safe to run more than once. Apply supabase/migrations/0001_v1_catalog_core.sql first.
+-- Safe to run more than once. Apply the migrations first:
+-- supabase/migrations/0001_v1_catalog_core.sql
+-- supabase/migrations/0002_v1_1_polish.sql
 -- No real client names, credentials, or project URLs.
 
 insert into public.field_definitions (
@@ -160,11 +162,15 @@ declare
   v_tenant uuid := $sscb$11111111-1111-4111-8111-111111111111$sscb$::uuid;
 begin
   if exists (select 1 from public.tenants where slug = $sscb$acme-corp$sscb$) then
+    update public.tenants
+      set logo_url = $sscb$data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%227%22%20fill%3D%22%23141413%22%2F%3E%3Cpath%20d%3D%22M8.2%2024.2%2016%207.6l7.8%2016.6%22%20fill%3D%22none%22%20stroke%3D%22%23D97757%22%20stroke-width%3D%222.2%22%20stroke-linejoin%3D%22round%22%2F%3E%3Cpath%20d%3D%22M11.4%2018.4h9.2%22%20stroke%3D%22%23FAF9F5%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E$sscb$
+      where slug = $sscb$acme-corp$sscb$
+        and logo_url is null;
     return;
   end if;
   perform set_config('sscb.skip_audit', 'on', true);
-  insert into public.tenants (id, slug, name, service_code_mode)
-  values (v_tenant, $sscb$acme-corp$sscb$, $sscb$Acme Corp$sscb$, $sscb$sequential$sscb$);
+  insert into public.tenants (id, slug, name, service_code_mode, logo_url)
+  values (v_tenant, $sscb$acme-corp$sscb$, $sscb$Acme Corp$sscb$, $sscb$sequential$sscb$, $sscb$data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%227%22%20fill%3D%22%23141413%22%2F%3E%3Cpath%20d%3D%22M8.2%2024.2%2016%207.6l7.8%2016.6%22%20fill%3D%22none%22%20stroke%3D%22%23D97757%22%20stroke-width%3D%222.2%22%20stroke-linejoin%3D%22round%22%2F%3E%3Cpath%20d%3D%22M11.4%2018.4h9.2%22%20stroke%3D%22%23FAF9F5%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E$sscb$);
   insert into public.field_definitions (
     tenant_id, field_key, label, help_text, input_type, lookup_field_key,
     is_required, visibility, depth_level, sort_order, is_active, is_standard
@@ -195,11 +201,15 @@ declare
   v_tenant uuid := $sscb$22222222-2222-4222-8222-222222222222$sscb$::uuid;
 begin
   if exists (select 1 from public.tenants where slug = $sscb$meridian-health$sscb$) then
+    update public.tenants
+      set logo_url = $sscb$data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%227%22%20fill%3D%22%233C5C4E%22%2F%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2216%22%20r%3D%228.2%22%20fill%3D%22none%22%20stroke%3D%22%23FAF9F5%22%20stroke-width%3D%221.5%22%2F%3E%3Cpath%20d%3D%22M16%2010.8v10.4M10.8%2016h10.4%22%20stroke%3D%22%23FAF9F5%22%20stroke-width%3D%221.7%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E$sscb$
+      where slug = $sscb$meridian-health$sscb$
+        and logo_url is null;
     return;
   end if;
   perform set_config('sscb.skip_audit', 'on', true);
-  insert into public.tenants (id, slug, name, service_code_mode)
-  values (v_tenant, $sscb$meridian-health$sscb$, $sscb$Meridian Health$sscb$, $sscb$category_prefix$sscb$);
+  insert into public.tenants (id, slug, name, service_code_mode, logo_url)
+  values (v_tenant, $sscb$meridian-health$sscb$, $sscb$Meridian Health$sscb$, $sscb$category_prefix$sscb$, $sscb$data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%227%22%20fill%3D%22%233C5C4E%22%2F%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2216%22%20r%3D%228.2%22%20fill%3D%22none%22%20stroke%3D%22%23FAF9F5%22%20stroke-width%3D%221.5%22%2F%3E%3Cpath%20d%3D%22M16%2010.8v10.4M10.8%2016h10.4%22%20stroke%3D%22%23FAF9F5%22%20stroke-width%3D%221.7%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E$sscb$);
   insert into public.field_definitions (
     tenant_id, field_key, label, help_text, input_type, lookup_field_key,
     is_required, visibility, depth_level, sort_order, is_active, is_standard

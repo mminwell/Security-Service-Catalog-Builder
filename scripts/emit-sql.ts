@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { STARTER_FIELDS } from "../lib/catalog/fields";
+import { builtinLogoForSlug } from "../lib/catalog/logos";
 import { STARTER_LOOKUPS } from "../lib/catalog/lookups";
 import { SAMPLE_TENANTS, STARTER_PACK } from "../lib/catalog/samples";
 import { buildService, type ServiceSeed } from "../lib/catalog/service";
@@ -117,7 +118,15 @@ ${values}
 on conflict (service_code) do nothing;`;
 }
 
-function sampleBlock(tenantId: string, slug: string, name: string, mode: string, services: ServiceSeed[]): string {
+function sampleBlock(
+  tenantId: string,
+  slug: string,
+  name: string,
+  mode: string,
+  services: ServiceSeed[],
+  logoUrl: string | null,
+): string {
+  const logoSql = logoUrl ? quote(logoUrl) : "null";
   const rows = services
     .map((seed) => {
       const idSql = seed.id ? `${quote(seed.id)}::uuid` : "gen_random_uuid()";
@@ -129,11 +138,15 @@ declare
   v_tenant uuid := ${quote(tenantId)}::uuid;
 begin
   if exists (select 1 from public.tenants where slug = ${quote(slug)}) then
+    update public.tenants
+      set logo_url = ${logoSql}
+      where slug = ${quote(slug)}
+        and logo_url is null;
     return;
   end if;
   perform set_config('sscb.skip_audit', 'on', true);
-  insert into public.tenants (id, slug, name, service_code_mode)
-  values (v_tenant, ${quote(slug)}, ${quote(name)}, ${quote(mode)});
+  insert into public.tenants (id, slug, name, service_code_mode, logo_url)
+  values (v_tenant, ${quote(slug)}, ${quote(name)}, ${quote(mode)}, ${logoSql});
   insert into public.field_definitions (
     tenant_id, field_key, label, help_text, input_type, lookup_field_key,
     is_required, visibility, depth_level, sort_order, is_active, is_standard
@@ -165,18 +178,20 @@ const starterData = [
 
 const migrationPath = "supabase/migrations/0001_v1_catalog_core.sql";
 const migration = readFileSync(migrationPath, "utf8");
+if (!migration.includes("-- STARTER_DATA_BEGIN") || !migration.includes("-- STARTER_DATA_END")) {
+  throw new Error("Migration is missing STARTER_DATA markers.");
+}
 const nextMigration = migration.replace(
   /-- STARTER_DATA_BEGIN[\s\S]*?-- STARTER_DATA_END/,
   `-- STARTER_DATA_BEGIN\n${starterData}\n-- STARTER_DATA_END`,
 );
-if (nextMigration === migration || !migration.includes("-- STARTER_DATA_BEGIN")) {
-  throw new Error("Migration is missing STARTER_DATA markers.");
-}
 writeFileSync(migrationPath, nextMigration);
 
 const seed = `-- Optional sample data for Security Service Catalog Builder.
 -- Fictional workspaces only: Acme Corp and Meridian Health.
--- Safe to run more than once. Apply supabase/migrations/0001_v1_catalog_core.sql first.
+-- Safe to run more than once. Apply the migrations first:
+-- supabase/migrations/0001_v1_catalog_core.sql
+-- supabase/migrations/0002_v1_1_polish.sql
 -- No real client names, credentials, or project URLs.
 
 ${fieldInsert("on conflict (field_key) where tenant_id is null do nothing")}
@@ -184,7 +199,14 @@ ${fieldInsert("on conflict (field_key) where tenant_id is null do nothing")}
 ${lookupInsert("on conflict (field_key, code) where tenant_id is null do nothing")}
 
 ${SAMPLE_TENANTS.map((tenant) =>
-  sampleBlock(tenant.id, tenant.slug, tenant.name, tenant.service_code_mode, tenant.services),
+  sampleBlock(
+    tenant.id,
+    tenant.slug,
+    tenant.name,
+    tenant.service_code_mode,
+    tenant.services,
+    builtinLogoForSlug(tenant.slug),
+  ),
 ).join("\n\n")}
 `;
 

@@ -1,4 +1,6 @@
-import { materializeFields } from "@/lib/catalog/fields";
+import { canAdminister, canWriteServices } from "@/lib/catalog/access";
+import { isIdentityField, materializeFields } from "@/lib/catalog/fields";
+import { builtinLogoForSlug, normalizeLogoInput } from "@/lib/catalog/logos";
 import { STARTER_LOOKUPS } from "@/lib/catalog/lookups";
 import { SAMPLE_TENANTS, STARTER_PACK } from "@/lib/catalog/samples";
 import { buildService, normalizeService, withComputed } from "@/lib/catalog/service";
@@ -55,6 +57,7 @@ export function freshDemo(): CatalogDb {
       slug: sample.slug,
       name: sample.name,
       service_code_mode: sample.service_code_mode,
+      logo_url: builtinLogoForSlug(sample.slug),
       is_active: true,
       created_at: SEEDED_AT,
       updated_at: SEEDED_AT,
@@ -121,6 +124,7 @@ export function createTenant(db: CatalogDb, name: string, now = new Date().toISO
     slug,
     name: trimmed,
     service_code_mode: "sequential",
+    logo_url: null,
     is_active: true,
     created_at: now,
     updated_at: now,
@@ -326,6 +330,9 @@ export function saveField(db: CatalogDb, input: FieldDefinition, now = new Date(
   const tenantId = requireActive(db);
   const current = db.fields.find((field) => field.id === input.id && field.tenant_id === tenantId);
   if (!current) throw new Error("That field is not in this workspace.");
+  if (isIdentityField(current.field_key) && input.is_active === false) {
+    throw new Error("Service code and name stay active so every service remains identifiable.");
+  }
   const next: FieldDefinition = {
     ...current,
     label: input.label.trim() || current.label,
@@ -333,6 +340,7 @@ export function saveField(db: CatalogDb, input: FieldDefinition, now = new Date(
     visibility: input.visibility,
     depth_level: input.depth_level,
     is_required: input.is_required,
+    is_active: input.is_active,
     sort_order: Number.isFinite(input.sort_order) ? input.sort_order : current.sort_order,
   };
   return {
@@ -398,6 +406,96 @@ export function addMember(db: CatalogDb, email: string, role: Role, now = new Da
   };
 }
 
+export function setTenantLogo(db: CatalogDb, logoUrl: string | null, now = new Date().toISOString()): CatalogDb {
+  const actor = requireSession(db);
+  const tenantId = requireActive(db);
+  assertAdmin(db, tenantId, actor.userId, "Only a workspace admin can change the company logo.");
+  const nextLogo = normalizeLogoInput(logoUrl);
+  const current = db.tenants.find((tenant) => tenant.id === tenantId);
+  if (!current) throw new Error("Choose a workspace.");
+  if ((current.logo_url ?? null) === nextLogo) return db;
+  const next: Tenant = { ...current, logo_url: nextLogo, updated_at: now };
+  return {
+    ...db,
+    tenants: db.tenants.map((tenant) => (tenant.id === tenantId ? next : tenant)),
+    audit: [
+      auditEntry({
+        tenantId,
+        actor,
+        table: "tenants",
+        rowId: tenantId,
+        action: "update",
+        before: { name: current.name, logo_url: current.logo_url },
+        after: { name: next.name, logo_url: next.logo_url },
+        now,
+      }),
+      ...db.audit,
+    ],
+  };
+}
+
+export function setServiceArchived(
+  db: CatalogDb,
+  serviceId: string,
+  archived: boolean,
+  now = new Date().toISOString(),
+): CatalogDb {
+  const actor = requireSession(db);
+  const tenantId = requireActive(db);
+  assertWrite(db, tenantId, actor.userId);
+  const current = db.services.find((service) => service.id === serviceId && service.tenant_id === tenantId);
+  if (!current) throw new Error("That service is not in this workspace.");
+  if (Boolean(current.archived_at) === archived) return db;
+  const next: ServiceRecord = withComputed({
+    ...current,
+    archived_at: archived ? now : null,
+    updated_at: now,
+    updated_by: actor.userId,
+  });
+  return {
+    ...db,
+    services: db.services.map((service) => (service.id === next.id ? next : service)),
+    audit: [
+      auditEntry({
+        tenantId,
+        actor,
+        table: "services",
+        rowId: next.id,
+        action: "update",
+        before: serviceRecordData(current),
+        after: serviceRecordData(next),
+        now,
+      }),
+      ...db.audit,
+    ],
+  };
+}
+
+export function deleteService(db: CatalogDb, serviceId: string, now = new Date().toISOString()): CatalogDb {
+  const actor = requireSession(db);
+  const tenantId = requireActive(db);
+  assertAdmin(db, tenantId, actor.userId, "Only a workspace admin can permanently delete a service.");
+  const current = db.services.find((service) => service.id === serviceId && service.tenant_id === tenantId);
+  if (!current) throw new Error("That service is not in this workspace.");
+  return {
+    ...db,
+    services: db.services.filter((service) => service.id !== serviceId),
+    audit: [
+      auditEntry({
+        tenantId,
+        actor,
+        table: "services",
+        rowId: serviceId,
+        action: "delete",
+        before: serviceRecordData(current),
+        after: null,
+        now,
+      }),
+      ...db.audit,
+    ],
+  };
+}
+
 export function resetDemo(db: CatalogDb): CatalogDb {
   const fresh = freshDemo();
   if (!db.session) return fresh;
@@ -440,6 +538,16 @@ function requireSession(db: CatalogDb): SessionUser {
 function requireActive(db: CatalogDb): string {
   if (!db.activeTenantId) throw new Error("Choose a workspace.");
   return db.activeTenantId;
+}
+
+function assertWrite(db: CatalogDb, tenantId: string, userId: string): void {
+  if (!canWriteServices(roleFor(db, tenantId, userId))) {
+    throw new Error("You do not have permission to change services in this workspace.");
+  }
+}
+
+function assertAdmin(db: CatalogDb, tenantId: string, userId: string, message: string): void {
+  if (!canAdminister(roleFor(db, tenantId, userId))) throw new Error(message);
 }
 
 function auditEntry(args: {
