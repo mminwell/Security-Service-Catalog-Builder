@@ -611,8 +611,9 @@ table.catalog tr.clickable:hover td { background: rgba(240, 238, 230, 0.55); }
   z-index: 40;
   top: calc(100% + 8px);
   left: 0;
-  width: min(420px, 86vw);
-  max-height: min(520px, calc(100dvh - 18rem));
+  width: min(420px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: min(520px, calc(100dvh - 24px));
   overflow-y: auto;
   overscroll-behavior: contain;
   background: var(--white);
@@ -638,6 +639,12 @@ table.catalog tr.clickable:hover td { background: rgba(240, 238, 230, 0.55); }
   align-items: center;
   flex-basis: 100%;
   margin-top: 4px;
+}
+.chip-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
 }
 .chip {
   display: inline-flex;
@@ -779,6 +786,27 @@ table.catalog tr.clickable:hover td { background: rgba(240, 238, 230, 0.55); }
 }
 
 .catalog-toolbar .search { flex: 1; min-width: 220px; }
+.service-catalog-toolbar {
+  justify-content: flex-start;
+}
+.service-catalog-toolbar .search {
+  flex: 0 1 var(--catalog-search, 280px);
+  width: var(--catalog-search, 280px);
+  min-width: 0;
+  max-width: min(var(--catalog-search-max, 320px), 100%);
+}
+@media (min-width: 960px) {
+  .service-catalog-toolbar .search {
+    min-width: min(var(--catalog-search-min, 260px), 100%);
+  }
+}
+@media (max-width: 640px) {
+  .service-catalog-toolbar .search {
+    flex-basis: 100%;
+    width: 100%;
+    max-width: 100%;
+  }
+}
 .btn { gap: 8px; }
 .icon { display: block; }
 .cart-badge {
@@ -817,8 +845,11 @@ table.catalog tr.clickable:hover td { background: rgba(240, 238, 230, 0.55); }
   border: var(--border);
   border-radius: var(--radius-panel);
 }
-.pack-shelf { padding: 18px; margin-bottom: 18px; }
+.pack-shelf { padding: 18px; margin-top: 8px; margin-bottom: 18px; }
 .pack-head, .blueprint-meta, .pill-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pack-head { justify-content: space-between; }
+.skip-existing { font-weight: 600; color: var(--slate); }
+.store-head-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .pack-grid, .blueprint-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -829,6 +860,40 @@ table.catalog tr.clickable:hover td { background: rgba(240, 238, 230, 0.55); }
 .pack-card h3, .blueprint-card h3 { font-size: 20px; margin: 4px 0 8px; }
 .blueprint-card p, .pack-card p { margin: 0 0 10px; color: var(--gray-700); }
 .already { color: var(--olive) !important; font-weight: 600; }
+.blueprint-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.blueprint-row {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.15fr) minmax(0, 1.5fr) auto;
+  gap: 8px 14px;
+  align-items: center;
+  background: var(--white);
+  border: var(--border);
+  border-radius: var(--radius-row);
+  padding: 7px 12px;
+}
+.blueprint-row-main { min-width: 0; }
+.blueprint-row h3 { font-size: 16px; line-height: 1.25; }
+.blueprint-row-tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 2px; }
+.blueprint-row-tags .micro,
+.blueprint-row .already { margin: 0; }
+.blueprint-row-summary {
+  margin: 0;
+  min-width: 0;
+  color: var(--gray-700);
+  font-size: 13px;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.blueprint-row .row-actions { flex-wrap: nowrap; }
 .aisle-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
 .aisle-row button {
   border: var(--border);
@@ -884,6 +949,9 @@ table.catalog tr.clickable:hover td { background: rgba(240, 238, 230, 0.55); }
 .cell-clip { display: inline-block; max-width: 280px; }
 
 @media (max-width: 860px) {
-  .form-grid, .admin-layout, .option-card, .field-admin, .hero-card, .pack-grid, .blueprint-grid, .map-grid { grid-template-columns: 1fr; }
+  .form-grid, .admin-layout, .option-card, .field-admin, .hero-card, .pack-grid, .blueprint-grid, .map-grid, .blueprint-row { grid-template-columns: 1fr; }
   .page-head h1 { font-size: 28px; }
+  .blueprint-row { align-items: start; }
+  .blueprint-row-summary { display: none; }
+  .blueprint-row .row-actions { flex-wrap: wrap; }
 }

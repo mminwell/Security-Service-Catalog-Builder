@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useState, useSyncExternalStore, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   AISLES,
@@ -13,6 +13,15 @@ import {
   type Blueprint,
   type BlueprintBundle,
 } from "@/lib/catalog/blueprints";
+import {
+  ALREADY_IN_CATALOG_LABEL,
+  cycleBlueprintView,
+  readBlueprintView,
+  SKIP_EXISTING_LABEL,
+  subscribeBlueprintView,
+  writeBlueprintView,
+  type BlueprintView,
+} from "@/lib/catalog/blueprint-view";
 import { addPackToCart, toggleCart } from "@/lib/catalog/cart";
 import { cartIdsFor, setCartIdsFor, subscribeCart } from "@/lib/catalog/cart-store";
 import { STARTER_FIELDS } from "@/lib/catalog/fields";
@@ -46,6 +55,7 @@ export function BlueprintStore() {
   const [skipExisting, setSkipExisting] = useState(true);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const view = useSyncExternalStore(subscribeBlueprintView, readBlueprintView, () => "list" as const);
 
   const cart = useSyncExternalStore(
     subscribeCart,
@@ -107,18 +117,93 @@ export function BlueprintStore() {
             then review every item before it lands in the catalog.
           </p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={() => setDrawer(true)}>
-          <CartIcon />
-          Cart · {cart.length}
-        </button>
+        <div className="store-head-actions">
+          <BlueprintViewToggle
+            view={view}
+            onChange={(next) => {
+              writeBlueprintView(next);
+            }}
+          />
+          <button type="button" className="btn btn-primary" onClick={() => setDrawer(true)}>
+            <CartIcon />
+            Cart · {cart.length}
+          </button>
+        </div>
       </div>
 
-      <section className="pack-shelf" aria-label="Starter packs">
+      <div data-section="browse">
+        <div className="toolbar catalog-toolbar">
+          <input
+            className="input search"
+            placeholder="Search blueprints"
+            aria-label="Search blueprints"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+          <select className="select" aria-label="Bundle filter" value={bundleId} onChange={(event) => setBundleId(event.target.value)}>
+            <option value="all">All bundles</option>
+            {BUNDLES.map((bundle) => (
+              <option key={bundle.id} value={bundle.id}>
+                {bundle.title}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="aisle-row" role="tablist" aria-label="Domain aisles">
+          <button type="button" role="tab" aria-selected={aisle === "all"} onClick={() => setAisle("all")}>
+            All
+          </button>
+          {AISLES.map((item) => (
+            <button key={item.id} type="button" role="tab" aria-selected={aisle === item.id} onClick={() => setAisle(item.id)}>
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div data-section="results" data-view={view}>
+        {view === "list" ? (
+          <ul className="blueprint-list">
+            {visible.map((blueprint) => (
+              <BlueprintListRow
+                key={blueprint.id}
+                blueprint={blueprint}
+                lookups={api.lookups}
+                inCart={cart.includes(blueprint.id)}
+                owned={inCatalog.has(blueprint.id)}
+                onPreview={() => setPreview(blueprint)}
+                onToggle={() => persist(toggleCart(cart, blueprint.id))}
+              />
+            ))}
+          </ul>
+        ) : (
+          <div className="blueprint-grid">
+            {visible.map((blueprint) => (
+              <BlueprintCard
+                key={blueprint.id}
+                blueprint={blueprint}
+                lookups={api.lookups}
+                inCart={cart.includes(blueprint.id)}
+                owned={inCatalog.has(blueprint.id)}
+                onPreview={() => setPreview(blueprint)}
+                onToggle={() => persist(toggleCart(cart, blueprint.id))}
+              />
+            ))}
+          </div>
+        )}
+        {visible.length === 0 ? (
+          <section className="empty">
+            <h2>No blueprints match.</h2>
+          </section>
+        ) : null}
+      </div>
+
+      <section className="pack-shelf" aria-label="Starter packs" data-section="starter-packs">
         <div className="pack-head">
           <h2>Starter packs</h2>
-          <label className="check">
+          <label className="check skip-existing">
             <input type="checkbox" checked={skipExisting} onChange={(event) => setSkipExisting(event.target.checked)} />
-            Skip services already in this catalog
+            {SKIP_EXISTING_LABEL}
           </label>
         </div>
         <p className="micro">Company size</p>
@@ -135,67 +220,6 @@ export function BlueprintStore() {
         </div>
         {note ? <p className="hint">{note}</p> : null}
       </section>
-
-      <div className="toolbar catalog-toolbar">
-        <input
-          className="input search"
-          placeholder="Search blueprints"
-          aria-label="Search blueprints"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-        <select className="select" aria-label="Bundle filter" value={bundleId} onChange={(event) => setBundleId(event.target.value)}>
-          <option value="all">All bundles</option>
-          {BUNDLES.map((bundle) => (
-            <option key={bundle.id} value={bundle.id}>
-              {bundle.title}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="aisle-row" role="tablist" aria-label="Domain aisles">
-        <button type="button" role="tab" aria-selected={aisle === "all"} onClick={() => setAisle("all")}>
-          All
-        </button>
-        {AISLES.map((item) => (
-          <button key={item.id} type="button" role="tab" aria-selected={aisle === item.id} onClick={() => setAisle(item.id)}>
-            {item.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="blueprint-grid">
-        {visible.map((blueprint) => {
-          const inCart = cart.includes(blueprint.id);
-          const owned = inCatalog.has(blueprint.id);
-          return (
-            <article className="blueprint-card" key={blueprint.id}>
-              <div className="blueprint-meta">
-                <span className="micro">{optionLabel(api.lookups, "category", blueprint.category)}</span>
-                <Badge tone="neutral">{shortTier(optionLabel(api.lookups, "service_tier", blueprint.service_tier))}</Badge>
-                <Badge tone="info">{CSF_SHORT[blueprint.primary_csf_function] ?? blueprint.primary_csf_function}</Badge>
-              </div>
-              <h3>{blueprint.name}</h3>
-              <p>{blueprint.summary}</p>
-              {owned ? <p className="already">Already in catalog</p> : null}
-              <div className="row-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => setPreview(blueprint)}>
-                  Preview
-                </button>
-                <button
-                  type="button"
-                  className={inCart ? "btn btn-secondary" : "btn btn-primary"}
-                  aria-pressed={inCart}
-                  onClick={() => persist(toggleCart(cart, blueprint.id))}
-                >
-                  {inCart ? "✓ In Cart" : "+ Add to Cart"}
-                </button>
-              </div>
-            </article>
-          );
-        })}
-      </div>
-      {visible.length === 0 ? <section className="empty"><h2>No blueprints match.</h2></section> : null}
 
       {cart.length > 0 ? (
         <div className="cart-sticky">
@@ -294,6 +318,135 @@ export function BlueprintStore() {
         </div>
       ) : null}
     </>
+  );
+}
+
+function BlueprintViewToggle({ view, onChange }: { view: BlueprintView; onChange: (view: BlueprintView) => void }) {
+  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    const next = cycleBlueprintView(view, event.key);
+    if (!next) return;
+    event.preventDefault();
+    onChange(next);
+    const target = event.currentTarget.querySelector<HTMLButtonElement>(`button[data-view="${next}"]`);
+    target?.focus();
+  }
+
+  return (
+    <div className="segmented" role="radiogroup" aria-label="Blueprint layout" aria-orientation="horizontal" onKeyDown={onKeyDown}>
+      <button
+        type="button"
+        role="radio"
+        data-view="cards"
+        aria-checked={view === "cards"}
+        tabIndex={view === "cards" ? 0 : -1}
+        onClick={() => onChange("cards")}
+      >
+        Cards
+      </button>
+      <button
+        type="button"
+        role="radio"
+        data-view="list"
+        aria-checked={view === "list"}
+        tabIndex={view === "list" ? 0 : -1}
+        onClick={() => onChange("list")}
+      >
+        List
+      </button>
+    </div>
+  );
+}
+
+function AlreadyInCatalog({ owned }: { owned: boolean }) {
+  if (!owned) return null;
+  return <p className="already">{ALREADY_IN_CATALOG_LABEL}</p>;
+}
+
+function BlueprintActions({
+  inCart,
+  onPreview,
+  onToggle,
+}: {
+  inCart: boolean;
+  onPreview: () => void;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="row-actions">
+      <button type="button" className="btn btn-secondary" onClick={onPreview}>
+        Preview
+      </button>
+      <button type="button" className={inCart ? "btn btn-secondary" : "btn btn-primary"} aria-pressed={inCart} onClick={onToggle}>
+        {inCart ? "✓ In Cart" : "+ Add to Cart"}
+      </button>
+    </div>
+  );
+}
+
+function BlueprintCard({
+  blueprint,
+  lookups,
+  inCart,
+  owned,
+  onPreview,
+  onToggle,
+}: {
+  blueprint: Blueprint;
+  lookups: import("@/lib/catalog/types").LookupOption[];
+  inCart: boolean;
+  owned: boolean;
+  onPreview: () => void;
+  onToggle: () => void;
+}) {
+  return (
+    <article className="blueprint-card">
+      <div className="blueprint-meta">
+        <span className="micro">{optionLabel(lookups, "category", blueprint.category)}</span>
+        <Badge tone="neutral">{shortTier(optionLabel(lookups, "service_tier", blueprint.service_tier))}</Badge>
+        <Badge tone="info">{CSF_SHORT[blueprint.primary_csf_function] ?? blueprint.primary_csf_function}</Badge>
+      </div>
+      <h3>{blueprint.name}</h3>
+      <p>{blueprint.summary}</p>
+      <AlreadyInCatalog owned={owned} />
+      <BlueprintActions inCart={inCart} onPreview={onPreview} onToggle={onToggle} />
+    </article>
+  );
+}
+
+function BlueprintListRow({
+  blueprint,
+  lookups,
+  inCart,
+  owned,
+  onPreview,
+  onToggle,
+}: {
+  blueprint: Blueprint;
+  lookups: import("@/lib/catalog/types").LookupOption[];
+  inCart: boolean;
+  owned: boolean;
+  onPreview: () => void;
+  onToggle: () => void;
+}) {
+  const category = optionLabel(lookups, "category", blueprint.category);
+  const tier = shortTier(optionLabel(lookups, "service_tier", blueprint.service_tier));
+  const csf = CSF_SHORT[blueprint.primary_csf_function] ?? blueprint.primary_csf_function;
+  return (
+    <li className="blueprint-row">
+      <div className="blueprint-row-main">
+        <h3>{blueprint.name}</h3>
+        <div className="blueprint-row-tags">
+          <span className="micro">{category}</span>
+          <Badge tone="neutral">{tier}</Badge>
+          <Badge tone="info">{csf}</Badge>
+          <AlreadyInCatalog owned={owned} />
+        </div>
+      </div>
+      <p className="blueprint-row-summary" title={blueprint.summary}>
+        {blueprint.summary}
+      </p>
+      <BlueprintActions inCart={inCart} onPreview={onPreview} onToggle={onToggle} />
+    </li>
   );
 }
 
