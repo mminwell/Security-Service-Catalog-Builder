@@ -1,6 +1,6 @@
 # Security Service Catalog Builder
 
-**Status: V1.1.** A multi-tenant catalog for the security services an organization delivers. Enter each service once, keep internal notes out of public views, and export the audience you choose.
+**Status: V1.2.** A multi-tenant catalog for the security services an organization delivers. Enter each service once, shop a blueprint instead of starting from a blank form, keep internal notes out of public views, and export the audience you choose.
 
 V1 includes the service form, the catalog list, dropdown and field administration, CSV export, workspace isolation, and an audit trail. Framework mapping, audience HTML/Word exports, linked artifacts, and assisted drafting come later.
 
@@ -16,6 +16,9 @@ V1 includes the service form, the catalog list, dropdown and field administratio
 - Set each field’s public or internal visibility and its Core / Operations / Governance depth per workspace. Retire a field without deleting stored values. Service code and name stay active.
 - Archive a service, restore it, or permanently delete it when you are a workspace admin. Add a company logo in the workspace switcher.
 - Open a change history for one service or for the whole workspace.
+- Shop pre-built security service blueprints, including company-size and industry packs, review them in a cart, and add them to the catalog in one checkout.
+- Choose and reorder the columns on the catalog table. Admins can save a workspace default. Everyone else can keep a browser override.
+- Import a lookup group from CSV, including a large roster, with a template download and a column-mapping preview.
 
 ## Architecture
 
@@ -70,6 +73,7 @@ Copy `.env.example` to `.env.local` only on your machine. `.env.local` is gitign
 - `lib/data/` — Demo Mode store and the Supabase adapter
 - `supabase/migrations/0001_v1_catalog_core.sql` — tables, RLS, audit triggers, provision function, starter data
 - `supabase/migrations/0002_v1_1_polish.sql` — workspace `logo_url` and service `archived_at`
+- `supabase/migrations/0003_v1_2_blueprints_columns_import.sql` — catalog column defaults, bulk lookup import, and blueprint checkout
 - `supabase/seed.sql` — the same starter lookups, plus Acme Corp and Meridian Health
 - `tests/` — computed fields, service IDs, CSV visibility and distribution markings, filters, archive, field retirement, depth behavior
 

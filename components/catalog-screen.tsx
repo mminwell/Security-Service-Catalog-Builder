@@ -2,57 +2,39 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
+import { cartIdsFor, subscribeCart } from "@/lib/catalog/cart-store";
+import { columnLabel, formatCatalogCell } from "@/lib/catalog/columns";
+import { CLOSED_COMPOSER, requestAdditionalFilter, type FilterComposer } from "@/lib/catalog/filter";
 import { filterServices } from "@/lib/catalog/filter";
-import { optionLabel } from "@/lib/catalog/lookups";
-import {
-  capabilityTone,
-  cmmiTone,
-  completenessTone,
-  formatDate,
-  gapText,
-  reviewTone,
-  shortTier,
-  statusTone,
-} from "@/lib/catalog/present";
-import { completenessPercent } from "@/lib/catalog/service";
-import { EMPTY_FILTERS, type CatalogFilters, type ServiceRecord } from "@/lib/catalog/types";
-import { ExportDialog, FilterControl } from "@/components/catalog-tools";
+import { EMPTY_FILTERS, type CatalogFilters } from "@/lib/catalog/types";
+import { BlueprintCartArt } from "@/components/blueprint-art";
+import { ExportDialog, FilterChipRow, FilterControl } from "@/components/catalog-tools";
+import { ColumnPicker, useCatalogColumns } from "@/components/column-picker";
 import { useCatalog } from "@/components/catalog-provider";
+import { CartIcon } from "@/components/icons";
 import { AuditDrawer, Badge } from "@/components/widgets";
 import { WorkspaceMark } from "@/components/workspace-mark";
-
-const COLUMNS: Array<{ id: string; label: string; fieldKey?: string }> = [
-  { id: "code", label: "Code", fieldKey: "service_code" },
-  { id: "name", label: "Service", fieldKey: "name" },
-  { id: "category", label: "Category", fieldKey: "category" },
-  { id: "status", label: "Status", fieldKey: "status" },
-  { id: "tier", label: "Tier", fieldKey: "service_tier" },
-  { id: "owner", label: "Owner team", fieldKey: "owner_team" },
-  { id: "capability", label: "Capability", fieldKey: "capability_rating" },
-  { id: "review", label: "Next review", fieldKey: "next_review_date" },
-  { id: "internal", label: "Internal name", fieldKey: "internal_name" },
-  { id: "cmmi", label: "CMMI", fieldKey: "current_maturity_cmmi" },
-  { id: "gap", label: "Gap", fieldKey: "maturity_gap" },
-  { id: "complete", label: "Completeness" },
-];
 
 export function CatalogScreen() {
   const api = useCatalog();
   const router = useRouter();
   const [filters, setFilters] = useState<CatalogFilters>(EMPTY_FILTERS);
+  const [composer, setComposer] = useState<FilterComposer>(CLOSED_COMPOSER);
   const [history, setHistory] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const tenant = api.activeTenant;
+  const columns = useCatalogColumns(tenant?.id ?? null, tenant?.catalog_columns?.keys ?? null, api.fields);
+  const cartCount = useSyncExternalStore(
+    subscribeCart,
+    () => cartIdsFor(tenant?.id ?? null).length,
+    () => 0,
+  );
+
   const filtered = useMemo(
     () => filterServices(api.services, filters, api.fields),
     [api.services, api.fields, filters],
   );
-  const activeKeys = useMemo(
-    () => new Set(api.fields.filter((field) => field.is_active).map((field) => field.field_key)),
-    [api.fields],
-  );
-  const columns = COLUMNS.filter((column) => !column.fieldKey || activeKeys.has(column.fieldKey));
-  const tenant = api.activeTenant;
 
   return (
     <>
@@ -63,14 +45,17 @@ export function CatalogScreen() {
             {tenant ? <WorkspaceMark name={tenant.name} logoUrl={tenant.logo_url} size={40} /> : null}
             <h1>{tenant?.name}</h1>
           </div>
-          <p className="lede">
-            Search and filter the services in this workspace. Completeness counts every active field.
-          </p>
+          <p className="lede">Search and filter the services in this workspace. Completeness counts every active field.</p>
         </div>
         <div className="row-actions">
           <button type="button" className="btn btn-secondary" onClick={() => setHistory(true)}>
             Change history
           </button>
+          <Link className="btn btn-secondary" href="/blueprints">
+            <CartIcon />
+            Shop Blueprints
+            {cartCount > 0 ? <span className="cart-badge">{cartCount}</span> : null}
+          </Link>
           {api.canWrite ? (
             <Link className="btn btn-primary" href="/services/new">
               Add service
@@ -79,18 +64,7 @@ export function CatalogScreen() {
         </div>
       </div>
 
-      <div className="toolbar">
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={() => setExportOpen(true)}
-          disabled={filtered.length === 0}
-        >
-          Export
-        </button>
-      </div>
-
-      <div className="filters">
+      <div className="toolbar catalog-toolbar">
         <input
           className="input search"
           placeholder="Search code, name, or summary"
@@ -98,30 +72,74 @@ export function CatalogScreen() {
           aria-label="Search services"
           onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))}
         />
-        <FilterControl filters={filters} fields={api.fields} lookups={api.lookups} onChange={setFilters} />
+        <FilterControl
+          filters={filters}
+          fields={api.fields}
+          lookups={api.lookups}
+          composer={composer}
+          onChange={setFilters}
+          onComposer={setComposer}
+        />
+        <ColumnPicker
+          fields={api.fields}
+          keys={columns.keys}
+          canAdmin={api.canAdmin}
+          onChange={columns.update}
+          onSaveDefault={(keys) => void api.saveCatalogColumns(keys)}
+        />
+        <button type="button" className="btn btn-secondary" onClick={() => setExportOpen(true)} disabled={filtered.length === 0}>
+          Export
+        </button>
       </div>
+      <FilterChipRow
+        filters={filters}
+        fields={api.fields}
+        lookups={api.lookups}
+        onChange={setFilters}
+        onComposer={setComposer}
+        onAddAdditional={() => setComposer((current) => requestAdditionalFilter(current))}
+      />
 
       {api.services.length === 0 ? (
-        <section className="empty">
-          <h2>This workspace has no services yet.</h2>
-          <p className="lede">Add the first service, or load a starter set you can edit.</p>
-          <div className="row-actions" style={{ marginTop: 16 }}>
-            {api.canWrite ? (
-              <button type="button" className="btn btn-primary" onClick={() => void api.loadSampleServices()}>
-                Load starter sample services
-              </button>
-            ) : null}
-            {api.canWrite ? (
-              <Link className="btn btn-secondary" href="/services/new">
-                Add a service
+        <section className="hero-card">
+          <BlueprintCartArt />
+          <div>
+            <p className="micro">Blueprint store</p>
+            <h2>Don&apos;t start from scratch.</h2>
+            <p className="lede">
+              Shop pre-built security service blueprints, bundle them by company size or industry, and tailor every field
+              to your organization.
+            </p>
+            <div className="row-actions" style={{ marginTop: 16 }}>
+              <Link className="btn btn-primary" href="/blueprints">
+                <CartIcon />
+                Shop Pre-Built Security Services
               </Link>
+              {api.canWrite ? (
+                <Link className="btn btn-secondary" href="/services/new">
+                  Add a service from scratch
+                </Link>
+              ) : null}
+            </div>
+            {api.canWrite ? (
+              <button type="button" className="btn btn-ghost" style={{ marginTop: 8 }} onClick={() => void api.loadSampleServices()}>
+                Or load four starter samples
+              </button>
             ) : null}
           </div>
         </section>
       ) : filtered.length === 0 ? (
         <section className="empty">
           <h2>{filters.scope === "archived" ? "No archived services match." : "No services match these filters."}</h2>
-          <button type="button" className="btn btn-secondary" style={{ marginTop: 12 }} onClick={() => setFilters(EMPTY_FILTERS)}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ marginTop: 12 }}
+            onClick={() => {
+              setFilters(EMPTY_FILTERS);
+              setComposer(CLOSED_COMPOSER);
+            }}
+          >
             Clear filters
           </button>
         </section>
@@ -130,17 +148,17 @@ export function CatalogScreen() {
           <table className="catalog">
             <thead>
               <tr>
-                {columns.map((column) => (
-                  <th key={column.id}>{column.label}</th>
+                {columns.keys.map((key) => (
+                  <th key={key}>{columnLabel(key, api.fields)}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {filtered.map((service) => (
                 <tr key={service.id} className="clickable" onClick={() => router.push(`/services/${service.id}`)}>
-                  {columns.map((column) => (
-                    <td key={column.id}>
-                      <CatalogCell columnId={column.id} service={service} />
+                  {columns.keys.map((key) => (
+                    <td key={key}>
+                      <CatalogCell fieldKey={key} service={service} />
                     </td>
                   ))}
                 </tr>
@@ -161,17 +179,14 @@ export function CatalogScreen() {
         />
       ) : null}
 
-      {history ? (
-        <AuditDrawer title="Workspace history" entries={api.audit} fields={api.fields} onClose={() => setHistory(false)} />
-      ) : null}
+      {history ? <AuditDrawer title="Workspace history" entries={api.audit} fields={api.fields} onClose={() => setHistory(false)} /> : null}
     </>
   );
 }
 
-function CatalogCell({ columnId, service }: { columnId: string; service: ServiceRecord }) {
+function CatalogCell({ fieldKey, service }: { fieldKey: string; service: import("@/lib/catalog/types").ServiceRecord }) {
   const api = useCatalog();
-  if (columnId === "code") return <span className="code">{service.service_code}</span>;
-  if (columnId === "name") {
+  if (fieldKey === "name") {
     return (
       <span className="name-cell">
         <Link className="service-name" href={`/services/${service.id}`} onClick={(event) => event.stopPropagation()}>
@@ -181,55 +196,36 @@ function CatalogCell({ columnId, service }: { columnId: string; service: Service
       </span>
     );
   }
-  if (columnId === "category") return <>{optionLabel(api.lookups, "category", service.category)}</>;
-  if (columnId === "status") {
+  const field = api.fields.find((item) => item.field_key === fieldKey);
+  const model = formatCatalogCell(fieldKey, service, field, api.lookups, api.fields);
+  if (model.kind === "code") return <span className="code">{model.text}</span>;
+  if (model.kind === "meter") {
     return (
-      <Badge tone={statusTone(service.status)}>{optionLabel(api.lookups, "status", service.status) || "—"}</Badge>
-    );
-  }
-  if (columnId === "tier") return <>{shortTier(optionLabel(api.lookups, "service_tier", service.service_tier)) || "—"}</>;
-  if (columnId === "owner") return <>{optionLabel(api.lookups, "team", service.owner_team) || "—"}</>;
-  if (columnId === "capability") {
-    return service.capability_rating ? (
-      <Badge tone={capabilityTone(service.capability_rating)}>
-        {optionLabel(api.lookups, "capability_rating", service.capability_rating)}
-      </Badge>
-    ) : (
-      <>{"—"}</>
-    );
-  }
-  if (columnId === "review") {
-    return service.next_review_date ? (
-      <Badge tone={reviewTone(service.next_review_date)}>{formatDate(service.next_review_date)}</Badge>
-    ) : (
-      <>{"—"}</>
-    );
-  }
-  if (columnId === "internal") return <>{service.internal_name || "—"}</>;
-  if (columnId === "cmmi") {
-    return service.current_maturity_cmmi == null ? (
-      <>{"—"}</>
-    ) : (
-      <Badge tone={cmmiTone(service.current_maturity_cmmi)}>{service.current_maturity_cmmi}</Badge>
-    );
-  }
-  if (columnId === "gap") {
-    return service.maturity_gap == null ? (
-      <>{"—"}</>
-    ) : (
-      <Badge tone={service.maturity_gap > 0 ? "warning" : "success"}>
-        <span title={gapText(service.maturity_gap)}>{service.maturity_gap}</span>
-      </Badge>
-    );
-  }
-  const percent = completenessPercent(service, api.fields);
-  const tone = completenessTone(percent);
-  return (
-    <div className="meter" title="Filled fields divided by all active field definitions">
-      <div className={`meter-track ${tone === "success" ? "" : tone}`}>
-        <span style={{ width: `${percent}%` }} />
+      <div className="meter" title={model.title}>
+        <div className={`meter-track ${model.tone === "success" ? "" : model.tone ?? ""}`}>
+          <span style={{ width: `${model.percent ?? 0}%` }} />
+        </div>
+        <span className="code">{model.text}</span>
       </div>
-      <span className="code">{percent}%</span>
-    </div>
-  );
+    );
+  }
+  if (model.kind === "badge" && model.tone) {
+    return (
+      <Badge tone={model.tone}>
+        <span title={model.title}>{model.text}</span>
+      </Badge>
+    );
+  }
+  if (model.kind === "pills") {
+    return (
+      <span className="pill-row" title={model.title}>
+        {model.pills?.map((pill) => (
+          <span className="mini-pill" key={pill}>
+            {pill}
+          </span>
+        ))}
+      </span>
+    );
+  }
+  return <span title={model.title}>{model.text}</span>;
 }

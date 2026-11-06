@@ -4,74 +4,156 @@ import { useState } from "react";
 import { downloadName, distributionMarking, servicesToCsv, type CsvVisibility } from "@/lib/catalog/csv";
 import {
   activeFilterCount,
+  clearFilterRules,
+  closeFilterPopup,
+  commitDraftRule,
   defaultOperator,
   describeRule,
+  openFilterPopup,
   operatorsFor,
+  removeFilterRule,
   valueKind,
+  type FilterComposer,
 } from "@/lib/catalog/filter";
 import { activeOptions } from "@/lib/catalog/lookups";
-import { EMPTY_FILTERS, type CatalogFilters, type FieldDefinition, type FilterOp, type LookupOption } from "@/lib/catalog/types";
+import { type CatalogFilters, type FieldDefinition, type FilterOp, type LookupOption } from "@/lib/catalog/types";
 import { useDismiss } from "@/components/widgets";
 
 export function FilterControl({
   filters,
   fields,
   lookups,
+  composer,
   onChange,
+  onComposer,
+}: {
+  filters: CatalogFilters;
+  fields: FieldDefinition[];
+  lookups: LookupOption[];
+  composer: FilterComposer;
+  onChange: (filters: CatalogFilters) => void;
+  onComposer: (composer: FilterComposer) => void;
+}) {
+  const ref = useDismiss(composer.popupOpen, () => onComposer(closeFilterPopup(composer)));
+  const count = activeFilterCount(filters);
+  const activeFields = fields
+    .filter((field) => field.is_active)
+    .sort((a, b) => a.depth_level - b.depth_level || a.sort_order - b.sort_order);
+  const selected = activeFields.find((field) => field.field_key === composer.draftField) ?? null;
+  const canAdd = Boolean(selected) && composer.draftValue.trim().length > 0;
+
+  function chooseField(fieldKey: string) {
+    const field = activeFields.find((item) => item.field_key === fieldKey);
+    onComposer({
+      ...composer,
+      draftField: fieldKey,
+      draftOp: field ? defaultOperator(field) : "eq",
+      draftValue: "",
+    });
+  }
+
+  function addRule() {
+    const committed = commitDraftRule(filters, composer, crypto.randomUUID());
+    if (!committed) return;
+    onChange(committed.filters);
+    onComposer(committed.composer);
+  }
+
+  return (
+    <div className="filter-anchor" ref={ref}>
+      <button
+        type="button"
+        className="btn btn-secondary"
+        aria-expanded={composer.popupOpen}
+        aria-haspopup="dialog"
+        onClick={() => onComposer(composer.popupOpen ? closeFilterPopup(composer) : openFilterPopup(composer))}
+      >
+        Filter{count > 0 ? ` · ${count}` : ""}
+      </button>
+      {composer.popupOpen ? (
+        <div className="filter-panel" role="dialog" aria-label="Filter services">
+          <p className="micro">Catalog</p>
+          <div className="segmented" role="radiogroup" aria-label="Service archive state">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={filters.scope === "active"}
+              onClick={() => onChange({ ...filters, scope: "active" })}
+            >
+              Active
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={filters.scope === "archived"}
+              onClick={() => onChange({ ...filters, scope: "archived" })}
+            >
+              Archived
+            </button>
+          </div>
+          <p className="hint">Archived services stay in the workspace and can be restored.</p>
+          {filters.rules.length > 0 ? (
+            <div className="filter-rules">
+              {filters.rules.map((rule) => {
+                const label = describeRule(rule, fields.find((field) => field.field_key === rule.fieldKey), lookups);
+                return (
+                  <div className="filter-rule" key={rule.id}>
+                    <span>{label}</span>
+                    <button type="button" className="btn btn-ghost" onClick={() => onChange(removeFilterRule(filters, rule.id))}>
+                      Remove
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+          {composer.composing ? (
+            <div className="filter-compose">
+              <label htmlFor="filter-field">Field</label>
+              <select id="filter-field" className="select" value={composer.draftField} onChange={(event) => chooseField(event.target.value)}>
+                <option value="">Choose a field</option>
+                {activeFields.map((field) => (
+                  <option key={field.id} value={field.field_key}>
+                    {field.label}
+                  </option>
+                ))}
+              </select>
+              {selected ? (
+                <RuleValue
+                  field={selected}
+                  lookups={lookups}
+                  op={composer.draftOp}
+                  value={composer.draftValue}
+                  onOp={(op) => onComposer({ ...composer, draftOp: op })}
+                  onValue={(value) => onComposer({ ...composer, draftValue: value })}
+                />
+              ) : null}
+              <button type="button" className="btn btn-primary" disabled={!canAdd} onClick={addRule}>
+                Add
+              </button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function FilterChipRow({
+  filters,
+  fields,
+  lookups,
+  onChange,
+  onComposer,
+  onAddAdditional,
 }: {
   filters: CatalogFilters;
   fields: FieldDefinition[];
   lookups: LookupOption[];
   onChange: (filters: CatalogFilters) => void;
+  onComposer: (composer: FilterComposer) => void;
+  onAddAdditional: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [composing, setComposing] = useState(true);
-  const [draftField, setDraftField] = useState("");
-  const [draftOp, setDraftOp] = useState<FilterOp>("eq");
-  const [draftValue, setDraftValue] = useState("");
-  const ref = useDismiss(open, () => setOpen(false));
-  const count = activeFilterCount(filters);
-  const activeFields = fields
-    .filter((field) => field.is_active)
-    .sort((a, b) => a.depth_level - b.depth_level || a.sort_order - b.sort_order);
-  const selected = activeFields.find((field) => field.field_key === draftField) ?? null;
-  const showComposer = filters.rules.length === 0 || composing;
-  const canAdd = Boolean(selected) && draftValue.trim().length > 0;
-
-  function chooseField(fieldKey: string) {
-    setDraftField(fieldKey);
-    const field = activeFields.find((item) => item.field_key === fieldKey);
-    setDraftOp(field ? defaultOperator(field) : "eq");
-    setDraftValue("");
-  }
-
-  function addRule() {
-    if (!selected || !canAdd) return;
-    onChange({
-      ...filters,
-      rules: [
-        ...filters.rules,
-        { id: crypto.randomUUID(), fieldKey: selected.field_key, op: draftOp, value: draftValue.trim() },
-      ],
-    });
-    setDraftField("");
-    setDraftValue("");
-    setComposing(false);
-  }
-
-  function removeRule(id: string) {
-    const rules = filters.rules.filter((rule) => rule.id !== id);
-    onChange({ ...filters, rules });
-    if (rules.length === 0) setComposing(true);
-  }
-
-  function clearAll() {
-    onChange({ ...EMPTY_FILTERS, query: filters.query });
-    setComposing(true);
-    setDraftField("");
-    setDraftValue("");
-  }
-
   const chips = [
     ...(filters.scope === "archived"
       ? [{ id: "scope", label: "Archived", remove: () => onChange({ ...filters, scope: "active" }) }]
@@ -79,112 +161,35 @@ export function FilterControl({
     ...filters.rules.map((rule) => ({
       id: rule.id,
       label: describeRule(rule, fields.find((field) => field.field_key === rule.fieldKey), lookups),
-      remove: () => removeRule(rule.id),
+      remove: () => onChange(removeFilterRule(filters, rule.id)),
     })),
   ];
-
+  if (chips.length === 0) return null;
   return (
-    <>
-      <div className="filter-anchor" ref={ref}>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            aria-expanded={open}
-            aria-haspopup="dialog"
-            onClick={() => setOpen((value) => !value)}
-          >
-            Filter{count > 0 ? ` · ${count}` : ""}
+    <div className="chips" aria-label="Active filters">
+      {chips.map((chip) => (
+        <span className="chip" key={chip.id}>
+          {chip.label}
+          <button type="button" aria-label={`Remove ${chip.label}`} onClick={chip.remove}>
+            ×
           </button>
-          {open ? (
-            <div className="filter-panel" role="dialog" aria-label="Filter services">
-              <p className="micro">Catalog</p>
-              <div className="segmented" role="radiogroup" aria-label="Service archive state">
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={filters.scope === "active"}
-                  onClick={() => onChange({ ...filters, scope: "active" })}
-                >
-                  Active
-                </button>
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={filters.scope === "archived"}
-                  onClick={() => onChange({ ...filters, scope: "archived" })}
-                >
-                  Archived
-                </button>
-              </div>
-              <p className="hint">Archived services stay in the workspace and can be restored.</p>
-
-              {filters.rules.length > 0 ? (
-                <div className="filter-rules">
-                  {filters.rules.map((rule) => {
-                    const label = describeRule(
-                      rule,
-                      fields.find((field) => field.field_key === rule.fieldKey),
-                      lookups,
-                    );
-                    return (
-                      <div className="filter-rule" key={rule.id}>
-                        <span>{label}</span>
-                        <button type="button" className="btn btn-ghost" onClick={() => removeRule(rule.id)}>
-                          Remove
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : null}
-
-              {showComposer ? (
-                <div className="filter-compose">
-                  <label htmlFor="filter-field">Field</label>
-                  <select
-                    id="filter-field"
-                    className="select"
-                    value={draftField}
-                    onChange={(event) => chooseField(event.target.value)}
-                  >
-                    <option value="">Choose a field</option>
-                    {activeFields.map((field) => (
-                      <option key={field.id} value={field.field_key}>
-                        {field.label}
-                      </option>
-                    ))}
-                  </select>
-                  {selected ? <RuleValue field={selected} lookups={lookups} op={draftOp} value={draftValue} onOp={setDraftOp} onValue={setDraftValue} /> : null}
-                  <button type="button" className="btn btn-primary" disabled={!canAdd} onClick={addRule}>
-                    Add
-                  </button>
-                </div>
-              ) : null}
-
-              {filters.rules.length > 0 && !showComposer ? (
-                <button type="button" className="btn btn-secondary" style={{ marginTop: 10 }} onClick={() => setComposing(true)}>
-                  Add additional filter
-                </button>
-              ) : null}
-            </div>
-          ) : null}
-      </div>
-      {chips.length > 0 ? (
-        <div className="chips" aria-label="Active filters">
-          {chips.map((chip) => (
-            <span className="chip" key={chip.id}>
-              {chip.label}
-              <button type="button" aria-label={`Remove ${chip.label}`} onClick={chip.remove}>
-                ×
-              </button>
-            </span>
-          ))}
-          <button type="button" className="btn btn-ghost" onClick={clearAll}>
-            Clear all
-          </button>
-        </div>
-      ) : null}
-    </>
+        </span>
+      ))}
+      <button type="button" className="btn btn-ghost" onClick={onAddAdditional}>
+        + Add additional filter
+      </button>
+      <button
+        type="button"
+        className="btn btn-ghost"
+        onClick={() => {
+          const cleared = clearFilterRules(filters);
+          onChange(cleared.filters);
+          onComposer(cleared.composer);
+        }}
+      >
+        Clear all
+      </button>
+    </div>
   );
 }
 

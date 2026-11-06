@@ -16,12 +16,19 @@ export type ServiceCodeMode = "sequential" | "category_prefix";
 
 export type Role = "platform_owner" | "tenant_admin" | "editor" | "viewer";
 
+/** Ordered catalog table columns. `completeness` is the computed column. */
+export type CatalogColumnConfig = {
+  keys: string[];
+};
+
 export type Tenant = {
   id: string;
   slug: string;
   name: string;
   service_code_mode: ServiceCodeMode;
   logo_url: string | null;
+  /** Workspace default. Null uses the built-in column set. Viewers may override locally. */
+  catalog_columns: CatalogColumnConfig | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

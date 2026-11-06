@@ -58,6 +58,7 @@ export function freshDemo(): CatalogDb {
       name: sample.name,
       service_code_mode: sample.service_code_mode,
       logo_url: builtinLogoForSlug(sample.slug),
+      catalog_columns: null,
       is_active: true,
       created_at: SEEDED_AT,
       updated_at: SEEDED_AT,
@@ -125,6 +126,7 @@ export function createTenant(db: CatalogDb, name: string, now = new Date().toISO
     name: trimmed,
     service_code_mode: "sequential",
     logo_url: null,
+    catalog_columns: null,
     is_active: true,
     created_at: now,
     updated_at: now,
@@ -489,6 +491,164 @@ export function deleteService(db: CatalogDb, serviceId: string, now = new Date()
         action: "delete",
         before: serviceRecordData(current),
         after: null,
+        now,
+      }),
+      ...db.audit,
+    ],
+  };
+}
+
+export function importLookups(
+  db: CatalogDb,
+  fieldKey: string,
+  rows: Array<{ code: string; label: string; description: string | null; code_prefix: string | null }>,
+  now = new Date().toISOString(),
+): { db: CatalogDb; created: number; updated: number } {
+  const actor = requireSession(db);
+  const tenantId = requireActive(db);
+  assertAdmin(db, tenantId, actor.userId, "Only a workspace admin can import dropdown options.");
+  const group = fieldKey.trim();
+  if (!group) throw new Error("Choose a lookup group.");
+  const existing = db.lookups.filter((option) => option.tenant_id === tenantId && option.field_key === group);
+  const byCode = new Map(existing.map((option) => [option.code, option]));
+  let maxSort = existing.reduce((max, option) => Math.max(max, option.sort_order), 0);
+  const nextLookups = db.lookups.slice();
+  let created = 0;
+  let updated = 0;
+  for (const row of rows) {
+    const code = row.code.trim().toLowerCase();
+    const label = row.label.trim();
+    if (!label || !/^[a-z0-9_]+$/.test(code)) continue;
+    const description = row.description?.trim() ? row.description.trim() : null;
+    const prefix = group === "category" && row.code_prefix?.trim() ? row.code_prefix.trim().toUpperCase() : null;
+    const current = byCode.get(code);
+    if (current) {
+      const next = {
+        ...current,
+        label,
+        description,
+        code_prefix: group === "category" ? prefix : current.code_prefix,
+        is_active: true,
+      };
+      const index = nextLookups.findIndex((option) => option.id === current.id);
+      if (index >= 0) nextLookups[index] = next;
+      byCode.set(code, next);
+      updated += 1;
+    } else {
+      maxSort += 10;
+      const option = {
+        id: crypto.randomUUID(),
+        tenant_id: tenantId,
+        field_key: group,
+        code,
+        label,
+        description,
+        code_prefix: prefix,
+        sort_order: maxSort,
+        is_active: true,
+      };
+      nextLookups.push(option);
+      byCode.set(code, option);
+      created += 1;
+    }
+  }
+  if (created === 0 && updated === 0) return { db, created, updated };
+  return {
+    db: {
+      ...db,
+      lookups: nextLookups,
+      audit: [
+        auditEntry({
+          tenantId,
+          actor,
+          table: "lookup_options",
+          rowId: tenantId,
+          action: "insert",
+          before: null,
+          after: { kind: "lookup_import", field_key: group, created, updated },
+          now,
+        }),
+        ...db.audit,
+      ],
+    },
+    created,
+    updated,
+  };
+}
+
+export function checkoutServices(
+  db: CatalogDb,
+  incoming: ServiceRecord[],
+  now = new Date().toISOString(),
+): CatalogDb {
+  const actor = requireSession(db);
+  const tenantId = requireActive(db);
+  assertWrite(db, tenantId, actor.userId);
+  if (incoming.length === 0) throw new Error("The cart is empty.");
+  const taken = new Set(
+    db.services.filter((service) => service.tenant_id === tenantId).map((service) => service.service_code.toLowerCase()),
+  );
+  const stamped = incoming.map((service) => {
+    if (service.tenant_id !== tenantId) throw new Error("That service belongs to another workspace.");
+    const code = service.service_code.trim();
+    if (!code) throw new Error("Every service needs a code.");
+    if (taken.has(code.toLowerCase())) throw new Error(`Service code ${code} is already used in this workspace.`);
+    taken.add(code.toLowerCase());
+    return {
+      ...service,
+      service_code: code,
+      created_at: now,
+      updated_at: now,
+      created_by: actor.userId,
+      updated_by: actor.userId,
+      archived_at: null,
+    };
+  });
+  return {
+    ...db,
+    services: [...db.services, ...stamped],
+    audit: [
+      auditEntry({
+        tenantId,
+        actor,
+        table: "services",
+        rowId: stamped[0]?.id ?? tenantId,
+        action: "insert",
+        before: null,
+        after: {
+          kind: "blueprint_checkout",
+          count: stamped.length,
+          service_codes: stamped.map((service) => service.service_code),
+          names: stamped.map((service) => service.name),
+        },
+        now,
+      }),
+      ...db.audit,
+    ],
+  };
+}
+
+export function setCatalogColumns(db: CatalogDb, keys: string[], now = new Date().toISOString()): CatalogDb {
+  const actor = requireSession(db);
+  const tenantId = requireActive(db);
+  assertAdmin(db, tenantId, actor.userId, "Only a workspace admin can save the catalog column default.");
+  const clean = keys.filter((key) => key.trim().length > 0);
+  if (clean.length === 0) throw new Error("Choose at least one column.");
+  const current = db.tenants.find((tenant) => tenant.id === tenantId);
+  if (!current) throw new Error("Choose a workspace.");
+  const next = { ...current, catalog_columns: { keys: clean }, updated_at: now };
+  return {
+    ...db,
+    tenants: db.tenants.map((tenant) => (tenant.id === tenantId ? next : tenant)),
+    audit: [
+      auditEntry({
+        tenantId,
+        actor,
+        table: "tenants",
+        rowId: tenantId,
+        action: "update",
+        before: { catalog_columns: current.catalog_columns },
+        after: { catalog_columns: next.catalog_columns },
         now,
       }),
       ...db.audit,

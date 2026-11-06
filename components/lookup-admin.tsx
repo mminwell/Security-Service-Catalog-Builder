@@ -4,6 +4,7 @@ import { useState } from "react";
 import { LOOKUP_GROUPS } from "@/lib/catalog/lookups";
 import type { LookupOption } from "@/lib/catalog/types";
 import { useCatalog } from "@/components/catalog-provider";
+import { LookupImportControls } from "@/components/lookup-import";
 
 export function LookupAdmin() {
   const api = useCatalog();
@@ -54,6 +55,7 @@ export function LookupAdmin() {
           <p className="micro">{group.field_key}</p>
           <h2>{group.title}</h2>
           <p className="lede">{group.blurb}</p>
+          <LookupImportControls fieldKey={group.field_key} />
           <form
             className="form-grid"
             style={{ margin: "16px 0" }}
