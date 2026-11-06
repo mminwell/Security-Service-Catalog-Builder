@@ -1,7 +1,13 @@
 import { parseColumnConfig } from "@/lib/catalog/columns";
+import { CSF_ELEMENTS, CSF_FRAMEWORK } from "@/lib/catalog/framework";
+import { STARTER_LOOKUPS } from "@/lib/catalog/lookups";
 import { builtinLogoForSlug } from "@/lib/catalog/logos";
-import type { ServiceRecord, Tenant } from "@/lib/catalog/types";
+import type { LookupOption, OutcomeMapping, ServiceRecord, Tenant } from "@/lib/catalog/types";
 import { freshDemo, type CatalogDb } from "@/lib/data/model";
+
+const PREVIOUS_CSF_HELP = "Primary NIST CSF 2.0 function. Detailed control mapping comes in a later version.";
+const CURRENT_CSF_HELP =
+  "Primary NIST CSF 2.0 function for this service. This dropdown is not an outcome assessment and does not count as coverage.";
 
 export const DEMO_STORAGE_KEY = "sscb.demo.v1";
 export const ACTIVE_TENANT_KEY = "sscb.activeTenantId";
@@ -18,10 +24,13 @@ export function loadDemoDb(): CatalogDb {
 }
 
 /**
- * Accept a V1 or V1.1 demo cache.
+ * Accept a V1, V1.1, or V1.2 demo cache.
  * V1 has no `logo_url`, `archived_at`, or `catalog_columns`.
  * A missing logo on Acme Corp or Meridian Health receives the built-in mark.
- * An explicit null logo stays cleared. Edited services, lookups, and fields are kept.
+ * An explicit null logo stays cleared. Edited services, lookups, fields, and
+ * saved outcome assessments are kept. The official CSF 2.0 core is attached
+ * when the cache has no framework rows. Missing outcome-assessment dropdowns
+ * are added without rewriting lookup groups the workspace already edited.
  * Returns null when the payload is not a catalog.
  */
 export function migrateDemoState(raw: unknown): CatalogDb | null {
@@ -31,14 +40,19 @@ export function migrateDemoState(raw: unknown): CatalogDb | null {
     if (!Array.isArray(parsed.tenants) || !Array.isArray(parsed.services) || !Array.isArray(parsed.lookups)) {
       return null;
     }
+    const tenants = parsed.tenants.map(normalizeTenant);
+    const lookups = ensureCoverageLookups(parsed.lookups, tenants.map((tenant) => tenant.id));
     return {
       session: parsed.session ?? null,
       activeTenantId: typeof parsed.activeTenantId === "string" ? parsed.activeTenantId : null,
-      tenants: parsed.tenants.map(normalizeTenant),
+      tenants,
       members: Array.isArray(parsed.members) ? parsed.members : [],
-      fields: Array.isArray(parsed.fields) ? parsed.fields : [],
-      lookups: parsed.lookups,
+      fields: Array.isArray(parsed.fields) ? parsed.fields.map(normalizeStoredField) : [],
+      lookups,
       services: parsed.services.map(normalizeStoredService),
+      frameworks: [{ ...CSF_FRAMEWORK }],
+      elements: CSF_ELEMENTS.map((element) => ({ ...element })),
+      mappings: normalizeStoredMappings(parsed.mappings),
       audit: Array.isArray(parsed.audit) ? parsed.audit : [],
     };
   } catch {
@@ -83,6 +97,68 @@ function normalizeTenant(input: unknown): Tenant {
     created_at: typeof row.created_at === "string" ? row.created_at : "",
     updated_at: typeof row.updated_at === "string" ? row.updated_at : "",
   };
+}
+
+function normalizeStoredField(input: unknown): CatalogDb["fields"][number] {
+  const row = (input && typeof input === "object" ? input : {}) as CatalogDb["fields"][number];
+  if (row.field_key === "primary_csf_function" && row.help_text === PREVIOUS_CSF_HELP) {
+    return { ...row, help_text: CURRENT_CSF_HELP };
+  }
+  return row;
+}
+
+const COVERAGE_SEEDS = STARTER_LOOKUPS.filter((row) => row.field_key === "outcome_coverage");
+
+function ensureCoverageLookups(lookups: LookupOption[], tenantIds: string[]): LookupOption[] {
+  const next = lookups.slice();
+  for (const tenantId of tenantIds) {
+    if (!tenantId) continue;
+    if (next.some((option) => option.tenant_id === tenantId && option.field_key === "outcome_coverage")) continue;
+    for (const seed of COVERAGE_SEEDS) {
+      next.push({
+        id: `lookup:${tenantId}:outcome_coverage:${seed.code}`,
+        tenant_id: tenantId,
+        field_key: seed.field_key,
+        code: seed.code,
+        label: seed.label,
+        description: seed.description,
+        code_prefix: seed.code_prefix,
+        sort_order: seed.sort_order,
+        is_active: true,
+      });
+    }
+  }
+  return next;
+}
+
+function normalizeStoredMappings(input: unknown): OutcomeMapping[] {
+  if (!Array.isArray(input)) return [];
+  const seen = new Set<string>();
+  const mappings: OutcomeMapping[] = [];
+  for (const item of input) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Partial<OutcomeMapping>;
+    if (row.coverage !== "full" && row.coverage !== "partial" && row.coverage !== "none") continue;
+    if (typeof row.id !== "string" || typeof row.tenant_id !== "string") continue;
+    if (typeof row.service_id !== "string" || typeof row.element_id !== "string") continue;
+    const key = `${row.tenant_id}:${row.service_id}:${row.element_id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    mappings.push({
+      id: row.id,
+      tenant_id: row.tenant_id,
+      service_id: row.service_id,
+      element_id: row.element_id,
+      coverage: row.coverage,
+      rationale: typeof row.rationale === "string" && row.rationale.trim() ? row.rationale : null,
+      notes: typeof row.notes === "string" && row.notes.trim() ? row.notes : null,
+      created_by: typeof row.created_by === "string" ? row.created_by : null,
+      updated_by: typeof row.updated_by === "string" ? row.updated_by : null,
+      created_at: typeof row.created_at === "string" ? row.created_at : "",
+      updated_at: typeof row.updated_at === "string" ? row.updated_at : "",
+    });
+  }
+  return mappings;
 }
 
 function normalizeStoredService(input: unknown): ServiceRecord {

@@ -1,5 +1,7 @@
 import { canAdminister, canWriteServices } from "@/lib/catalog/access";
+import { isExplicitCoverage } from "@/lib/catalog/coverage";
 import { isIdentityField, materializeFields } from "@/lib/catalog/fields";
+import { CSF_ELEMENTS, CSF_FRAMEWORK, type FrameworkElement, type FrameworkRelease } from "@/lib/catalog/framework";
 import { builtinLogoForSlug, normalizeLogoInput } from "@/lib/catalog/logos";
 import { STARTER_LOOKUPS } from "@/lib/catalog/lookups";
 import { SAMPLE_TENANTS, STARTER_PACK } from "@/lib/catalog/samples";
@@ -11,6 +13,7 @@ import {
   type FieldDefinition,
   type LookupOption,
   type Member,
+  type OutcomeMapping,
   type Role,
   type ServiceCodeMode,
   type ServiceRecord,
@@ -26,6 +29,9 @@ export type CatalogDb = {
   fields: FieldDefinition[];
   lookups: LookupOption[];
   services: ServiceRecord[];
+  frameworks: FrameworkRelease[];
+  elements: FrameworkElement[];
+  mappings: OutcomeMapping[];
   audit: AuditEntry[];
 };
 
@@ -40,6 +46,9 @@ export function emptyDb(): CatalogDb {
     fields: [],
     lookups: [],
     services: [],
+    frameworks: [],
+    elements: [],
+    mappings: [],
     audit: [],
   };
 }
@@ -86,6 +95,9 @@ export function freshDemo(): CatalogDb {
     fields,
     lookups,
     services,
+    frameworks: [{ ...CSF_FRAMEWORK }],
+    elements: CSF_ELEMENTS.map((element) => ({ ...element })),
+    mappings: [],
     audit: [],
   };
 }
@@ -479,9 +491,11 @@ export function deleteService(db: CatalogDb, serviceId: string, now = new Date()
   assertAdmin(db, tenantId, actor.userId, "Only a workspace admin can permanently delete a service.");
   const current = db.services.find((service) => service.id === serviceId && service.tenant_id === tenantId);
   if (!current) throw new Error("That service is not in this workspace.");
+  const removed = db.mappings.filter((mapping) => mapping.service_id === serviceId);
   return {
     ...db,
     services: db.services.filter((service) => service.id !== serviceId),
+    mappings: db.mappings.filter((mapping) => mapping.service_id !== serviceId),
     audit: [
       auditEntry({
         tenantId,
@@ -490,6 +504,105 @@ export function deleteService(db: CatalogDb, serviceId: string, now = new Date()
         rowId: serviceId,
         action: "delete",
         before: serviceRecordData(current),
+        after: null,
+        now,
+      }),
+      ...removed.map((mapping) =>
+        auditEntry({
+          tenantId,
+          actor,
+          table: "service_outcome_mappings",
+          rowId: mapping.id,
+          action: "delete",
+          before: mappingSnapshot(db, mapping, current),
+          after: null,
+          now,
+        }),
+      ),
+      ...db.audit,
+    ],
+  };
+}
+
+export type OutcomeMappingInput = {
+  serviceId: string;
+  elementId: string;
+  coverage: string;
+  rationale?: string | null;
+  notes?: string | null;
+};
+
+export function saveOutcomeMapping(
+  db: CatalogDb,
+  input: OutcomeMappingInput,
+  now = new Date().toISOString(),
+): CatalogDb {
+  const actor = requireSession(db);
+  const tenantId = requireActive(db);
+  assertWrite(db, tenantId, actor.userId);
+  const service = db.services.find((item) => item.id === input.serviceId && item.tenant_id === tenantId);
+  if (!service) throw new Error("That service belongs to another workspace.");
+  const element = db.elements.find((item) => item.id === input.elementId && item.element_type === "subcategory");
+  if (!element) throw new Error("Choose a CSF 2.0 subcategory outcome.");
+  if (!isExplicitCoverage(input.coverage)) throw new Error("Coverage must be full, partial, or none.");
+  const rationale = cleanNote(input.rationale);
+  const notes = cleanNote(input.notes);
+  const current = db.mappings.find(
+    (mapping) => mapping.tenant_id === tenantId && mapping.service_id === service.id && mapping.element_id === element.id,
+  );
+  const next: OutcomeMapping = {
+    id: current?.id ?? crypto.randomUUID(),
+    tenant_id: tenantId,
+    service_id: service.id,
+    element_id: element.id,
+    coverage: input.coverage,
+    rationale,
+    notes,
+    created_by: current?.created_by ?? actor.userId,
+    updated_by: actor.userId,
+    created_at: current?.created_at ?? now,
+    updated_at: now,
+  };
+  const mappings = current
+    ? db.mappings.map((mapping) => (mapping.id === current.id ? next : mapping))
+    : [...db.mappings, next];
+  return {
+    ...db,
+    mappings,
+    audit: [
+      auditEntry({
+        tenantId,
+        actor,
+        table: "service_outcome_mappings",
+        rowId: next.id,
+        action: current ? "update" : "insert",
+        before: current ? mappingSnapshot(db, current, service) : null,
+        after: mappingSnapshot(db, next, service),
+        now,
+      }),
+      ...db.audit,
+    ],
+  };
+}
+
+export function removeOutcomeMapping(db: CatalogDb, mappingId: string, now = new Date().toISOString()): CatalogDb {
+  const actor = requireSession(db);
+  const tenantId = requireActive(db);
+  assertWrite(db, tenantId, actor.userId);
+  const current = db.mappings.find((mapping) => mapping.id === mappingId && mapping.tenant_id === tenantId);
+  if (!current) throw new Error("That assessment is not in this workspace.");
+  const service = db.services.find((item) => item.id === current.service_id && item.tenant_id === tenantId);
+  return {
+    ...db,
+    mappings: db.mappings.filter((mapping) => mapping.id !== current.id),
+    audit: [
+      auditEntry({
+        tenantId,
+        actor,
+        table: "service_outcome_mappings",
+        rowId: current.id,
+        action: "delete",
+        before: mappingSnapshot(db, current, service),
         after: null,
         now,
       }),
@@ -736,4 +849,27 @@ function auditEntry(args: {
 
 function serviceRecordData(service: ServiceRecord): Record<string, unknown> {
   return { ...withComputed(service) };
+}
+
+function cleanNote(value: string | null | undefined): string | null {
+  const text = value?.trim() ?? "";
+  if (text.length > 4000) throw new Error("Keep rationale and notes under 4000 characters.");
+  return text.length > 0 ? text : null;
+}
+
+function mappingSnapshot(
+  db: CatalogDb,
+  mapping: OutcomeMapping,
+  service: ServiceRecord | undefined,
+): Record<string, unknown> {
+  const element = db.elements.find((item) => item.id === mapping.element_id);
+  return {
+    element_id: mapping.element_id,
+    element_code: element?.code ?? null,
+    service_id: mapping.service_id,
+    service_code: service?.service_code ?? null,
+    coverage: mapping.coverage,
+    rationale: mapping.rationale,
+    notes: mapping.notes,
+  };
 }

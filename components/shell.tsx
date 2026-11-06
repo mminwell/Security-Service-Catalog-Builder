@@ -61,6 +61,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Link href="/catalog" aria-current={pathname.startsWith("/catalog") ? "page" : undefined}>
             Catalog
           </Link>
+          <Link href="/coverage" aria-current={pathname.startsWith("/coverage") ? "page" : undefined}>
+            Coverage
+          </Link>
           <Link
             href="/blueprints"
             aria-label={SHOP_FREE_BLUEPRINTS_LABEL}

@@ -61,7 +61,13 @@ export const LOOKUP_GROUPS: LookupGroup[] = [
   {
     field_key: "primary_csf_function",
     title: "NIST CSF 2.0 Functions",
-    blurb: "The six CSF 2.0 functions. Control-level mapping is a later version.",
+    blurb: "The six CSF 2.0 functions as a single label on the service. Outcome assessments are recorded separately and are not certification.",
+  },
+  {
+    field_key: "outcome_coverage",
+    title: "CSF Outcome Assessment",
+    blurb:
+      "Explicit workspace assessment of a CSF 2.0 subcategory outcome: full, partial, or none. Not a maturity score and not certification. Unmapped is the absence of an assessment, not a fourth option.",
   },
   {
     field_key: "data_classification",
@@ -311,6 +317,26 @@ export const STARTER_LOOKUPS: LookupSeed[] = [
       code: "recover",
       label: "Recover",
       description: "Restore assets and operations that a cybersecurity incident affected.",
+    },
+  ]),
+  ...rows("outcome_coverage", [
+    {
+      code: "full",
+      label: "Full",
+      description:
+        "This service addresses the outcome, as assessed by this workspace. Full is not a certification and does not add partial credit from other services.",
+    },
+    {
+      code: "partial",
+      label: "Partial",
+      description:
+        "This service addresses part of the outcome. Partial is not half of a full assessment and is not added into a percentage.",
+    },
+    {
+      code: "none",
+      label: "None",
+      description:
+        "An assessor recorded that this service does not address the outcome. None is different from leaving the outcome unmapped.",
     },
   ]),
   ...rows("data_classification", [

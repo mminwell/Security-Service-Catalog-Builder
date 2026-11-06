@@ -17,6 +17,7 @@ import {
 } from "@/lib/catalog/service";
 import { DEPTH_META, type DepthLevel, type FieldDefinition, type ServiceRecord } from "@/lib/catalog/types";
 import { useCatalog } from "@/components/catalog-provider";
+import { ServiceMappingSection } from "@/components/outcome-mapping";
 import { AuditDrawer, Badge, ConfirmDialog, DepthToggle, FieldHelp, InfoTip, LookupSelect } from "@/components/widgets";
 
 export function ServiceForm({ serviceId }: { serviceId: string }) {
@@ -253,6 +254,18 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
       ))}
 
       {actionBar("bottom")}
+
+      {isNew ? (
+        <section className="form-section" id="mapping">
+          <h2>Mapping</h2>
+          <p className="lede">
+            Save the service before recording an outcome assessment. A blueprint hint is not coverage, and a primary
+            CSF function is not an assessment.
+          </p>
+        </section>
+      ) : (
+        <ServiceMappingSection serviceId={draft.id} />
+      )}
 
       {history && !isNew ? (
         <AuditDrawer

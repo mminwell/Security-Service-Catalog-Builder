@@ -502,7 +502,7 @@ function PreviewBody({
       <section>
         <h3>Suggested NIST CSF 2.0 subcategories</h3>
         <p>{blueprint.nist_csf.join(", ")}</p>
-        <p className="hint">Hints for a later mapping release. They are stored with the service and are not a control assessment.</p>
+        <p className="hint">Hints only. Checkout stores them on the service and does not count them as coverage until someone saves an assessment.</p>
       </section>
     </div>
   );

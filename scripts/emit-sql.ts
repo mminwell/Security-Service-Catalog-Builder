@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { STARTER_FIELDS } from "../lib/catalog/fields";
+import { CSF_ELEMENTS, CSF_FRAMEWORK } from "../lib/catalog/framework";
 import { builtinLogoForSlug } from "../lib/catalog/logos";
 import { STARTER_LOOKUPS } from "../lib/catalog/lookups";
 import { SAMPLE_TENANTS, STARTER_PACK } from "../lib/catalog/samples";
@@ -169,6 +170,115 @@ ${rows};
 end $$;`;
 }
 
+function frameworkSeed(): string {
+  const framework = CSF_FRAMEWORK;
+  const header = `insert into public.frameworks (
+  id, code, version, name, published_on, publication, publication_url,
+  source_title, source_tool, source_url, reference_tool_url, retrieved_on,
+  export_change_log, export_generated_at, export_sha256, content_sha256,
+  id_namespace, excluded_withdrawn_rows, provenance, is_active
+) values (
+  ${quote(framework.id)}::uuid,
+  ${quote(framework.code)},
+  ${quote(framework.version)},
+  ${quote(framework.name)},
+  ${quote(framework.published_on)}::date,
+  ${quote(framework.publication)},
+  ${quote(framework.publication_url)},
+  ${quote(framework.source_title)},
+  ${quote(framework.source_tool)},
+  ${quote(framework.source_url)},
+  ${quote(framework.reference_tool_url)},
+  ${quote(framework.retrieved_on)}::date,
+  ${quote(framework.export_change_log)},
+  ${quote(framework.export_generated_at)},
+  ${quote(framework.export_sha256)},
+  ${quote(framework.content_sha256)},
+  ${quote(framework.id_namespace)},
+  ${framework.excluded_withdrawn_rows},
+  ${quote(framework.provenance)},
+  true
+)
+on conflict (code, version) do update set
+  name = excluded.name,
+  published_on = excluded.published_on,
+  publication = excluded.publication,
+  publication_url = excluded.publication_url,
+  source_title = excluded.source_title,
+  source_tool = excluded.source_tool,
+  source_url = excluded.source_url,
+  reference_tool_url = excluded.reference_tool_url,
+  retrieved_on = excluded.retrieved_on,
+  export_change_log = excluded.export_change_log,
+  export_generated_at = excluded.export_generated_at,
+  export_sha256 = excluded.export_sha256,
+  content_sha256 = excluded.content_sha256,
+  id_namespace = excluded.id_namespace,
+  excluded_withdrawn_rows = excluded.excluded_withdrawn_rows,
+  provenance = excluded.provenance,
+  is_active = excluded.is_active;`;
+
+  const elementInsert = (elementType: "function" | "category" | "subcategory") => {
+    const values = CSF_ELEMENTS.filter((element) => element.element_type === elementType)
+      .map((element) => {
+        const parent = element.parent_id ? `${quote(element.parent_id)}::uuid` : "null";
+        return `  (${quote(element.id)}::uuid, ${quote(framework.id)}::uuid, ${quote(element.element_type)}, ${quote(element.code)}, ${parent}, ${quote(element.title)}, ${quote(element.statement)}, ${element.sort_order})`;
+      })
+      .join(",\n");
+    return `insert into public.framework_elements (
+  id, framework_id, element_type, code, parent_id, title, statement, sort_order
+) values
+${values}
+on conflict (framework_id, code) do update set
+  element_type = excluded.element_type,
+  parent_id = excluded.parent_id,
+  title = excluded.title,
+  statement = excluded.statement,
+  sort_order = excluded.sort_order;`;
+  };
+
+  const coverage = STARTER_LOOKUPS.filter((row) => row.field_key === "outcome_coverage")
+    .map((row) => {
+      const description = row.description ? quote(row.description) : "null";
+      return `  (null, ${quote(row.field_key)}, ${quote(row.code)}, ${quote(row.label)}, ${description}, null, ${row.sort_order}, true)`;
+    })
+    .join(",\n");
+  const coverageSql = `insert into public.lookup_options (
+  tenant_id, field_key, code, label, description, code_prefix, sort_order, is_active
+) values
+${coverage}
+on conflict (field_key, code) where tenant_id is null do update set
+  label = excluded.label,
+  description = excluded.description,
+  sort_order = excluded.sort_order,
+  is_active = excluded.is_active;
+
+insert into public.lookup_options (
+  tenant_id, field_key, code, label, description, code_prefix, sort_order, is_active
+)
+select t.id, s.field_key, s.code, s.label, s.description, s.code_prefix, s.sort_order, s.is_active
+from public.tenants t
+join public.lookup_options s
+  on s.tenant_id is null
+ and s.field_key = 'outcome_coverage'
+where not exists (
+  select 1
+  from public.lookup_options existing
+  where existing.tenant_id = t.id
+    and existing.field_key = s.field_key
+    and existing.code = s.code
+);`;
+
+  return [
+    "-- NIST CSF 2.0 core. Idempotent. Withdrawn crosswalk rows are not included.",
+    header,
+    elementInsert("function"),
+    elementInsert("category"),
+    elementInsert("subcategory"),
+    coverageSql,
+  ].join("\n\n");
+}
+
 const starterData = [
   "-- Platform templates. tenant_id is null. provision_tenant copies these into each workspace.",
   fieldInsert("on conflict (field_key) where tenant_id is null do nothing"),
@@ -187,17 +297,34 @@ const nextMigration = migration.replace(
 );
 writeFileSync(migrationPath, nextMigration);
 
+const frameworkMigrationPath = "supabase/migrations/0004_v2_csf_mappings.sql";
+const frameworkMigration = readFileSync(frameworkMigrationPath, "utf8");
+if (!frameworkMigration.includes("-- FRAMEWORK_SEED_BEGIN") || !frameworkMigration.includes("-- FRAMEWORK_SEED_END")) {
+  throw new Error("V2 migration is missing FRAMEWORK_SEED markers.");
+}
+writeFileSync(
+  frameworkMigrationPath,
+  frameworkMigration.replace(
+    /-- FRAMEWORK_SEED_BEGIN[\s\S]*?-- FRAMEWORK_SEED_END/,
+    `-- FRAMEWORK_SEED_BEGIN\n${frameworkSeed()}\n-- FRAMEWORK_SEED_END`,
+  ),
+);
+
 const seed = `-- Optional sample data for Security Service Catalog Builder.
 -- Fictional workspaces only: Acme Corp and Meridian Health.
 -- Safe to run more than once. Apply the migrations first:
 -- supabase/migrations/0001_v1_catalog_core.sql
 -- supabase/migrations/0002_v1_1_polish.sql
 -- supabase/migrations/0003_v1_2_blueprints_columns_import.sql
+-- supabase/migrations/0004_v2_csf_mappings.sql
 -- No real client names, credentials, or project URLs.
+-- The CSF 2.0 core is loaded by 0004. The block below repeats it so a later seed stays idempotent.
 
 ${fieldInsert("on conflict (field_key) where tenant_id is null do nothing")}
 
 ${lookupInsert("on conflict (field_key, code) where tenant_id is null do nothing")}
+
+${frameworkSeed()}
 
 ${SAMPLE_TENANTS.map((tenant) =>
   sampleBlock(
@@ -212,4 +339,4 @@ ${SAMPLE_TENANTS.map((tenant) =>
 `;
 
 writeFileSync("supabase/seed.sql", seed);
-console.log(`Wrote starter data into ${migrationPath} and supabase/seed.sql`);
+console.log(`Wrote starter data into ${migrationPath}, ${frameworkMigrationPath}, and supabase/seed.sql`);

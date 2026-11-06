@@ -17,10 +17,12 @@ import { isIdentityField } from "@/lib/catalog/fields";
 import { optionByCode } from "@/lib/catalog/lookups";
 import { normalizeLogoInput } from "@/lib/catalog/logos";
 import { localToday } from "@/lib/catalog/present";
+import type { FrameworkElement, FrameworkRelease } from "@/lib/catalog/framework";
 import type {
   FieldDefinition,
   LookupOption,
   Member,
+  OutcomeMapping,
   Role,
   ServiceCodeMode,
   ServiceRecord,
@@ -34,10 +36,12 @@ import {
   checkoutServices,
   deleteService as deleteServiceRecord,
   importLookups as importLookupRowsModel,
+  removeOutcomeMapping as removeOutcomeMappingRow,
   resetDemo,
   roleFor,
   saveField as saveFieldRow,
   saveLookup as saveLookupRow,
+  saveOutcomeMapping as saveOutcomeMappingRow,
   saveService as saveServiceRow,
   setServiceArchived,
   setCatalogColumns as setCatalogColumnsRow,
@@ -50,6 +54,7 @@ import {
 } from "@/lib/data/model";
 import {
   checkoutBlueprintRows,
+  deleteOutcomeMappingRow as deleteOutcomeMappingRemote,
   deleteServiceRow,
   hydrateFromSupabase,
   importLookupRows,
@@ -57,6 +62,7 @@ import {
   persistCatalogColumns,
   persistField,
   persistLookup,
+  persistOutcomeMapping,
   persistService,
   persistServiceArchived,
   persistTenantLogo,
@@ -83,6 +89,9 @@ type CatalogApi = {
   fields: FieldDefinition[];
   lookups: LookupOption[];
   services: ServiceRecord[];
+  framework: FrameworkRelease | null;
+  elements: FrameworkElement[];
+  mappings: OutcomeMapping[];
   audit: AuditEntryLike[];
   members: Member[];
   signIn: (email: string, password: string) => Promise<void>;
@@ -118,6 +127,14 @@ type CatalogApi = {
     deliveryTeam: string | null;
   }) => Promise<void>;
   saveCatalogColumns: (keys: string[]) => Promise<void>;
+  saveOutcomeMapping: (input: {
+    serviceId: string;
+    elementId: string;
+    coverage: string;
+    rationale?: string | null;
+    notes?: string | null;
+  }) => Promise<void>;
+  removeOutcomeMapping: (mappingId: string) => Promise<void>;
   resetDemoData: () => void;
 };
 
@@ -198,6 +215,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     const fields = db?.fields.filter((field) => field.tenant_id === tenantId) ?? [];
     const lookups = db?.lookups.filter((option) => option.tenant_id === tenantId) ?? [];
     const services = db?.services.filter((service) => service.tenant_id === tenantId) ?? [];
+    const mappings = db?.mappings.filter((mapping) => mapping.tenant_id === tenantId) ?? [];
     const audit = db?.audit.filter((entry) => entry.tenant_id === tenantId) ?? [];
     const members = db?.members.filter((member) => member.tenant_id === tenantId) ?? [];
 
@@ -217,6 +235,9 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       fields,
       lookups,
       services,
+      framework: db?.frameworks.find((item) => item.is_active) ?? null,
+      elements: db?.elements ?? [],
+      mappings,
       audit,
       members,
       signIn: (email, password) =>
@@ -481,6 +502,36 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           const supabase = supabaseRef.current;
           if (!supabase) throw new Error("Supabase is not connected.");
           await checkoutBlueprintRows(supabase, tenantId, planned);
+          await reload();
+        }),
+      saveOutcomeMapping: (input) =>
+        guard(async () => {
+          if (!db) throw new Error("The catalog is still loading.");
+          const next = saveOutcomeMappingRow(db, input);
+          if (mode === "demo") {
+            commit(next);
+            return;
+          }
+          const supabase = supabaseRef.current;
+          if (!supabase) throw new Error("Supabase is not connected.");
+          const mapping = next.mappings.find(
+            (item) => item.service_id === input.serviceId && item.element_id === input.elementId,
+          );
+          if (!mapping) throw new Error("The assessment could not be saved.");
+          await persistOutcomeMapping(supabase, mapping);
+          await reload();
+        }),
+      removeOutcomeMapping: (mappingId: string) =>
+        guard(async () => {
+          if (!db) throw new Error("The catalog is still loading.");
+          const next = removeOutcomeMappingRow(db, mappingId);
+          if (mode === "demo") {
+            commit(next);
+            return;
+          }
+          const supabase = supabaseRef.current;
+          if (!supabase) throw new Error("Supabase is not connected.");
+          await deleteOutcomeMappingRemote(supabase, mappingId);
           await reload();
         }),
       saveCatalogColumns: (keys) =>
