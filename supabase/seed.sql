@@ -5,8 +5,10 @@
 -- supabase/migrations/0002_v1_1_polish.sql
 -- supabase/migrations/0003_v1_2_blueprints_columns_import.sql
 -- supabase/migrations/0004_v2_csf_mappings.sql
+-- supabase/migrations/0005_v3_exports_frameworks.sql
 -- No real client names, credentials, or project URLs.
 -- The CSF 2.0 core is loaded by 0004. The block below repeats it so a later seed stays idempotent.
+-- Optional field groups and the unloaded framework registry are repeated from 0005.
 
 insert into public.field_definitions (
   tenant_id, field_key, label, help_text, input_type, lookup_field_key,
@@ -55,7 +57,12 @@ insert into public.field_definitions (
   (null, $sscb$cost_or_effort_notes$sscb$, $sscb$Cost / Effort Notes$sscb$, $sscb$Sizing, effort, or cost-band notes. Internal.$sscb$, $sscb$textarea$sscb$, null, false, $sscb$internal$sscb$, 3, 410, true, true),
   (null, $sscb$review_cadence$sscb$, $sscb$Review Cadence$sscb$, $sscb$How often this catalog entry should be reviewed. On Change does not calculate a next date.$sscb$, $sscb$dropdown$sscb$, $sscb$review_cadence$sscb$, false, $sscb$public$sscb$, 3, 420, true, true),
   (null, $sscb$last_reviewed_date$sscb$, $sscb$Last Reviewed$sscb$, $sscb$Date this entry was last reviewed.$sscb$, $sscb$date$sscb$, null, false, $sscb$public$sscb$, 3, 430, true, true),
-  (null, $sscb$next_review_date$sscb$, $sscb$Next Review$sscb$, $sscb$Computed from the last reviewed date and the review cadence.$sscb$, $sscb$computed$sscb$, null, false, $sscb$public$sscb$, 3, 440, true, true)
+  (null, $sscb$next_review_date$sscb$, $sscb$Next Review$sscb$, $sscb$Computed from the last reviewed date and the review cadence.$sscb$, $sscb$computed$sscb$, null, false, $sscb$public$sscb$, 3, 440, true, true),
+  (null, $sscb$data_residency_regions$sscb$, $sscb$Data residency regions$sscb$, $sscb$Regions this workspace has recorded for where the service runs or stores data. A recorded region is not a legal residency determination.$sscb$, $sscb$multi_select$sscb$, $sscb$data_residency_region$sscb$, false, $sscb$public$sscb$, 2, 450, false, true),
+  (null, $sscb$hosting_model$sscb$, $sscb$Hosting model$sscb$, $sscb$Where the workspace says this service is hosted. This is an operational note, not a finding about sovereignty or a contract.$sscb$, $sscb$dropdown$sscb$, $sscb$hosting_model$sscb$, false, $sscb$public$sscb$, 2, 460, false, true),
+  (null, $sscb$personal_data_recorded$sscb$, $sscb$Personal data recorded$sscb$, $sscb$Whether this workspace has recorded that the service handles personal data. Yes is not a legal classification and does not mean a privacy law applies.$sscb$, $sscb$dropdown$sscb$, $sscb$personal_data_recorded$sscb$, false, $sscb$public$sscb$, 2, 470, false, true),
+  (null, $sscb$recorded_jurisdictions$sscb$, $sscb$Recorded jurisdictions$sscb$, $sscb$Jurisdictions the workspace has noted for people whose data the service may handle. This is not a finding that a privacy law applies.$sscb$, $sscb$multi_select$sscb$, $sscb$recorded_jurisdiction$sscb$, false, $sscb$public$sscb$, 2, 480, false, true),
+  (null, $sscb$privacy_operations_notes$sscb$, $sscb$Privacy operations notes$sscb$, $sscb$Operational privacy notes for this service. This catalog does not conclude that a law, contract, or framework is met.$sscb$, $sscb$textarea$sscb$, null, false, $sscb$public$sscb$, 3, 490, false, true)
 on conflict (field_key) where tenant_id is null do nothing;
 
 insert into public.lookup_options (
@@ -160,7 +167,31 @@ insert into public.lookup_options (
   (null, $sscb$target_audience$sscb$, $sscb$security_team$sscb$, $sscb$Security Team$sscb$, $sscb$The security organization itself.$sscb$, null, 40, true),
   (null, $sscb$target_audience$sscb$, $sscb$business_owners$sscb$, $sscb$Business Owners$sscb$, $sscb$Owners of business processes and services.$sscb$, null, 50, true),
   (null, $sscb$target_audience$sscb$, $sscb$external_parties$sscb$, $sscb$External Parties$sscb$, $sscb$Suppliers, partners, or other outside parties.$sscb$, null, 60, true),
-  (null, $sscb$target_audience$sscb$, $sscb$customers$sscb$, $sscb$Customers$sscb$, $sscb$The organization’s customers.$sscb$, null, 70, true)
+  (null, $sscb$target_audience$sscb$, $sscb$customers$sscb$, $sscb$Customers$sscb$, $sscb$The organization’s customers.$sscb$, null, 70, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$not_recorded$sscb$, $sscb$Not recorded$sscb$, $sscb$The workspace has not recorded a region.$sscb$, null, 10, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$customer_environment$sscb$, $sscb$Customer environment$sscb$, $sscb$The service runs in the customer’s own environment.$sscb$, null, 20, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$on_premises$sscb$, $sscb$On premises$sscb$, $sscb$The workspace records this service as on premises.$sscb$, null, 30, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$us$sscb$, $sscb$United States$sscb$, $sscb$A United States region the workspace recorded. Not a legal conclusion.$sscb$, null, 40, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$ca$sscb$, $sscb$Canada$sscb$, $sscb$A Canada region the workspace recorded. Not a legal conclusion.$sscb$, null, 50, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$uk$sscb$, $sscb$United Kingdom$sscb$, $sscb$A United Kingdom region the workspace recorded. Not a legal conclusion.$sscb$, null, 60, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$eea$sscb$, $sscb$European Economic Area$sscb$, $sscb$An EEA region the workspace recorded. Not a legal conclusion.$sscb$, null, 70, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$apac$sscb$, $sscb$Asia Pacific$sscb$, $sscb$An Asia Pacific region the workspace recorded. Not a legal conclusion.$sscb$, null, 80, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$latam$sscb$, $sscb$Latin America$sscb$, $sscb$A Latin America region the workspace recorded. Not a legal conclusion.$sscb$, null, 90, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$other$sscb$, $sscb$Other recorded region$sscb$, $sscb$Another region named in the service notes.$sscb$, null, 100, true),
+  (null, $sscb$hosting_model$sscb$, $sscb$not_recorded$sscb$, $sscb$Not recorded$sscb$, $sscb$The workspace has not recorded a hosting model.$sscb$, null, 10, true),
+  (null, $sscb$hosting_model$sscb$, $sscb$customer_environment$sscb$, $sscb$Customer environment$sscb$, $sscb$Hosted in the customer’s environment.$sscb$, null, 20, true),
+  (null, $sscb$hosting_model$sscb$, $sscb$on_premises$sscb$, $sscb$On premises$sscb$, $sscb$Hosted on premises.$sscb$, null, 30, true),
+  (null, $sscb$hosting_model$sscb$, $sscb$single_region$sscb$, $sscb$Single region$sscb$, $sscb$The workspace records a single hosting region.$sscb$, null, 40, true),
+  (null, $sscb$hosting_model$sscb$, $sscb$multi_region$sscb$, $sscb$Multiple regions$sscb$, $sscb$The workspace records more than one hosting region.$sscb$, null, 50, true),
+  (null, $sscb$personal_data_recorded$sscb$, $sscb$not_recorded$sscb$, $sscb$Not recorded$sscb$, $sscb$The workspace has not recorded whether personal data is handled.$sscb$, null, 10, true),
+  (null, $sscb$personal_data_recorded$sscb$, $sscb$no$sscb$, $sscb$No$sscb$, $sscb$The workspace recorded that this service does not handle personal data.$sscb$, null, 20, true),
+  (null, $sscb$personal_data_recorded$sscb$, $sscb$yes$sscb$, $sscb$Yes$sscb$, $sscb$The workspace recorded that this service handles personal data. This is not a legal classification.$sscb$, null, 30, true),
+  (null, $sscb$recorded_jurisdiction$sscb$, $sscb$not_recorded$sscb$, $sscb$Not recorded$sscb$, $sscb$The workspace has not recorded a jurisdiction.$sscb$, null, 10, true),
+  (null, $sscb$recorded_jurisdiction$sscb$, $sscb$us$sscb$, $sscb$United States$sscb$, $sscb$Noted by the workspace. Not a finding that a US privacy law applies.$sscb$, null, 20, true),
+  (null, $sscb$recorded_jurisdiction$sscb$, $sscb$ca$sscb$, $sscb$Canada$sscb$, $sscb$Noted by the workspace. Not a finding that a Canadian privacy law applies.$sscb$, null, 30, true),
+  (null, $sscb$recorded_jurisdiction$sscb$, $sscb$uk$sscb$, $sscb$United Kingdom$sscb$, $sscb$Noted by the workspace. Not a finding that a UK privacy law applies.$sscb$, null, 40, true),
+  (null, $sscb$recorded_jurisdiction$sscb$, $sscb$eea$sscb$, $sscb$European Economic Area$sscb$, $sscb$Noted by the workspace. Not a finding that an EEA privacy law applies.$sscb$, null, 50, true),
+  (null, $sscb$recorded_jurisdiction$sscb$, $sscb$other$sscb$, $sscb$Other$sscb$, $sscb$Another jurisdiction named in the service notes.$sscb$, null, 60, true)
 on conflict (field_key, code) where tenant_id is null do nothing;
 
 -- NIST CSF 2.0 core. Idempotent. Withdrawn crosswalk rows are not included.
@@ -220,7 +251,7 @@ insert into public.framework_elements (
   ($sscb$8a502742-5861-503e-849f-17f473941a42$sscb$::uuid, $sscb$024f2c3f-f4dd-5372-8c0a-893c132c5aef$sscb$::uuid, $sscb$function$sscb$, $sscb$DE$sscb$, null, $sscb$DETECT$sscb$, $sscb$Possible cybersecurity attacks and compromises are found and analyzed$sscb$, 92),
   ($sscb$20bede1b-1d1b-5c16-8112-43685e645c5c$sscb$::uuid, $sscb$024f2c3f-f4dd-5372-8c0a-893c132c5aef$sscb$::uuid, $sscb$function$sscb$, $sscb$RS$sscb$, null, $sscb$RESPOND$sscb$, $sscb$Actions regarding a detected cybersecurity incident are taken$sscb$, 106),
   ($sscb$5c80b5f5-f942-5ec8-a7f4-127cebb2da97$sscb$::uuid, $sscb$024f2c3f-f4dd-5372-8c0a-893c132c5aef$sscb$::uuid, $sscb$function$sscb$, $sscb$RC$sscb$, null, $sscb$RECOVER$sscb$, $sscb$Assets and operations affected by a cybersecurity incident are restored$sscb$, 124)
-on conflict (framework_id, code) do update set
+on conflict (framework_id, code) where tenant_id is null do update set
   element_type = excluded.element_type,
   parent_id = excluded.parent_id,
   title = excluded.title,
@@ -252,7 +283,7 @@ insert into public.framework_elements (
   ($sscb$3f8c1ec9-bdcf-5bc6-b22a-36fd67087f4f$sscb$::uuid, $sscb$024f2c3f-f4dd-5372-8c0a-893c132c5aef$sscb$::uuid, $sscb$category$sscb$, $sscb$RS.MI$sscb$, $sscb$20bede1b-1d1b-5c16-8112-43685e645c5c$sscb$::uuid, $sscb$Incident Mitigation$sscb$, $sscb$Activities are performed to prevent expansion of an event and mitigate its effects$sscb$, 121),
   ($sscb$e1d463fc-021e-5372-bcae-1378976fe51d$sscb$::uuid, $sscb$024f2c3f-f4dd-5372-8c0a-893c132c5aef$sscb$::uuid, $sscb$category$sscb$, $sscb$RC.RP$sscb$, $sscb$5c80b5f5-f942-5ec8-a7f4-127cebb2da97$sscb$::uuid, $sscb$Incident Recovery Plan Execution$sscb$, $sscb$Restoration activities are performed to ensure operational availability of systems and services affected by cybersecurity incidents$sscb$, 125),
   ($sscb$48163add-cd9f-53f0-8dfd-aedcd9651008$sscb$::uuid, $sscb$024f2c3f-f4dd-5372-8c0a-893c132c5aef$sscb$::uuid, $sscb$category$sscb$, $sscb$RC.CO$sscb$, $sscb$5c80b5f5-f942-5ec8-a7f4-127cebb2da97$sscb$::uuid, $sscb$Incident Recovery Communication$sscb$, $sscb$Restoration activities are coordinated with internal and external parties$sscb$, 132)
-on conflict (framework_id, code) do update set
+on conflict (framework_id, code) where tenant_id is null do update set
   element_type = excluded.element_type,
   parent_id = excluded.parent_id,
   title = excluded.title,
@@ -368,7 +399,7 @@ insert into public.framework_elements (
   ($sscb$89a7f4e0-cf5b-52fc-af4c-38daa6b4404f$sscb$::uuid, $sscb$024f2c3f-f4dd-5372-8c0a-893c132c5aef$sscb$::uuid, $sscb$subcategory$sscb$, $sscb$RC.RP-06$sscb$, $sscb$e1d463fc-021e-5372-bcae-1378976fe51d$sscb$::uuid, $sscb$RC.RP-06$sscb$, $sscb$The end of incident recovery is declared based on criteria, and incident-related documentation is completed$sscb$, 131),
   ($sscb$3c6a04fb-0eeb-5800-aa3c-5d7cdb0c2a94$sscb$::uuid, $sscb$024f2c3f-f4dd-5372-8c0a-893c132c5aef$sscb$::uuid, $sscb$subcategory$sscb$, $sscb$RC.CO-03$sscb$, $sscb$48163add-cd9f-53f0-8dfd-aedcd9651008$sscb$::uuid, $sscb$RC.CO-03$sscb$, $sscb$Recovery activities and progress in restoring operational capabilities are communicated to designated internal and external stakeholders$sscb$, 133),
   ($sscb$08bf6a20-99f1-5538-9964-aa9167e4f3c0$sscb$::uuid, $sscb$024f2c3f-f4dd-5372-8c0a-893c132c5aef$sscb$::uuid, $sscb$subcategory$sscb$, $sscb$RC.CO-04$sscb$, $sscb$48163add-cd9f-53f0-8dfd-aedcd9651008$sscb$::uuid, $sscb$RC.CO-04$sscb$, $sscb$Public updates on incident recovery are shared using approved methods and messaging$sscb$, 134)
-on conflict (framework_id, code) do update set
+on conflict (framework_id, code) where tenant_id is null do update set
   element_type = excluded.element_type,
   parent_id = excluded.parent_id,
   title = excluded.title,
@@ -402,6 +433,113 @@ where not exists (
     and existing.field_key = s.field_key
     and existing.code = s.code
 );
+
+-- Optional geography and privacy fields. Inactive until an admin enables the group.
+-- Re-running does not turn a group back off and does not delete stored values.
+
+insert into public.field_definitions (
+  tenant_id, field_key, label, help_text, input_type, lookup_field_key,
+  is_required, visibility, depth_level, sort_order, is_active, is_standard
+) values
+  (null, $sscb$data_residency_regions$sscb$, $sscb$Data residency regions$sscb$, $sscb$Regions this workspace has recorded for where the service runs or stores data. A recorded region is not a legal residency determination.$sscb$, $sscb$multi_select$sscb$, $sscb$data_residency_region$sscb$, false, $sscb$public$sscb$, 2, 450, false, true),
+  (null, $sscb$hosting_model$sscb$, $sscb$Hosting model$sscb$, $sscb$Where the workspace says this service is hosted. This is an operational note, not a finding about sovereignty or a contract.$sscb$, $sscb$dropdown$sscb$, $sscb$hosting_model$sscb$, false, $sscb$public$sscb$, 2, 460, false, true),
+  (null, $sscb$personal_data_recorded$sscb$, $sscb$Personal data recorded$sscb$, $sscb$Whether this workspace has recorded that the service handles personal data. Yes is not a legal classification and does not mean a privacy law applies.$sscb$, $sscb$dropdown$sscb$, $sscb$personal_data_recorded$sscb$, false, $sscb$public$sscb$, 2, 470, false, true),
+  (null, $sscb$recorded_jurisdictions$sscb$, $sscb$Recorded jurisdictions$sscb$, $sscb$Jurisdictions the workspace has noted for people whose data the service may handle. This is not a finding that a privacy law applies.$sscb$, $sscb$multi_select$sscb$, $sscb$recorded_jurisdiction$sscb$, false, $sscb$public$sscb$, 2, 480, false, true),
+  (null, $sscb$privacy_operations_notes$sscb$, $sscb$Privacy operations notes$sscb$, $sscb$Operational privacy notes for this service. This catalog does not conclude that a law, contract, or framework is met.$sscb$, $sscb$textarea$sscb$, null, false, $sscb$public$sscb$, 3, 490, false, true)
+on conflict (field_key) where tenant_id is null do nothing;
+
+insert into public.field_definitions (
+  tenant_id, field_key, label, help_text, input_type, lookup_field_key,
+  is_required, visibility, depth_level, sort_order, is_active, is_standard
+)
+select t.id, s.field_key, s.label, s.help_text, s.input_type, s.lookup_field_key,
+  s.is_required, s.visibility, s.depth_level, s.sort_order, s.is_active, s.is_standard
+from public.tenants t
+join public.field_definitions s
+  on s.tenant_id is null
+ and s.field_key in ($sscb$data_residency_regions$sscb$, $sscb$hosting_model$sscb$, $sscb$personal_data_recorded$sscb$, $sscb$recorded_jurisdictions$sscb$, $sscb$privacy_operations_notes$sscb$)
+where not exists (
+  select 1 from public.field_definitions existing
+  where existing.tenant_id = t.id
+    and existing.field_key = s.field_key
+);
+
+insert into public.lookup_options (
+  tenant_id, field_key, code, label, description, code_prefix, sort_order, is_active
+) values
+  (null, $sscb$data_residency_region$sscb$, $sscb$not_recorded$sscb$, $sscb$Not recorded$sscb$, $sscb$The workspace has not recorded a region.$sscb$, null, 10, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$customer_environment$sscb$, $sscb$Customer environment$sscb$, $sscb$The service runs in the customer’s own environment.$sscb$, null, 20, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$on_premises$sscb$, $sscb$On premises$sscb$, $sscb$The workspace records this service as on premises.$sscb$, null, 30, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$us$sscb$, $sscb$United States$sscb$, $sscb$A United States region the workspace recorded. Not a legal conclusion.$sscb$, null, 40, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$ca$sscb$, $sscb$Canada$sscb$, $sscb$A Canada region the workspace recorded. Not a legal conclusion.$sscb$, null, 50, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$uk$sscb$, $sscb$United Kingdom$sscb$, $sscb$A United Kingdom region the workspace recorded. Not a legal conclusion.$sscb$, null, 60, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$eea$sscb$, $sscb$European Economic Area$sscb$, $sscb$An EEA region the workspace recorded. Not a legal conclusion.$sscb$, null, 70, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$apac$sscb$, $sscb$Asia Pacific$sscb$, $sscb$An Asia Pacific region the workspace recorded. Not a legal conclusion.$sscb$, null, 80, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$latam$sscb$, $sscb$Latin America$sscb$, $sscb$A Latin America region the workspace recorded. Not a legal conclusion.$sscb$, null, 90, true),
+  (null, $sscb$data_residency_region$sscb$, $sscb$other$sscb$, $sscb$Other recorded region$sscb$, $sscb$Another region named in the service notes.$sscb$, null, 100, true),
+  (null, $sscb$hosting_model$sscb$, $sscb$not_recorded$sscb$, $sscb$Not recorded$sscb$, $sscb$The workspace has not recorded a hosting model.$sscb$, null, 10, true),
+  (null, $sscb$hosting_model$sscb$, $sscb$customer_environment$sscb$, $sscb$Customer environment$sscb$, $sscb$Hosted in the customer’s environment.$sscb$, null, 20, true),
+  (null, $sscb$hosting_model$sscb$, $sscb$on_premises$sscb$, $sscb$On premises$sscb$, $sscb$Hosted on premises.$sscb$, null, 30, true),
+  (null, $sscb$hosting_model$sscb$, $sscb$single_region$sscb$, $sscb$Single region$sscb$, $sscb$The workspace records a single hosting region.$sscb$, null, 40, true),
+  (null, $sscb$hosting_model$sscb$, $sscb$multi_region$sscb$, $sscb$Multiple regions$sscb$, $sscb$The workspace records more than one hosting region.$sscb$, null, 50, true),
+  (null, $sscb$personal_data_recorded$sscb$, $sscb$not_recorded$sscb$, $sscb$Not recorded$sscb$, $sscb$The workspace has not recorded whether personal data is handled.$sscb$, null, 10, true),
+  (null, $sscb$personal_data_recorded$sscb$, $sscb$no$sscb$, $sscb$No$sscb$, $sscb$The workspace recorded that this service does not handle personal data.$sscb$, null, 20, true),
+  (null, $sscb$personal_data_recorded$sscb$, $sscb$yes$sscb$, $sscb$Yes$sscb$, $sscb$The workspace recorded that this service handles personal data. This is not a legal classification.$sscb$, null, 30, true),
+  (null, $sscb$recorded_jurisdiction$sscb$, $sscb$not_recorded$sscb$, $sscb$Not recorded$sscb$, $sscb$The workspace has not recorded a jurisdiction.$sscb$, null, 10, true),
+  (null, $sscb$recorded_jurisdiction$sscb$, $sscb$us$sscb$, $sscb$United States$sscb$, $sscb$Noted by the workspace. Not a finding that a US privacy law applies.$sscb$, null, 20, true),
+  (null, $sscb$recorded_jurisdiction$sscb$, $sscb$ca$sscb$, $sscb$Canada$sscb$, $sscb$Noted by the workspace. Not a finding that a Canadian privacy law applies.$sscb$, null, 30, true),
+  (null, $sscb$recorded_jurisdiction$sscb$, $sscb$uk$sscb$, $sscb$United Kingdom$sscb$, $sscb$Noted by the workspace. Not a finding that a UK privacy law applies.$sscb$, null, 40, true),
+  (null, $sscb$recorded_jurisdiction$sscb$, $sscb$eea$sscb$, $sscb$European Economic Area$sscb$, $sscb$Noted by the workspace. Not a finding that an EEA privacy law applies.$sscb$, null, 50, true),
+  (null, $sscb$recorded_jurisdiction$sscb$, $sscb$other$sscb$, $sscb$Other$sscb$, $sscb$Another jurisdiction named in the service notes.$sscb$, null, 60, true)
+on conflict (field_key, code) where tenant_id is null do nothing;
+
+insert into public.lookup_options (
+  tenant_id, field_key, code, label, description, code_prefix, sort_order, is_active
+)
+select t.id, s.field_key, s.code, s.label, s.description, s.code_prefix, s.sort_order, s.is_active
+from public.tenants t
+join public.lookup_options s
+  on s.tenant_id is null
+ and s.field_key in ($sscb$data_residency_region$sscb$, $sscb$hosting_model$sscb$, $sscb$personal_data_recorded$sscb$, $sscb$recorded_jurisdiction$sscb$)
+where not exists (
+  select 1 from public.lookup_options existing
+  where existing.tenant_id = t.id
+    and existing.field_key = s.field_key
+    and existing.code = s.code
+);
+
+update public.field_definitions
+set field_group = $sscb$geography$sscb$
+where field_key in ($sscb$data_residency_regions$sscb$, $sscb$hosting_model$sscb$)
+  and field_group is distinct from $sscb$geography$sscb$;
+
+update public.field_definitions
+set field_group = $sscb$privacy$sscb$
+where field_key in ($sscb$personal_data_recorded$sscb$, $sscb$recorded_jurisdictions$sscb$, $sscb$privacy_operations_notes$sscb$)
+  and field_group is distinct from $sscb$privacy$sscb$;
+
+-- Selectable frameworks with no control text. NIST CSF 2.0 is not updated here.
+
+insert into public.frameworks (
+  id, code, version, name, published_on, publication, publication_url,
+  source_title, source_tool, source_url, reference_tool_url, retrieved_on,
+  export_change_log, export_generated_at, export_sha256, content_sha256,
+  id_namespace, excluded_withdrawn_rows, provenance, is_active, content_state, license_note
+) values
+  ($sscb$ddbb042c-94ed-534b-b984-cf73b4d118bd$sscb$::uuid, $sscb$ISO-27001$sscb$, $sscb$2022$sscb$, $sscb$ISO/IEC 27001$sscb$, $sscb$2022-10-25$sscb$::date, $sscb$ISO/IEC 27001:2022$sscb$, $sscb$$sscb$, $sscb$ISO/IEC 27001:2022$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, null, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, 0, $sscb$ISO/IEC 27001:2022 control text is not included. The standard is licensed. Import an authorized CSV if your organization has the rights to use that text.$sscb$, true, $sscb$not_loaded$sscb$, $sscb$ISO/IEC 27001:2022 is copyrighted by ISO. This catalog does not ship its control set.$sscb$),
+  ($sscb$5e572c39-1e18-50b2-a156-70fb3a8f99ff$sscb$::uuid, $sscb$SOC2-TSC$sscb$, $sscb$2017$sscb$, $sscb$AICPA Trust Services Criteria$sscb$, $sscb$2017-04-01$sscb$::date, $sscb$TSP section 100 (2017)$sscb$, $sscb$$sscb$, $sscb$TSP section 100 (2017)$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, null, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, 0, $sscb$Trust Services Criteria text is not included. The criteria are copyrighted by the AICPA. Import an authorized CSV if your organization has the rights to use that text.$sscb$, true, $sscb$not_loaded$sscb$, $sscb$The AICPA Trust Services Criteria are copyrighted. This catalog does not ship them.$sscb$),
+  ($sscb$fbc75172-4771-5432-90f8-65554708166b$sscb$::uuid, $sscb$CIS-V8$sscb$, $sscb$8$sscb$, $sscb$CIS Controls$sscb$, $sscb$2021-05-01$sscb$::date, $sscb$CIS Controls v8$sscb$, $sscb$$sscb$, $sscb$CIS Controls v8$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, null, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, 0, $sscb$CIS Controls v8 safeguards are not included. They are licensed by CIS. Import an authorized CSV if your organization has the rights to use that text.$sscb$, true, $sscb$not_loaded$sscb$, $sscb$CIS Controls are copyrighted by the Center for Internet Security. This catalog does not ship them.$sscb$),
+  ($sscb$e1d4e213-aef9-50d8-9879-9de7cf0cea55$sscb$::uuid, $sscb$HIPAA-SR$sscb$, $sscb$45-CFR-164$sscb$, $sscb$HIPAA Security Rule$sscb$, $sscb$2013-01-25$sscb$::date, $sscb$45 CFR Part 164 Subpart C$sscb$, $sscb$$sscb$, $sscb$45 CFR Part 164 Subpart C$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, null, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, 0, $sscb$The HIPAA Security Rule is public regulation. This release does not ship a reconstructed control list. Import a CSV your team prepared from 45 CFR Part 164 Subpart C if you want those citations in the catalog.$sscb$, true, $sscb$not_loaded$sscb$, $sscb$45 CFR Part 164 Subpart C is public regulation. No control text is seeded, so the catalog cannot imply a complete HIPAA catalog.$sscb$),
+  ($sscb$b8773c64-04ed-53f5-aae5-fb79f19c8dcb$sscb$::uuid, $sscb$NIST-AI-RMF$sscb$, $sscb$1.0$sscb$, $sscb$NIST AI Risk Management Framework$sscb$, $sscb$2023-01-26$sscb$::date, $sscb$NIST AI 100-1$sscb$, $sscb$$sscb$, $sscb$NIST AI 100-1$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, null, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, 0, $sscb$NIST AI RMF 1.0 is a public NIST publication. This release does not include an unverified copy of its functions and categories. Import a CSV taken from the publication you use.$sscb$, true, $sscb$not_loaded$sscb$, $sscb$No AI RMF core is seeded in this release. Coverage stays empty until an authorized import.$sscb$),
+  ($sscb$9252398c-caaa-573a-aac6-07d125cc568b$sscb$::uuid, $sscb$NIST-PF$sscb$, $sscb$1.0$sscb$, $sscb$NIST Privacy Framework$sscb$, $sscb$2020-01-16$sscb$::date, $sscb$NIST Privacy Framework 1.0$sscb$, $sscb$$sscb$, $sscb$NIST Privacy Framework 1.0$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, null, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, 0, $sscb$The NIST Privacy Framework 1.0 is a public NIST publication. This release does not include an unverified copy of its core. Import a CSV taken from the publication you use.$sscb$, true, $sscb$not_loaded$sscb$, $sscb$No Privacy Framework core is seeded in this release. Coverage stays empty until an authorized import.$sscb$)
+on conflict (code, version) do update set
+  name = excluded.name,
+  publication = excluded.publication,
+  provenance = excluded.provenance,
+  license_note = excluded.license_note,
+  content_state = excluded.content_state,
+  is_active = excluded.is_active
+where public.frameworks.code <> 'NIST-CSF';
 
 do $$
 declare

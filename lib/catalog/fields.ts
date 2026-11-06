@@ -1,5 +1,7 @@
 import type { DepthLevel, FieldDefinition, InputType, Visibility } from "@/lib/catalog/types";
 
+export type FieldGroupId = "geography" | "privacy";
+
 export type FieldSeed = {
   field_key: string;
   label: string;
@@ -10,6 +12,9 @@ export type FieldSeed = {
   visibility: Visibility;
   depth_level: DepthLevel;
   sort_order: number;
+  /** Absent means active. Geography and privacy ship inactive so completeness stays put. */
+  is_active?: boolean;
+  field_group?: FieldGroupId | null;
 };
 
 const RAW: Array<Omit<FieldSeed, "sort_order">> = [
@@ -460,6 +465,71 @@ const RAW: Array<Omit<FieldSeed, "sort_order">> = [
     visibility: "public",
     depth_level: 3,
   },
+  {
+    field_key: "data_residency_regions",
+    label: "Data residency regions",
+    help_text:
+      "Regions this workspace has recorded for where the service runs or stores data. A recorded region is not a legal residency determination.",
+    input_type: "multi_select",
+    lookup_field_key: "data_residency_region",
+    is_required: false,
+    visibility: "public",
+    depth_level: 2,
+    is_active: false,
+    field_group: "geography",
+  },
+  {
+    field_key: "hosting_model",
+    label: "Hosting model",
+    help_text:
+      "Where the workspace says this service is hosted. This is an operational note, not a finding about sovereignty or a contract.",
+    input_type: "dropdown",
+    lookup_field_key: "hosting_model",
+    is_required: false,
+    visibility: "public",
+    depth_level: 2,
+    is_active: false,
+    field_group: "geography",
+  },
+  {
+    field_key: "personal_data_recorded",
+    label: "Personal data recorded",
+    help_text:
+      "Whether this workspace has recorded that the service handles personal data. Yes is not a legal classification and does not mean a privacy law applies.",
+    input_type: "dropdown",
+    lookup_field_key: "personal_data_recorded",
+    is_required: false,
+    visibility: "public",
+    depth_level: 2,
+    is_active: false,
+    field_group: "privacy",
+  },
+  {
+    field_key: "recorded_jurisdictions",
+    label: "Recorded jurisdictions",
+    help_text:
+      "Jurisdictions the workspace has noted for people whose data the service may handle. This is not a finding that a privacy law applies.",
+    input_type: "multi_select",
+    lookup_field_key: "recorded_jurisdiction",
+    is_required: false,
+    visibility: "public",
+    depth_level: 2,
+    is_active: false,
+    field_group: "privacy",
+  },
+  {
+    field_key: "privacy_operations_notes",
+    label: "Privacy operations notes",
+    help_text:
+      "Operational privacy notes for this service. This catalog does not conclude that a law, contract, or framework is met.",
+    input_type: "textarea",
+    lookup_field_key: null,
+    is_required: false,
+    visibility: "public",
+    depth_level: 3,
+    is_active: false,
+    field_group: "privacy",
+  },
 ];
 
 export const STARTER_FIELDS: FieldSeed[] = RAW.map((field, index) => ({
@@ -480,8 +550,9 @@ export function materializeFields(tenantId: string | null, idFor: (fieldKey: str
     visibility: field.visibility,
     depth_level: field.depth_level,
     sort_order: field.sort_order,
-    is_active: true,
+    is_active: field.is_active !== false,
     is_standard: true,
+    field_group: field.field_group ?? null,
   }));
 }
 

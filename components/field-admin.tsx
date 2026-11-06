@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { isIdentityField } from "@/lib/catalog/fields";
+import { isIdentityField, type FieldGroupId } from "@/lib/catalog/fields";
 import { DEPTH_META, type DepthLevel, type FieldDefinition, type Visibility } from "@/lib/catalog/types";
 import { useCatalog } from "@/components/catalog-provider";
 import { Badge, VisibilityBadge } from "@/components/widgets";
@@ -35,6 +35,16 @@ export function FieldAdmin() {
           </p>
         </div>
       </div>
+      <section className="panel pad" style={{ marginBottom: 16 }}>
+        <h2>Optional groups</h2>
+        <p className="lede">
+          Geography and privacy are off until a workspace admin turns them on. Turning a group on adds its fields to the
+          form and to completeness. Turning it off hides them and leaves stored values in place. The fields record what
+          the workspace entered. They do not decide whether a law applies.
+        </p>
+        <GroupToggle group="geography" title="Geography" />
+        <GroupToggle group="privacy" title="Privacy" />
+      </section>
       {groups.map((group) => (
         <section className="panel pad" key={group.level} style={{ marginBottom: 16 }}>
           <h2>
@@ -46,6 +56,26 @@ export function FieldAdmin() {
         </section>
       ))}
     </>
+  );
+}
+
+function GroupToggle({ group, title }: { group: FieldGroupId; title: string }) {
+  const api = useCatalog();
+  const members = api.fields.filter((field) => field.field_group === group);
+  const enabled = members.length > 0 && members.every((field) => field.is_active);
+  return (
+    <label className="check" style={{ marginTop: 10 }}>
+      <input
+        type="checkbox"
+        checked={enabled}
+        onChange={(event) => void api.setFieldGroup(group, event.target.checked)}
+      />
+      {title}
+      <span className="hint">
+        {" "}
+        {enabled ? "On" : "Off"} · {members.length} fields
+      </span>
+    </label>
   );
 }
 

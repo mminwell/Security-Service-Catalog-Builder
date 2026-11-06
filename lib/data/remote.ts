@@ -4,6 +4,7 @@ import { withComputed } from "@/lib/catalog/service";
 import type { FrameworkElement, FrameworkRelease } from "@/lib/catalog/framework";
 import type {
   AuditEntry,
+  ExportProfile,
   FieldDefinition,
   LookupOption,
   Member,
@@ -13,6 +14,8 @@ import type {
   ServiceRecord,
   Tenant,
 } from "@/lib/catalog/types";
+import type { ExportLogMeta } from "@/lib/catalog/export-plan";
+import type { PlannedElement } from "@/lib/catalog/framework-import";
 import { emptyDb, type CatalogDb } from "@/lib/data/model";
 import { readActiveTenantId } from "@/lib/data/storage";
 
@@ -41,7 +44,7 @@ export async function hydrateFromSupabase(supabase: SupabaseClient): Promise<Hyd
     return { db: { ...emptyDb(), session }, warning: null };
   }
 
-  const [fields, lookups, services, members, audit, frameworks, elements, mappings] = await Promise.all([
+  const [fields, lookups, services, members, audit, frameworks, elements, mappings, profiles] = await Promise.all([
     supabase.from("field_definitions").select("*").in("tenant_id", ids),
     supabase.from("lookup_options").select("*").in("tenant_id", ids),
     supabase.from("services").select("*").in("tenant_id", ids),
@@ -50,8 +53,9 @@ export async function hydrateFromSupabase(supabase: SupabaseClient): Promise<Hyd
     supabase.from("frameworks").select("*").eq("is_active", true),
     supabase.from("framework_elements").select("*").order("sort_order"),
     supabase.from("service_outcome_mappings").select("*").in("tenant_id", ids),
+    supabase.from("export_profiles").select("*").in("tenant_id", ids),
   ]);
-  for (const result of [fields, lookups, services, frameworks, elements, mappings]) {
+  for (const result of [fields, lookups, services, frameworks, elements, mappings, profiles]) {
     if (result.error) throw new Error(result.error.message);
   }
   if (members.error) throw new Error(members.error.message);
@@ -72,6 +76,7 @@ export async function hydrateFromSupabase(supabase: SupabaseClient): Promise<Hyd
       frameworks: (frameworks.data ?? []).map(asFramework),
       elements: (elements.data ?? []).map(asElement),
       mappings: (mappings.data ?? []).map(asMapping),
+      exportProfiles: (profiles.data ?? []).map(asExportProfile),
       audit: (audit.data ?? []).map(asAudit),
     },
     warning: null,
@@ -308,6 +313,55 @@ export async function persistOutcomeMapping(supabase: SupabaseClient, mapping: O
   if (error) throw new Error(error.message);
 }
 
+export async function persistExportProfile(supabase: SupabaseClient, profile: ExportProfile): Promise<void> {
+  const { error } = await supabase.from("export_profiles").upsert(
+    {
+      id: profile.id,
+      tenant_id: profile.tenant_id,
+      name: profile.name,
+      audience: profile.audience,
+      field_keys: profile.field_keys,
+      is_default: profile.is_default,
+    },
+    { onConflict: "id" },
+  );
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteExportProfileRow(supabase: SupabaseClient, profileId: string): Promise<void> {
+  const { error } = await supabase.from("export_profiles").delete().eq("id", profileId);
+  if (error) throw new Error(error.message);
+}
+
+export async function logCatalogExport(supabase: SupabaseClient, tenantId: string, meta: ExportLogMeta): Promise<void> {
+  const { error } = await supabase.rpc("log_catalog_export", { p_tenant: tenantId, p_meta: meta });
+  if (error) throw new Error(error.message);
+}
+
+export async function importFrameworkRowsRemote(
+  supabase: SupabaseClient,
+  tenantId: string,
+  frameworkId: string,
+  version: string,
+  rows: PlannedElement[],
+): Promise<void> {
+  const payload = rows.map((row) => ({
+    code: row.code,
+    parent_code: row.parentCode,
+    title: row.title,
+    statement: row.statement,
+    element_type: row.elementType,
+    sort_order: row.sortOrder,
+    version,
+  }));
+  const { error } = await supabase.rpc("import_framework_elements", {
+    p_tenant: tenantId,
+    p_framework: frameworkId,
+    p_rows: payload,
+  });
+  if (error) throw new Error(error.message);
+}
+
 export async function deleteOutcomeMappingRow(supabase: SupabaseClient, mappingId: string): Promise<void> {
   const { error } = await supabase.from("service_outcome_mappings").delete().eq("id", mappingId);
   if (error) throw new Error(error.message);
@@ -335,6 +389,8 @@ function asFramework(row: Record<string, unknown>): FrameworkRelease {
     excluded_withdrawn_rows: Number(row.excluded_withdrawn_rows ?? 0),
     provenance: String(row.provenance ?? ""),
     is_active: row.is_active !== false,
+    content_state: row.content_state === "seeded" || String(row.code) === "NIST-CSF" ? "seeded" : "not_loaded",
+    license_note: String(row.license_note ?? ""),
   };
 }
 
@@ -349,6 +405,7 @@ function asElement(row: Record<string, unknown>): FrameworkElement {
     title: String(row.title ?? ""),
     statement: String(row.statement ?? ""),
     sort_order: Number(row.sort_order ?? 0),
+    tenant_id: row.tenant_id == null ? null : String(row.tenant_id),
   };
 }
 
@@ -398,6 +455,21 @@ function asField(row: Record<string, unknown>): FieldDefinition {
     sort_order: Number(row.sort_order),
     is_active: Boolean(row.is_active),
     is_standard: Boolean(row.is_standard),
+    field_group: row.field_group === "geography" || row.field_group === "privacy" ? row.field_group : null,
+  };
+}
+
+function asExportProfile(row: Record<string, unknown>): ExportProfile {
+  const keys = Array.isArray(row.field_keys) ? row.field_keys.map(String) : [];
+  return {
+    id: String(row.id),
+    tenant_id: String(row.tenant_id),
+    name: String(row.name ?? ""),
+    audience: row.audience === "internal" ? "internal" : "public",
+    field_keys: keys,
+    is_default: Boolean(row.is_default),
+    created_at: String(row.created_at ?? ""),
+    updated_at: String(row.updated_at ?? ""),
   };
 }
 

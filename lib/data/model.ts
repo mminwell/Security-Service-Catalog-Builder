@@ -1,6 +1,10 @@
 import { canAdminister, canWriteServices } from "@/lib/catalog/access";
 import { isExplicitCoverage } from "@/lib/catalog/coverage";
-import { isIdentityField, materializeFields } from "@/lib/catalog/fields";
+import { sanitizeExportLog, type ExportLogMeta } from "@/lib/catalog/export-plan";
+import { keysForSavedProfile } from "@/lib/catalog/export-plan";
+import { type FieldGroupId, isIdentityField, materializeFields } from "@/lib/catalog/fields";
+import { applyFrameworkImport, type PlannedElement } from "@/lib/catalog/framework-import";
+import { FRAMEWORK_CATALOG } from "@/lib/catalog/framework-catalog";
 import { CSF_ELEMENTS, CSF_FRAMEWORK, type FrameworkElement, type FrameworkRelease } from "@/lib/catalog/framework";
 import { builtinLogoForSlug, normalizeLogoInput } from "@/lib/catalog/logos";
 import { STARTER_LOOKUPS } from "@/lib/catalog/lookups";
@@ -13,6 +17,7 @@ import {
   type FieldDefinition,
   type LookupOption,
   type Member,
+  type ExportProfile,
   type OutcomeMapping,
   type Role,
   type ServiceCodeMode,
@@ -32,6 +37,7 @@ export type CatalogDb = {
   frameworks: FrameworkRelease[];
   elements: FrameworkElement[];
   mappings: OutcomeMapping[];
+  exportProfiles: ExportProfile[];
   audit: AuditEntry[];
 };
 
@@ -49,6 +55,7 @@ export function emptyDb(): CatalogDb {
     frameworks: [],
     elements: [],
     mappings: [],
+    exportProfiles: [],
     audit: [],
   };
 }
@@ -95,9 +102,10 @@ export function freshDemo(): CatalogDb {
     fields,
     lookups,
     services,
-    frameworks: [{ ...CSF_FRAMEWORK }],
+    frameworks: FRAMEWORK_CATALOG.map((framework) => ({ ...framework })),
     elements: CSF_ELEMENTS.map((element) => ({ ...element })),
     mappings: [],
+    exportProfiles: [],
     audit: [],
   };
 }
@@ -762,6 +770,181 @@ export function setCatalogColumns(db: CatalogDb, keys: string[], now = new Date(
         action: "update",
         before: { catalog_columns: current.catalog_columns },
         after: { catalog_columns: next.catalog_columns },
+        now,
+      }),
+      ...db.audit,
+    ],
+  };
+}
+
+export function setFieldGroup(db: CatalogDb, group: FieldGroupId, active: boolean, now = new Date().toISOString()): CatalogDb {
+  const actor = requireSession(db);
+  const tenantId = requireActive(db);
+  assertAdmin(db, tenantId, actor.userId, "Only a workspace admin can turn field groups on or off.");
+  const touched = db.fields.filter((field) => field.tenant_id === tenantId && field.field_group === group);
+  if (touched.length === 0) throw new Error("That field group is not in this workspace.");
+  return {
+    ...db,
+    fields: db.fields.map((field) =>
+      field.tenant_id === tenantId && field.field_group === group ? { ...field, is_active: active } : field,
+    ),
+    audit: [
+      auditEntry({
+        tenantId,
+        actor,
+        table: "field_definitions",
+        rowId: touched[0].id,
+        action: "update",
+        before: { field_group: group, is_active: touched.every((field) => field.is_active) },
+        after: { field_group: group, is_active: active, field_count: touched.length },
+        now,
+      }),
+      ...db.audit,
+    ],
+  };
+}
+
+export function saveExportProfile(
+  db: CatalogDb,
+  input: { id?: string; name: string; audience: "public" | "internal"; fieldKeys: string[]; isDefault: boolean },
+  now = new Date().toISOString(),
+): CatalogDb {
+  const actor = requireSession(db);
+  const tenantId = requireActive(db);
+  assertAdmin(db, tenantId, actor.userId, "Only a workspace admin can save an export profile.");
+  const name = input.name.trim();
+  if (name.length < 2 || name.length > 80) throw new Error("Name the profile with 2 to 80 characters.");
+  const fields = db.fields.filter((field) => field.tenant_id === tenantId);
+  const audience = input.audience === "internal" ? "internal" : "public";
+  const fieldKeys = keysForSavedProfile(fields, input.fieldKeys, audience);
+  if (fieldKeys.length < 2) throw new Error("A profile keeps the service code and name.");
+  const duplicate = db.exportProfiles.some(
+    (profile) =>
+      profile.tenant_id === tenantId &&
+      profile.id !== input.id &&
+      profile.name.toLowerCase() === name.toLowerCase(),
+  );
+  if (duplicate) throw new Error("A profile with that name already exists in this workspace.");
+  const current = input.id ? db.exportProfiles.find((profile) => profile.id === input.id && profile.tenant_id === tenantId) : undefined;
+  if (input.id && !current) throw new Error("That profile is not in this workspace.");
+  const next: ExportProfile = {
+    id: current?.id ?? crypto.randomUUID(),
+    tenant_id: tenantId,
+    name,
+    audience,
+    field_keys: fieldKeys,
+    is_default: input.isDefault,
+    created_at: current?.created_at ?? now,
+    updated_at: now,
+  };
+  const others = db.exportProfiles
+    .filter((profile) => profile.id !== next.id)
+    .map((profile) =>
+      profile.tenant_id === tenantId && next.is_default ? { ...profile, is_default: false } : profile,
+    );
+  return {
+    ...db,
+    exportProfiles: [...others, next],
+    audit: [
+      auditEntry({
+        tenantId,
+        actor,
+        table: "export_profiles",
+        rowId: next.id,
+        action: current ? "update" : "insert",
+        before: current ? { name: current.name, audience: current.audience, field_count: current.field_keys.length, is_default: current.is_default } : null,
+        after: { name: next.name, audience: next.audience, field_count: next.field_keys.length, is_default: next.is_default },
+        now,
+      }),
+      ...db.audit,
+    ],
+  };
+}
+
+export function deleteExportProfile(db: CatalogDb, profileId: string, now = new Date().toISOString()): CatalogDb {
+  const actor = requireSession(db);
+  const tenantId = requireActive(db);
+  assertAdmin(db, tenantId, actor.userId, "Only a workspace admin can delete an export profile.");
+  const current = db.exportProfiles.find((profile) => profile.id === profileId && profile.tenant_id === tenantId);
+  if (!current) throw new Error("That profile is not in this workspace.");
+  return {
+    ...db,
+    exportProfiles: db.exportProfiles.filter((profile) => profile.id !== profileId),
+    audit: [
+      auditEntry({
+        tenantId,
+        actor,
+        table: "export_profiles",
+        rowId: profileId,
+        action: "delete",
+        before: { name: current.name, audience: current.audience, field_count: current.field_keys.length },
+        after: null,
+        now,
+      }),
+      ...db.audit,
+    ],
+  };
+}
+
+export function importFrameworkRows(
+  db: CatalogDb,
+  frameworkId: string,
+  planned: PlannedElement[],
+  now = new Date().toISOString(),
+): CatalogDb {
+  const actor = requireSession(db);
+  const tenantId = requireActive(db);
+  assertAdmin(db, tenantId, actor.userId, "Only a workspace admin can import framework content.");
+  const framework = db.frameworks.find((item) => item.id === frameworkId && item.is_active);
+  if (!framework) throw new Error("That framework is not available.");
+  if (framework.code === CSF_FRAMEWORK.code) {
+    throw new Error("NIST CSF 2.0 stays on the reference-tool core. This importer does not replace it.");
+  }
+  if (planned.length === 0) throw new Error("Nothing to import.");
+  const before = db.elements.filter((element) => element.tenant_id === tenantId && element.framework_id === frameworkId).length;
+  const elements = applyFrameworkImport(db.elements, tenantId, frameworkId, planned);
+  const after = elements.filter((element) => element.tenant_id === tenantId && element.framework_id === frameworkId).length;
+  return {
+    ...db,
+    elements,
+    audit: [
+      auditEntry({
+        tenantId,
+        actor,
+        table: "framework_elements",
+        rowId: frameworkId,
+        action: before === 0 ? "insert" : "update",
+        before: null,
+        after: {
+          framework_code: framework.code,
+          version: framework.version,
+          created: Math.max(0, after - before),
+          updated: Math.min(before, planned.length),
+          row_count: planned.length,
+        },
+        now,
+      }),
+      ...db.audit,
+    ],
+  };
+}
+
+export function recordExport(db: CatalogDb, meta: ExportLogMeta, now = new Date().toISOString()): CatalogDb {
+  const actor = requireSession(db);
+  const tenantId = requireActive(db);
+  if (!roleFor(db, tenantId, actor.userId)) throw new Error("You do not have access to this workspace.");
+  const safe = sanitizeExportLog(meta);
+  return {
+    ...db,
+    audit: [
+      auditEntry({
+        tenantId,
+        actor,
+        table: "catalog_exports",
+        rowId: crypto.randomUUID(),
+        action: "insert",
+        before: null,
+        after: { ...safe },
         now,
       }),
       ...db.audit,

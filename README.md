@@ -1,8 +1,8 @@
 # Security Service Catalog Builder
 
-**Status: V2.** A multi-tenant catalog for the security services an organization delivers. Enter each service once, shop a blueprint instead of starting from a blank form, map services to NIST CSF 2.0 outcomes, and see where coverage is explicit or missing.
+**Status: V3.** A multi-tenant catalog for the security services an organization delivers. Enter each service once, shop a blueprint instead of starting from a blank form, map services to NIST CSF 2.0 outcomes, and export the audience you choose.
 
-V1 includes the service form, the catalog list, dropdown and field administration, CSV export, workspace isolation, and an audit trail. V2 adds the CSF 2.0 core and workspace assessments. Audience HTML/Word exports, linked artifacts, and assisted drafting come later.
+V1 includes the service form, the catalog list, dropdown and field administration, CSV export, workspace isolation, and an audit trail. V2 adds the CSF 2.0 core and workspace assessments. V3 adds saved audience profiles and Excel, Word, and PDF exports. Linked artifacts and assisted drafting come later.
 
 ## What you can do
 
@@ -11,7 +11,7 @@ V1 includes the service form, the catalog list, dropdown and field administratio
 - See a live service ID suggestion (`SVC-001`, or `SEC-SOC-001` when the workspace uses category prefixes). The code stays editable.
 - Read definitions where you pick them: Service Tiers 0–3, CMMI 0–5, capability rating, data classification, NIST CSF 2.0 functions, and every other dropdown that has help text.
 - Watch **Maturity Gap** (target CMMI minus current) and **Next Review** update as you type.
-- Search the catalog and stack filters on any active field, including a view of archived services. Export **Public CSV** or **Full CSV** from one Export dialog. Full exports ask you to confirm before downloading internal-use-only data, and both files can carry a corporate distribution marking on row 1.
+- Search the catalog and stack filters on any active field, including a view of archived services. Export the current rows as public or full CSV, Excel, Word, or PDF, or reuse a workspace audience profile. A file that contains internal fields asks for confirmation first. Distribution marking stays on unless you clear it. Jira and ServiceNow options are local CSV presets, not connections.
 - Edit dropdown labels, hover descriptions, sort order, and retire options without deleting them.
 - Set each field’s public or internal visibility and its Core / Operations / Governance depth per workspace. Retire a field without deleting stored values. Service code and name stay active.
 - Archive a service, restore it, or permanently delete it when you are a workspace admin. Add a company logo in the workspace switcher.
@@ -77,6 +77,7 @@ Copy `.env.example` to `.env.local` only on your machine. `.env.local` is gitign
 - `supabase/migrations/0002_v1_1_polish.sql` — workspace `logo_url` and service `archived_at`
 - `supabase/migrations/0003_v1_2_blueprints_columns_import.sql` — catalog column defaults, bulk lookup import, and blueprint checkout
 - `supabase/migrations/0004_v2_csf_mappings.sql` — NIST CSF 2.0 core, outcome assessments, RLS, and audit
+- `supabase/migrations/0005_v3_exports_frameworks.sql` — export profiles, optional geography and privacy fields, and the unloaded framework registry
 - `supabase/seed.sql` — the same starter lookups, the CSF 2.0 core, plus Acme Corp and Meridian Health
 - `docs/nist-csf-2.0-provenance.md` — source, version, and content hash for the CSF core
 - `tests/` — computed fields, service IDs, CSV visibility and distribution markings, filters, archive, field retirement, depth behavior
@@ -85,8 +86,16 @@ Copy `.env.example` to `.env.local` only on your machine. `.env.local` is gitign
 
 Intake methods and target audiences are included so those V1 dropdowns are usable. The locked lookup list did not enumerate them. Everything else in the starter set matches that list, including the tier, CMMI, capability, and data-classification descriptions.
 
+## V3 exports and frameworks
+
+Audience profiles are workspace-scoped. Public and Full presets stay available. A saved public profile cannot include internal fields, and any file that still contains an internal field asks for confirmation before download. CSV, Excel, Word, and PDF are generated in the browser. Jira and ServiceNow choices are generic CSV presets, not connectors.
+
+Geography and privacy field groups are off until an admin turns them on. Turning one off hides the fields and leaves stored values in place. The fields are operational notes, not legal conclusions.
+
+NIST CSF 2.0 remains the only seeded framework. ISO/IEC 27001, the AICPA Trust Services Criteria, CIS Controls, the HIPAA Security Rule, NIST AI RMF, and the NIST Privacy Framework can be selected and show “not loaded—authorized content needed” until an admin imports an authorized CSV. That import does not crosswalk frameworks and does not change the NIST denominator. See [docs/v3-frameworks.md](docs/v3-frameworks.md).
+
 ## Later versions
 
-V2 maps services to NIST CSF 2.0 subcategory outcomes and shows gaps. V3 adds saved audience exports. V4 links tools, runbooks, and policies. V5 may suggest text, and a person approves every save.
+V4 links tools, runbooks, and policies. V5 may suggest text, and a person approves every save.
 
 A license has not been selected yet.

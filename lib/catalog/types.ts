@@ -57,6 +57,8 @@ export type FieldDefinition = {
   sort_order: number;
   is_active: boolean;
   is_standard: boolean;
+  /** Optional group. Null for the original catalog fields. Inactive groups stay out of completeness. */
+  field_group: "geography" | "privacy" | null;
 };
 
 export type LookupOption = {
@@ -137,6 +139,18 @@ export type OutcomeMapping = {
   notes: string | null;
   created_by: string | null;
   updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Workspace-scoped export profile. Visibility is enforced when the profile is used. */
+export type ExportProfile = {
+  id: string;
+  tenant_id: string;
+  name: string;
+  audience: Visibility;
+  field_keys: string[];
+  is_default: boolean;
   created_at: string;
   updated_at: string;
 };
