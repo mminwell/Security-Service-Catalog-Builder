@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useCallback, useRef, useState, useSyncExternalStore } from "react";
+import { useAnchoredPanel } from "@/components/anchored-panel";
 import {
   COMPLETENESS_KEY,
   DEFAULT_COLUMN_KEYS,
@@ -45,19 +46,28 @@ export function ColumnPicker({
   onSaveDefault: (keys: string[]) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useDismiss(open, () => setOpen(false));
+  const anchorRef = useRef<HTMLDivElement | null>(null);
+  const dismissRef = useDismiss(open, () => setOpen(false));
+  const setAnchor = useCallback(
+    (node: HTMLDivElement | null) => {
+      anchorRef.current = node;
+      dismissRef(node);
+    },
+    [dismissRef],
+  );
+  const panelStyle = useAnchoredPanel(open, anchorRef, 460);
   const activeFields = fields
     .filter((field) => field.is_active && !isPinnedColumn(field.field_key))
     .sort((a, b) => a.depth_level - b.depth_level || a.sort_order - b.sort_order);
   const movable = keys.filter((key) => !isPinnedColumn(key));
 
   return (
-    <div className="filter-anchor" ref={ref}>
+    <div className="filter-anchor" ref={setAnchor} data-control="columns">
       <button type="button" className="btn btn-secondary" aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen((value) => !value)}>
         Columns
       </button>
       {open ? (
-        <div className="filter-panel column-panel" role="dialog" aria-label="Choose catalog columns">
+        <div className="filter-panel column-panel" role="dialog" aria-label="Choose catalog columns" style={panelStyle}>
           <p className="micro">Columns</p>
           <p className="hint">Code and Service stay pinned. Other columns follow the order below. Retired fields drop out of the table.</p>
           <ul className="column-list">
