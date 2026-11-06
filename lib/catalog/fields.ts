@@ -288,7 +288,8 @@ const RAW: Array<Omit<FieldSeed, "sort_order">> = [
   {
     field_key: "primary_csf_function",
     label: "Primary CSF Function",
-    help_text: "Primary NIST CSF 2.0 function. Detailed control mapping comes in a later version.",
+    help_text:
+      "Primary NIST CSF 2.0 function for this service. This dropdown is not an outcome assessment and does not count as coverage.",
     input_type: "dropdown",
     lookup_field_key: "primary_csf_function",
     is_required: false,

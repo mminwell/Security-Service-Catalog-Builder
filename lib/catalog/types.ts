@@ -126,6 +126,21 @@ export type ServiceRecord = {
   updated_at: string;
 };
 
+/** Workspace assessment of one CSF subcategory outcome. Not a certification. */
+export type OutcomeMapping = {
+  id: string;
+  tenant_id: string;
+  service_id: string;
+  element_id: string;
+  coverage: "full" | "partial" | "none";
+  rationale: string | null;
+  notes: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type AuditEntry = {
   id: string;
   tenant_id: string;

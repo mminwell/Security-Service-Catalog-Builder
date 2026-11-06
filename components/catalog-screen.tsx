@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { cartIdsFor, subscribeCart } from "@/lib/catalog/cart-store";
 import { columnLabel, formatCatalogCell } from "@/lib/catalog/columns";
+import { CATALOG_SEARCH_DESKTOP, CATALOG_SEARCH_PLACEHOLDER } from "@/lib/catalog/catalog-toolbar";
 import { CLOSED_COMPOSER, requestAdditionalFilter, type FilterComposer } from "@/lib/catalog/filter";
 import { filterServices } from "@/lib/catalog/filter";
+import { SHOP_FREE_BLUEPRINTS_LABEL } from "@/lib/catalog/shop-label";
 import { EMPTY_FILTERS, type CatalogFilters } from "@/lib/catalog/types";
 import { BlueprintCartArt } from "@/components/blueprint-art";
 import { ExportDialog, FilterChipRow, FilterControl } from "@/components/catalog-tools";
@@ -51,9 +53,9 @@ export function CatalogScreen() {
           <button type="button" className="btn btn-secondary" onClick={() => setHistory(true)}>
             Change history
           </button>
-          <Link className="btn btn-secondary" href="/blueprints">
+          <Link className="btn btn-secondary" href="/blueprints" aria-label={SHOP_FREE_BLUEPRINTS_LABEL}>
             <CartIcon />
-            Shop Blueprints
+            {SHOP_FREE_BLUEPRINTS_LABEL}
             {cartCount > 0 ? <span className="cart-badge">{cartCount}</span> : null}
           </Link>
           {api.canWrite ? (
@@ -64,10 +66,18 @@ export function CatalogScreen() {
         </div>
       </div>
 
-      <div className="toolbar catalog-toolbar">
+      <div
+        className="toolbar catalog-toolbar service-catalog-toolbar"
+        style={{
+          ["--catalog-search" as string]: `${CATALOG_SEARCH_DESKTOP.preferred}px`,
+          ["--catalog-search-min" as string]: `${CATALOG_SEARCH_DESKTOP.min}px`,
+          ["--catalog-search-max" as string]: `${CATALOG_SEARCH_DESKTOP.max}px`,
+        }}
+      >
         <input
           className="input search"
-          placeholder="Search code, name, or summary"
+          data-control="search"
+          placeholder={CATALOG_SEARCH_PLACEHOLDER}
           value={filters.query}
           aria-label="Search services"
           onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))}
@@ -87,7 +97,7 @@ export function CatalogScreen() {
           onChange={columns.update}
           onSaveDefault={(keys) => void api.saveCatalogColumns(keys)}
         />
-        <button type="button" className="btn btn-secondary" onClick={() => setExportOpen(true)} disabled={filtered.length === 0}>
+        <button type="button" className="btn btn-secondary" data-control="export" onClick={() => setExportOpen(true)} disabled={filtered.length === 0}>
           Export
         </button>
       </div>

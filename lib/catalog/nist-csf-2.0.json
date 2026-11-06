@@ -1,0 +1,1231 @@
+{
+  "framework": {
+    "id": "024f2c3f-f4dd-5372-8c0a-893c132c5aef",
+    "code": "NIST-CSF",
+    "version": "2.0",
+    "name": "NIST Cybersecurity Framework (CSF) 2.0",
+    "published_on": "2024-02-26",
+    "publication": "NIST CSWP 29",
+    "publication_url": "https://doi.org/10.6028/NIST.CSWP.29",
+    "source_title": "The NIST Cybersecurity Framework (CSF) 2.0",
+    "source_tool": "NIST Cybersecurity Framework (CSF) 2.0 Reference Tool",
+    "source_url": "https://csrc.nist.gov/extensions/nudp/services/json/csf/download?olirids=all",
+    "reference_tool_url": "https://csrc.nist.gov/Projects/cybersecurity-framework/Filters#/csf/filters",
+    "retrieved_on": "2026-11-06",
+    "export_change_log": "Final",
+    "export_generated_at": "2026-11-06 17:35:34.123000",
+    "export_sha256": "7afe88bfbad7a8ed6ac54d88d4a14715d31398367d4bf164d8b089127f808ed6",
+    "content_sha256": "1104ec7ac38bab958c2159083bd7240a8261647447cf77ada39f73204a2693b8",
+    "id_namespace": "uuid5(uuid5(NAMESPACE_URL, https://doi.org/10.6028/NIST.CSWP.29), NIST-CSF:2.0[:CODE])",
+    "excluded_withdrawn_rows": 91,
+    "provenance": "Functions, categories, and subcategory outcome statements extracted from the NIST CSF 2.0 Reference Tool export. Implementation Examples and Informative References in that export are not seeded. Rows whose statement begins with [Withdrawn are CSF 1.1 crosswalk notes and are not CSF 2.0 outcomes. A mapping in this catalog is a workspace assessment. It is not NIST certification."
+  },
+  "elements": [
+    {
+      "id": "f75cd82b-1b1a-51bf-aeb2-e0ebbdb1df7c",
+      "element_type": "function",
+      "code": "GV",
+      "parent_code": null,
+      "title": "GOVERN",
+      "statement": "The organization's cybersecurity risk management strategy, expectations, and policy are established, communicated, and monitored",
+      "sort_order": 1
+    },
+    {
+      "id": "0dd9b4ca-2825-517e-907b-f07776f48784",
+      "element_type": "category",
+      "code": "GV.OC",
+      "parent_code": "GV",
+      "title": "Organizational Context",
+      "statement": "The circumstances - mission, stakeholder expectations, dependencies, and legal, regulatory, and contractual requirements - surrounding the organization's cybersecurity risk management decisions are understood",
+      "sort_order": 2
+    },
+    {
+      "id": "1ca3110e-ba0f-538a-9b53-c58c4032dbce",
+      "element_type": "subcategory",
+      "code": "GV.OC-01",
+      "parent_code": "GV.OC",
+      "title": "GV.OC-01",
+      "statement": "The organizational mission is understood and informs cybersecurity risk management",
+      "sort_order": 3
+    },
+    {
+      "id": "0aa5f6c2-41cd-5247-8ef3-6c54a5cf5721",
+      "element_type": "subcategory",
+      "code": "GV.OC-02",
+      "parent_code": "GV.OC",
+      "title": "GV.OC-02",
+      "statement": "Internal and external stakeholders are understood, and their needs and expectations regarding cybersecurity risk management are understood and considered",
+      "sort_order": 4
+    },
+    {
+      "id": "4b281203-9932-5ed7-8e5c-a1c4e9d3e611",
+      "element_type": "subcategory",
+      "code": "GV.OC-03",
+      "parent_code": "GV.OC",
+      "title": "GV.OC-03",
+      "statement": "Legal, regulatory, and contractual requirements regarding cybersecurity - including privacy and civil liberties obligations - are understood and managed",
+      "sort_order": 5
+    },
+    {
+      "id": "bc9c4221-4901-5817-b40a-f329c9a382cc",
+      "element_type": "subcategory",
+      "code": "GV.OC-04",
+      "parent_code": "GV.OC",
+      "title": "GV.OC-04",
+      "statement": "Critical objectives, capabilities, and services that external stakeholders depend on or expect from the organization are understood and communicated",
+      "sort_order": 6
+    },
+    {
+      "id": "a465737a-e8f1-51b6-8802-67dc8f2572f1",
+      "element_type": "subcategory",
+      "code": "GV.OC-05",
+      "parent_code": "GV.OC",
+      "title": "GV.OC-05",
+      "statement": "Outcomes, capabilities, and services that the organization depends on are understood and communicated",
+      "sort_order": 7
+    },
+    {
+      "id": "14d84c86-7254-59fc-8a85-bb78e32b8722",
+      "element_type": "category",
+      "code": "GV.RM",
+      "parent_code": "GV",
+      "title": "Risk Management Strategy",
+      "statement": "The organization's priorities, constraints, risk tolerance and appetite statements, and assumptions are established, communicated, and used to support operational risk decisions",
+      "sort_order": 8
+    },
+    {
+      "id": "fd85f4e6-e195-55dc-985a-df43a5195165",
+      "element_type": "subcategory",
+      "code": "GV.RM-01",
+      "parent_code": "GV.RM",
+      "title": "GV.RM-01",
+      "statement": "Risk management objectives are established and agreed to by organizational stakeholders",
+      "sort_order": 9
+    },
+    {
+      "id": "a8e54b71-261e-58b1-93dd-dda97e388fc7",
+      "element_type": "subcategory",
+      "code": "GV.RM-02",
+      "parent_code": "GV.RM",
+      "title": "GV.RM-02",
+      "statement": "Risk appetite and risk tolerance statements are established, communicated, and maintained",
+      "sort_order": 10
+    },
+    {
+      "id": "57e8b0dc-42c6-52df-ac5f-850cfdf6da38",
+      "element_type": "subcategory",
+      "code": "GV.RM-03",
+      "parent_code": "GV.RM",
+      "title": "GV.RM-03",
+      "statement": "Cybersecurity risk management activities and outcomes are included in enterprise risk management processes",
+      "sort_order": 11
+    },
+    {
+      "id": "f1c997b4-27dd-5ac2-9fcd-d1f2e0e2ad00",
+      "element_type": "subcategory",
+      "code": "GV.RM-04",
+      "parent_code": "GV.RM",
+      "title": "GV.RM-04",
+      "statement": "Strategic direction that describes appropriate risk response options is established and communicated",
+      "sort_order": 12
+    },
+    {
+      "id": "3b081ca3-51e1-572f-8be0-0c2e6dc745f9",
+      "element_type": "subcategory",
+      "code": "GV.RM-05",
+      "parent_code": "GV.RM",
+      "title": "GV.RM-05",
+      "statement": "Lines of communication across the organization are established for cybersecurity risks, including risks from suppliers and other third parties",
+      "sort_order": 13
+    },
+    {
+      "id": "fc83d6bc-b606-5c0b-8796-dbcd24a62c52",
+      "element_type": "subcategory",
+      "code": "GV.RM-06",
+      "parent_code": "GV.RM",
+      "title": "GV.RM-06",
+      "statement": "A standardized method for calculating, documenting, categorizing, and prioritizing cybersecurity risks is established and communicated",
+      "sort_order": 14
+    },
+    {
+      "id": "62c8bc2d-9210-51a7-82d1-b817e293a335",
+      "element_type": "subcategory",
+      "code": "GV.RM-07",
+      "parent_code": "GV.RM",
+      "title": "GV.RM-07",
+      "statement": "Strategic opportunities (i.e., positive risks) are characterized and are included in organizational cybersecurity risk discussions",
+      "sort_order": 15
+    },
+    {
+      "id": "a1bfcffc-70ea-563b-bdd5-787ffaec2e73",
+      "element_type": "category",
+      "code": "GV.RR",
+      "parent_code": "GV",
+      "title": "Roles, Responsibilities, and Authorities",
+      "statement": "Cybersecurity roles, responsibilities, and authorities to foster accountability, performance assessment, and continuous improvement are established and communicated",
+      "sort_order": 16
+    },
+    {
+      "id": "1b256f16-e841-5c40-b6be-7371ac4517f4",
+      "element_type": "subcategory",
+      "code": "GV.RR-01",
+      "parent_code": "GV.RR",
+      "title": "GV.RR-01",
+      "statement": "Organizational leadership is responsible and accountable for cybersecurity risk and fosters a culture that is risk-aware, ethical, and continually improving",
+      "sort_order": 17
+    },
+    {
+      "id": "22b4382a-9d58-5c1e-b8ad-5a5c24c2f9e9",
+      "element_type": "subcategory",
+      "code": "GV.RR-02",
+      "parent_code": "GV.RR",
+      "title": "GV.RR-02",
+      "statement": "Roles, responsibilities, and authorities related to cybersecurity risk management are established, communicated, understood, and enforced",
+      "sort_order": 18
+    },
+    {
+      "id": "770b80ba-bd37-5f99-9643-14b25d03a0c5",
+      "element_type": "subcategory",
+      "code": "GV.RR-03",
+      "parent_code": "GV.RR",
+      "title": "GV.RR-03",
+      "statement": "Adequate resources are allocated commensurate with the cybersecurity risk strategy, roles, responsibilities, and policies",
+      "sort_order": 19
+    },
+    {
+      "id": "0177647d-79c9-5aa9-9b81-6bb5805f63a5",
+      "element_type": "subcategory",
+      "code": "GV.RR-04",
+      "parent_code": "GV.RR",
+      "title": "GV.RR-04",
+      "statement": "Cybersecurity is included in human resources practices",
+      "sort_order": 20
+    },
+    {
+      "id": "da67002b-16c4-5fad-ba38-59459b872e9a",
+      "element_type": "category",
+      "code": "GV.PO",
+      "parent_code": "GV",
+      "title": "Policy",
+      "statement": "Organizational cybersecurity policy is established, communicated, and enforced",
+      "sort_order": 21
+    },
+    {
+      "id": "98a19cad-7341-5d0a-b88f-069585233446",
+      "element_type": "subcategory",
+      "code": "GV.PO-01",
+      "parent_code": "GV.PO",
+      "title": "GV.PO-01",
+      "statement": "Policy for managing cybersecurity risks is established based on organizational context, cybersecurity strategy, and priorities and is communicated and enforced",
+      "sort_order": 22
+    },
+    {
+      "id": "4ed3a9f1-78c3-5241-8700-04eab22ac88e",
+      "element_type": "subcategory",
+      "code": "GV.PO-02",
+      "parent_code": "GV.PO",
+      "title": "GV.PO-02",
+      "statement": "Policy for managing cybersecurity risks is reviewed, updated, communicated, and enforced to reflect changes in requirements, threats, technology, and organizational mission",
+      "sort_order": 23
+    },
+    {
+      "id": "4cfab221-201e-5307-957d-57e9cbaf387a",
+      "element_type": "category",
+      "code": "GV.OV",
+      "parent_code": "GV",
+      "title": "Oversight",
+      "statement": "Results of organization-wide cybersecurity risk management activities and performance are used to inform, improve, and adjust the risk management strategy",
+      "sort_order": 24
+    },
+    {
+      "id": "f7ad0b28-d224-55fb-9f65-d7bad3ba3b59",
+      "element_type": "subcategory",
+      "code": "GV.OV-01",
+      "parent_code": "GV.OV",
+      "title": "GV.OV-01",
+      "statement": "Cybersecurity risk management strategy outcomes are reviewed to inform and adjust strategy and direction",
+      "sort_order": 25
+    },
+    {
+      "id": "98ec5923-3e22-52fd-8418-d0fddef93c64",
+      "element_type": "subcategory",
+      "code": "GV.OV-02",
+      "parent_code": "GV.OV",
+      "title": "GV.OV-02",
+      "statement": "The cybersecurity risk management strategy is reviewed and adjusted to ensure coverage of organizational requirements and risks",
+      "sort_order": 26
+    },
+    {
+      "id": "6447f53c-ded8-5fb0-8661-4df3a8befd0b",
+      "element_type": "subcategory",
+      "code": "GV.OV-03",
+      "parent_code": "GV.OV",
+      "title": "GV.OV-03",
+      "statement": "Organizational cybersecurity risk management performance is evaluated and reviewed for adjustments needed",
+      "sort_order": 27
+    },
+    {
+      "id": "0c5fe38b-4160-56c3-813a-bdedd64dd5f6",
+      "element_type": "category",
+      "code": "GV.SC",
+      "parent_code": "GV",
+      "title": "Cybersecurity Supply Chain Risk Management",
+      "statement": "Cyber supply chain risk management processes are identified, established, managed, monitored, and improved by organizational stakeholders",
+      "sort_order": 28
+    },
+    {
+      "id": "4cf75137-da28-5680-92e9-d0c8aecf8319",
+      "element_type": "subcategory",
+      "code": "GV.SC-01",
+      "parent_code": "GV.SC",
+      "title": "GV.SC-01",
+      "statement": "A cybersecurity supply chain risk management program, strategy, objectives, policies, and processes are established and agreed to by organizational stakeholders",
+      "sort_order": 29
+    },
+    {
+      "id": "9fd1a66c-0aff-52f9-96eb-dd795ae206ba",
+      "element_type": "subcategory",
+      "code": "GV.SC-02",
+      "parent_code": "GV.SC",
+      "title": "GV.SC-02",
+      "statement": "Cybersecurity roles and responsibilities for suppliers, customers, and partners are established, communicated, and coordinated internally and externally",
+      "sort_order": 30
+    },
+    {
+      "id": "62a35412-db7a-5f29-8cae-afd6341ecc19",
+      "element_type": "subcategory",
+      "code": "GV.SC-03",
+      "parent_code": "GV.SC",
+      "title": "GV.SC-03",
+      "statement": "Cybersecurity supply chain risk management is integrated into cybersecurity and enterprise risk management, risk assessment, and improvement processes",
+      "sort_order": 31
+    },
+    {
+      "id": "d48e194a-6714-5a44-a0fb-0c5e6b7e0f56",
+      "element_type": "subcategory",
+      "code": "GV.SC-04",
+      "parent_code": "GV.SC",
+      "title": "GV.SC-04",
+      "statement": "Suppliers are known and prioritized by criticality",
+      "sort_order": 32
+    },
+    {
+      "id": "9ef33bd2-6875-5368-90eb-4cde20714cc4",
+      "element_type": "subcategory",
+      "code": "GV.SC-05",
+      "parent_code": "GV.SC",
+      "title": "GV.SC-05",
+      "statement": "Requirements to address cybersecurity risks in supply chains are established, prioritized, and integrated into contracts and other types of agreements with suppliers and other relevant third parties",
+      "sort_order": 33
+    },
+    {
+      "id": "9441d5d6-9172-559f-b847-e918fec743a0",
+      "element_type": "subcategory",
+      "code": "GV.SC-06",
+      "parent_code": "GV.SC",
+      "title": "GV.SC-06",
+      "statement": "Planning and due diligence are performed to reduce risks before entering into formal supplier or other third-party relationships",
+      "sort_order": 34
+    },
+    {
+      "id": "9fbd6c8a-49ab-51d9-803f-0a702979aef6",
+      "element_type": "subcategory",
+      "code": "GV.SC-07",
+      "parent_code": "GV.SC",
+      "title": "GV.SC-07",
+      "statement": "The risks posed by a supplier, their products and services, and other third parties are understood, recorded, prioritized, assessed, responded to, and monitored over the course of the relationship",
+      "sort_order": 35
+    },
+    {
+      "id": "62af2439-2b04-5c57-a553-c30e3a367908",
+      "element_type": "subcategory",
+      "code": "GV.SC-08",
+      "parent_code": "GV.SC",
+      "title": "GV.SC-08",
+      "statement": "Relevant suppliers and other third parties are included in incident planning, response, and recovery activities",
+      "sort_order": 36
+    },
+    {
+      "id": "c9e46a23-6bdf-5566-a4a5-3c4e0693d84a",
+      "element_type": "subcategory",
+      "code": "GV.SC-09",
+      "parent_code": "GV.SC",
+      "title": "GV.SC-09",
+      "statement": "Supply chain security practices are integrated into cybersecurity and enterprise risk management programs, and their performance is monitored throughout the technology product and service life cycle",
+      "sort_order": 37
+    },
+    {
+      "id": "f35bebe5-5001-51a6-bbf7-438da59148a5",
+      "element_type": "subcategory",
+      "code": "GV.SC-10",
+      "parent_code": "GV.SC",
+      "title": "GV.SC-10",
+      "statement": "Cybersecurity supply chain risk management plans include provisions for activities that occur after the conclusion of a partnership or service agreement",
+      "sort_order": 38
+    },
+    {
+      "id": "b3c2b9ce-7156-566b-930b-90f08bf5d561",
+      "element_type": "function",
+      "code": "ID",
+      "parent_code": null,
+      "title": "IDENTIFY",
+      "statement": "The organization's current cybersecurity risks are understood",
+      "sort_order": 39
+    },
+    {
+      "id": "c38fe127-6051-5ecc-83b3-94cc453f1f69",
+      "element_type": "category",
+      "code": "ID.AM",
+      "parent_code": "ID",
+      "title": "Asset Management",
+      "statement": "Assets (e.g., data, hardware, software, systems, facilities, services, people) that enable the organization to achieve business purposes are identified and managed consistent with their relative importance to organizational objectives and the organization's risk strategy",
+      "sort_order": 40
+    },
+    {
+      "id": "1922ce8b-07aa-5275-ad41-8743f5419db8",
+      "element_type": "subcategory",
+      "code": "ID.AM-01",
+      "parent_code": "ID.AM",
+      "title": "ID.AM-01",
+      "statement": "Inventories of hardware managed by the organization are maintained",
+      "sort_order": 41
+    },
+    {
+      "id": "c97dc4dc-db2e-5819-9847-5578b149310b",
+      "element_type": "subcategory",
+      "code": "ID.AM-02",
+      "parent_code": "ID.AM",
+      "title": "ID.AM-02",
+      "statement": "Inventories of software, services, and systems managed by the organization are maintained",
+      "sort_order": 42
+    },
+    {
+      "id": "94bb73cd-06f1-5e54-8db5-a754ef86f5e7",
+      "element_type": "subcategory",
+      "code": "ID.AM-03",
+      "parent_code": "ID.AM",
+      "title": "ID.AM-03",
+      "statement": "Representations of the organization's authorized network communication and internal and external network data flows are maintained",
+      "sort_order": 43
+    },
+    {
+      "id": "7a896e7d-a98d-5e70-a287-4aaa98123159",
+      "element_type": "subcategory",
+      "code": "ID.AM-04",
+      "parent_code": "ID.AM",
+      "title": "ID.AM-04",
+      "statement": "Inventories of services provided by suppliers are maintained",
+      "sort_order": 44
+    },
+    {
+      "id": "cb8b4e11-c76a-5f51-ba7a-8b68e6170fc0",
+      "element_type": "subcategory",
+      "code": "ID.AM-05",
+      "parent_code": "ID.AM",
+      "title": "ID.AM-05",
+      "statement": "Assets are prioritized based on classification, criticality, resources, and impact on the mission",
+      "sort_order": 45
+    },
+    {
+      "id": "6bfda6f4-e325-5424-8b2d-2c7de5a85142",
+      "element_type": "subcategory",
+      "code": "ID.AM-07",
+      "parent_code": "ID.AM",
+      "title": "ID.AM-07",
+      "statement": "Inventories of data and corresponding metadata for designated data types are maintained",
+      "sort_order": 46
+    },
+    {
+      "id": "7dfd79ad-5760-5bee-b1fc-f48fc3c8366c",
+      "element_type": "subcategory",
+      "code": "ID.AM-08",
+      "parent_code": "ID.AM",
+      "title": "ID.AM-08",
+      "statement": "Systems, hardware, software, services, and data are managed throughout their life cycles",
+      "sort_order": 47
+    },
+    {
+      "id": "2adf30b2-cee9-5388-bb6a-155b6c734280",
+      "element_type": "category",
+      "code": "ID.RA",
+      "parent_code": "ID",
+      "title": "Risk Assessment",
+      "statement": "The cybersecurity risk to the organization, assets, and individuals is understood by the organization",
+      "sort_order": 48
+    },
+    {
+      "id": "121843ad-0ec9-5482-864e-8d54519d345f",
+      "element_type": "subcategory",
+      "code": "ID.RA-01",
+      "parent_code": "ID.RA",
+      "title": "ID.RA-01",
+      "statement": "Vulnerabilities in assets are identified, validated, and recorded",
+      "sort_order": 49
+    },
+    {
+      "id": "be60c3bb-74f0-5aec-9550-6a49036abde9",
+      "element_type": "subcategory",
+      "code": "ID.RA-02",
+      "parent_code": "ID.RA",
+      "title": "ID.RA-02",
+      "statement": "Cyber threat intelligence is received from information sharing forums and sources",
+      "sort_order": 50
+    },
+    {
+      "id": "93e4a052-9eb3-5a3c-a2b9-ba6a4d1e459e",
+      "element_type": "subcategory",
+      "code": "ID.RA-03",
+      "parent_code": "ID.RA",
+      "title": "ID.RA-03",
+      "statement": "Internal and external threats to the organization are identified and recorded",
+      "sort_order": 51
+    },
+    {
+      "id": "6d5bf5ae-b820-5e8e-976c-8a093210e50e",
+      "element_type": "subcategory",
+      "code": "ID.RA-04",
+      "parent_code": "ID.RA",
+      "title": "ID.RA-04",
+      "statement": "Potential impacts and likelihoods of threats exploiting vulnerabilities are identified and recorded",
+      "sort_order": 52
+    },
+    {
+      "id": "2fbc5254-9288-5c86-87d0-cbbca4f97d57",
+      "element_type": "subcategory",
+      "code": "ID.RA-05",
+      "parent_code": "ID.RA",
+      "title": "ID.RA-05",
+      "statement": "Threats, vulnerabilities, likelihoods, and impacts are used to understand inherent risk and inform risk response prioritization",
+      "sort_order": 53
+    },
+    {
+      "id": "4edb3688-45b6-597e-a687-94fa5e55fc7b",
+      "element_type": "subcategory",
+      "code": "ID.RA-06",
+      "parent_code": "ID.RA",
+      "title": "ID.RA-06",
+      "statement": "Risk responses are chosen, prioritized, planned, tracked, and communicated",
+      "sort_order": 54
+    },
+    {
+      "id": "8a28d637-b6dc-5058-bab3-8e8c3536a049",
+      "element_type": "subcategory",
+      "code": "ID.RA-07",
+      "parent_code": "ID.RA",
+      "title": "ID.RA-07",
+      "statement": "Changes and exceptions are managed, assessed for risk impact, recorded, and tracked",
+      "sort_order": 55
+    },
+    {
+      "id": "48fc528d-d809-55e3-aa89-1d01b647312b",
+      "element_type": "subcategory",
+      "code": "ID.RA-08",
+      "parent_code": "ID.RA",
+      "title": "ID.RA-08",
+      "statement": "Processes for receiving, analyzing, and responding to vulnerability disclosures are established",
+      "sort_order": 56
+    },
+    {
+      "id": "8b593a40-b7f8-5b0f-9a4d-9fb8141d5a74",
+      "element_type": "subcategory",
+      "code": "ID.RA-09",
+      "parent_code": "ID.RA",
+      "title": "ID.RA-09",
+      "statement": "The authenticity and integrity of hardware and software are assessed prior to acquisition and use",
+      "sort_order": 57
+    },
+    {
+      "id": "b7ab7958-e29f-5697-90ed-d27c97c38c1a",
+      "element_type": "subcategory",
+      "code": "ID.RA-10",
+      "parent_code": "ID.RA",
+      "title": "ID.RA-10",
+      "statement": "Critical suppliers are assessed prior to acquisition",
+      "sort_order": 58
+    },
+    {
+      "id": "2bf6a723-81fd-5b67-91ae-2b89e0d5e74b",
+      "element_type": "category",
+      "code": "ID.IM",
+      "parent_code": "ID",
+      "title": "Improvement",
+      "statement": "Improvements to organizational cybersecurity risk management processes, procedures and activities are identified across all CSF Functions",
+      "sort_order": 59
+    },
+    {
+      "id": "d868b8a4-9767-5afc-9cf7-1f10b2eb20e0",
+      "element_type": "subcategory",
+      "code": "ID.IM-01",
+      "parent_code": "ID.IM",
+      "title": "ID.IM-01",
+      "statement": "Improvements are identified from evaluations",
+      "sort_order": 60
+    },
+    {
+      "id": "7848de31-a3ea-5074-88d7-7c5f1e169134",
+      "element_type": "subcategory",
+      "code": "ID.IM-02",
+      "parent_code": "ID.IM",
+      "title": "ID.IM-02",
+      "statement": "Improvements are identified from security tests and exercises, including those done in coordination with suppliers and relevant third parties",
+      "sort_order": 61
+    },
+    {
+      "id": "cb55b140-0b5b-53c3-b2d0-c1b99db5700d",
+      "element_type": "subcategory",
+      "code": "ID.IM-03",
+      "parent_code": "ID.IM",
+      "title": "ID.IM-03",
+      "statement": "Improvements are identified from execution of operational processes, procedures, and activities",
+      "sort_order": 62
+    },
+    {
+      "id": "139c7feb-5b54-5a40-a992-51b848f741b6",
+      "element_type": "subcategory",
+      "code": "ID.IM-04",
+      "parent_code": "ID.IM",
+      "title": "ID.IM-04",
+      "statement": "Incident response plans and other cybersecurity plans that affect operations are established, communicated, maintained, and improved",
+      "sort_order": 63
+    },
+    {
+      "id": "eb843e7a-92c6-5aae-bae1-5ae148fe9de7",
+      "element_type": "function",
+      "code": "PR",
+      "parent_code": null,
+      "title": "PROTECT",
+      "statement": "Safeguards to manage the organization's cybersecurity risks are used",
+      "sort_order": 64
+    },
+    {
+      "id": "c5933d4b-d5f0-537d-9bc3-209d7aae6581",
+      "element_type": "category",
+      "code": "PR.AA",
+      "parent_code": "PR",
+      "title": "Identity Management, Authentication, and Access Control",
+      "statement": "Access to physical and logical assets is limited to authorized users, services, and hardware and  managed commensurate with the assessed risk of unauthorized access",
+      "sort_order": 65
+    },
+    {
+      "id": "1f97fd0b-e362-57ad-896d-41445757ed03",
+      "element_type": "subcategory",
+      "code": "PR.AA-01",
+      "parent_code": "PR.AA",
+      "title": "PR.AA-01",
+      "statement": "Identities and credentials for authorized users, services, and hardware are managed by the organization",
+      "sort_order": 66
+    },
+    {
+      "id": "be783620-59bd-57cb-8ec4-d97e02b68d54",
+      "element_type": "subcategory",
+      "code": "PR.AA-02",
+      "parent_code": "PR.AA",
+      "title": "PR.AA-02",
+      "statement": "Identities are proofed and bound to credentials based on the context of interactions",
+      "sort_order": 67
+    },
+    {
+      "id": "3d50eb6a-2fe9-5136-9fee-317d577bb277",
+      "element_type": "subcategory",
+      "code": "PR.AA-03",
+      "parent_code": "PR.AA",
+      "title": "PR.AA-03",
+      "statement": "Users, services, and hardware are authenticated",
+      "sort_order": 68
+    },
+    {
+      "id": "4d9b1265-e26c-5fda-afe6-369b57ee3f09",
+      "element_type": "subcategory",
+      "code": "PR.AA-04",
+      "parent_code": "PR.AA",
+      "title": "PR.AA-04",
+      "statement": "Identity assertions are protected, conveyed, and verified",
+      "sort_order": 69
+    },
+    {
+      "id": "83b3e39f-738e-5137-bb79-d87602c96655",
+      "element_type": "subcategory",
+      "code": "PR.AA-05",
+      "parent_code": "PR.AA",
+      "title": "PR.AA-05",
+      "statement": "Access permissions, entitlements, and authorizations are defined in a policy, managed, enforced, and reviewed, and incorporate the principles of least privilege and separation of duties",
+      "sort_order": 70
+    },
+    {
+      "id": "3306c76d-ea3e-5897-9a5d-0f83679c1ca7",
+      "element_type": "subcategory",
+      "code": "PR.AA-06",
+      "parent_code": "PR.AA",
+      "title": "PR.AA-06",
+      "statement": "Physical access to assets is managed, monitored, and enforced commensurate with risk",
+      "sort_order": 71
+    },
+    {
+      "id": "0216f08e-621f-5cfa-b21e-d76601fe5060",
+      "element_type": "category",
+      "code": "PR.AT",
+      "parent_code": "PR",
+      "title": "Awareness and Training",
+      "statement": "The organization's personnel are provided with cybersecurity awareness and training so that they can perform their cybersecurity-related tasks",
+      "sort_order": 72
+    },
+    {
+      "id": "d99bce10-6abc-5b8d-a305-ee512b9f95ba",
+      "element_type": "subcategory",
+      "code": "PR.AT-01",
+      "parent_code": "PR.AT",
+      "title": "PR.AT-01",
+      "statement": "Personnel are provided with awareness and training so that they possess the knowledge and skills to perform general tasks with cybersecurity risks in mind",
+      "sort_order": 73
+    },
+    {
+      "id": "0cbc9a3e-61e1-5faa-8f6e-76d187158aac",
+      "element_type": "subcategory",
+      "code": "PR.AT-02",
+      "parent_code": "PR.AT",
+      "title": "PR.AT-02",
+      "statement": "Individuals in specialized roles are provided with awareness and training so that they possess the knowledge and skills to perform relevant tasks with cybersecurity risks in mind",
+      "sort_order": 74
+    },
+    {
+      "id": "63c7e5ec-4572-5d2f-9afa-0b0022f9ea1a",
+      "element_type": "category",
+      "code": "PR.DS",
+      "parent_code": "PR",
+      "title": "Data Security",
+      "statement": "Data are managed consistent with the organization's risk strategy to protect the confidentiality, integrity, and availability of information",
+      "sort_order": 75
+    },
+    {
+      "id": "94aa4b56-ec34-51a2-a06c-409a6a68951b",
+      "element_type": "subcategory",
+      "code": "PR.DS-01",
+      "parent_code": "PR.DS",
+      "title": "PR.DS-01",
+      "statement": "The confidentiality, integrity, and availability of data-at-rest are protected",
+      "sort_order": 76
+    },
+    {
+      "id": "1bee5273-2d49-5e7c-9108-acf0f6a5affa",
+      "element_type": "subcategory",
+      "code": "PR.DS-02",
+      "parent_code": "PR.DS",
+      "title": "PR.DS-02",
+      "statement": "The confidentiality, integrity, and availability of data-in-transit are protected",
+      "sort_order": 77
+    },
+    {
+      "id": "a29109d0-c004-51cb-9d0f-ca4d9f8efe7a",
+      "element_type": "subcategory",
+      "code": "PR.DS-10",
+      "parent_code": "PR.DS",
+      "title": "PR.DS-10",
+      "statement": "The confidentiality, integrity, and availability of data-in-use are protected",
+      "sort_order": 78
+    },
+    {
+      "id": "36d7792d-48c6-5ca2-979c-598732bd56e8",
+      "element_type": "subcategory",
+      "code": "PR.DS-11",
+      "parent_code": "PR.DS",
+      "title": "PR.DS-11",
+      "statement": "Backups of data are created, protected, maintained, and tested",
+      "sort_order": 79
+    },
+    {
+      "id": "f7c5c70d-8f60-5611-ab82-0826ba0d9a45",
+      "element_type": "category",
+      "code": "PR.PS",
+      "parent_code": "PR",
+      "title": "Platform Security",
+      "statement": "The hardware, software (e.g., firmware, operating systems, applications), and services of physical and virtual platforms are managed consistent with the organization's risk strategy to protect their confidentiality, integrity, and availability",
+      "sort_order": 80
+    },
+    {
+      "id": "5894254a-a30a-5412-84da-049c7cae886e",
+      "element_type": "subcategory",
+      "code": "PR.PS-01",
+      "parent_code": "PR.PS",
+      "title": "PR.PS-01",
+      "statement": "Configuration management practices are established and applied",
+      "sort_order": 81
+    },
+    {
+      "id": "a22744c2-4908-5e81-882f-7b93638359dd",
+      "element_type": "subcategory",
+      "code": "PR.PS-02",
+      "parent_code": "PR.PS",
+      "title": "PR.PS-02",
+      "statement": "Software is maintained, replaced, and removed commensurate with risk",
+      "sort_order": 82
+    },
+    {
+      "id": "04177737-3b9a-50fb-ba8e-359d075ded56",
+      "element_type": "subcategory",
+      "code": "PR.PS-03",
+      "parent_code": "PR.PS",
+      "title": "PR.PS-03",
+      "statement": "Hardware is maintained, replaced, and removed commensurate with risk",
+      "sort_order": 83
+    },
+    {
+      "id": "3e1b0bc6-a785-51bb-9f2e-de4a4370a1c0",
+      "element_type": "subcategory",
+      "code": "PR.PS-04",
+      "parent_code": "PR.PS",
+      "title": "PR.PS-04",
+      "statement": "Log records are generated and made available for continuous monitoring",
+      "sort_order": 84
+    },
+    {
+      "id": "75d2a3f4-0544-579e-8c1b-667db53a8af7",
+      "element_type": "subcategory",
+      "code": "PR.PS-05",
+      "parent_code": "PR.PS",
+      "title": "PR.PS-05",
+      "statement": "Installation and execution of unauthorized software are prevented",
+      "sort_order": 85
+    },
+    {
+      "id": "66bfb88d-6c8f-55a0-9388-bba2b7fa2159",
+      "element_type": "subcategory",
+      "code": "PR.PS-06",
+      "parent_code": "PR.PS",
+      "title": "PR.PS-06",
+      "statement": "Secure software development practices are integrated, and their performance is monitored throughout the software development life cycle",
+      "sort_order": 86
+    },
+    {
+      "id": "bbbcd250-a097-5038-9fc7-67066ea7003a",
+      "element_type": "category",
+      "code": "PR.IR",
+      "parent_code": "PR",
+      "title": "Technology Infrastructure Resilience",
+      "statement": "Security architectures are managed with the organization's risk strategy to protect asset confidentiality, integrity, and availability, and organizational resilience",
+      "sort_order": 87
+    },
+    {
+      "id": "b2d0ed53-4d6e-571f-b33b-7c3df171fc6c",
+      "element_type": "subcategory",
+      "code": "PR.IR-01",
+      "parent_code": "PR.IR",
+      "title": "PR.IR-01",
+      "statement": "Networks and environments are protected from unauthorized logical access and usage",
+      "sort_order": 88
+    },
+    {
+      "id": "2b378f68-76d1-5b75-95ee-6c133427a0cf",
+      "element_type": "subcategory",
+      "code": "PR.IR-02",
+      "parent_code": "PR.IR",
+      "title": "PR.IR-02",
+      "statement": "The organization's technology assets are protected from environmental threats",
+      "sort_order": 89
+    },
+    {
+      "id": "9b74d8a3-84b2-5c48-9904-4b79e998e567",
+      "element_type": "subcategory",
+      "code": "PR.IR-03",
+      "parent_code": "PR.IR",
+      "title": "PR.IR-03",
+      "statement": "Mechanisms are implemented to achieve resilience requirements in normal and adverse situations",
+      "sort_order": 90
+    },
+    {
+      "id": "f444fdc5-48bb-5854-9dae-0cee0f10580d",
+      "element_type": "subcategory",
+      "code": "PR.IR-04",
+      "parent_code": "PR.IR",
+      "title": "PR.IR-04",
+      "statement": "Adequate resource capacity to ensure availability is maintained",
+      "sort_order": 91
+    },
+    {
+      "id": "8a502742-5861-503e-849f-17f473941a42",
+      "element_type": "function",
+      "code": "DE",
+      "parent_code": null,
+      "title": "DETECT",
+      "statement": "Possible cybersecurity attacks and compromises are found and analyzed",
+      "sort_order": 92
+    },
+    {
+      "id": "6a6eaa07-2230-5fae-9a84-d060bcb30dff",
+      "element_type": "category",
+      "code": "DE.CM",
+      "parent_code": "DE",
+      "title": "Continuous Monitoring",
+      "statement": "Assets are monitored to find anomalies, indicators of compromise, and other potentially adverse events",
+      "sort_order": 93
+    },
+    {
+      "id": "e36f6f50-2e9a-53d0-afb7-2b1cd4872b74",
+      "element_type": "subcategory",
+      "code": "DE.CM-01",
+      "parent_code": "DE.CM",
+      "title": "DE.CM-01",
+      "statement": "Networks and network services are monitored to find potentially adverse events",
+      "sort_order": 94
+    },
+    {
+      "id": "95019fef-5629-5ea1-b2b6-e9cf718532e6",
+      "element_type": "subcategory",
+      "code": "DE.CM-02",
+      "parent_code": "DE.CM",
+      "title": "DE.CM-02",
+      "statement": "The physical environment is monitored to find potentially adverse events",
+      "sort_order": 95
+    },
+    {
+      "id": "da64a720-0cf0-5e0f-b773-fda7a18fddca",
+      "element_type": "subcategory",
+      "code": "DE.CM-03",
+      "parent_code": "DE.CM",
+      "title": "DE.CM-03",
+      "statement": "Personnel activity and technology usage are monitored to find potentially adverse events",
+      "sort_order": 96
+    },
+    {
+      "id": "a40e0347-49bf-565f-9644-0d2561bc810e",
+      "element_type": "subcategory",
+      "code": "DE.CM-06",
+      "parent_code": "DE.CM",
+      "title": "DE.CM-06",
+      "statement": "External service provider activities and services are monitored to find potentially adverse events",
+      "sort_order": 97
+    },
+    {
+      "id": "4ac493d9-a6c1-5e3c-b29a-5115ddabdec1",
+      "element_type": "subcategory",
+      "code": "DE.CM-09",
+      "parent_code": "DE.CM",
+      "title": "DE.CM-09",
+      "statement": "Computing hardware and software, runtime environments, and their data are monitored to find potentially adverse events",
+      "sort_order": 98
+    },
+    {
+      "id": "47dc25f8-ca01-5188-8725-98f4f0771937",
+      "element_type": "category",
+      "code": "DE.AE",
+      "parent_code": "DE",
+      "title": "Adverse Event Analysis",
+      "statement": "Anomalies, indicators of compromise, and other potentially adverse events are analyzed to characterize the events and detect cybersecurity incidents",
+      "sort_order": 99
+    },
+    {
+      "id": "776c67f9-578f-59bf-b2cb-b1cd7ea38895",
+      "element_type": "subcategory",
+      "code": "DE.AE-02",
+      "parent_code": "DE.AE",
+      "title": "DE.AE-02",
+      "statement": "Potentially adverse events are analyzed to better understand associated activities",
+      "sort_order": 100
+    },
+    {
+      "id": "b53e9037-4247-5cc7-9759-97984718e594",
+      "element_type": "subcategory",
+      "code": "DE.AE-03",
+      "parent_code": "DE.AE",
+      "title": "DE.AE-03",
+      "statement": "Information is correlated from multiple sources",
+      "sort_order": 101
+    },
+    {
+      "id": "f5e1b76c-7883-5e82-941e-f74be9d389b1",
+      "element_type": "subcategory",
+      "code": "DE.AE-04",
+      "parent_code": "DE.AE",
+      "title": "DE.AE-04",
+      "statement": "The estimated impact and scope of adverse events are understood",
+      "sort_order": 102
+    },
+    {
+      "id": "de2bdab6-c8ef-5d8b-b792-0653faa28b4a",
+      "element_type": "subcategory",
+      "code": "DE.AE-06",
+      "parent_code": "DE.AE",
+      "title": "DE.AE-06",
+      "statement": "Information on adverse events is provided to authorized staff and tools",
+      "sort_order": 103
+    },
+    {
+      "id": "cacbc301-2307-5ece-9d76-645297f53928",
+      "element_type": "subcategory",
+      "code": "DE.AE-07",
+      "parent_code": "DE.AE",
+      "title": "DE.AE-07",
+      "statement": "Cyber threat intelligence and other contextual information are integrated into the analysis",
+      "sort_order": 104
+    },
+    {
+      "id": "5bc25b92-4481-5996-bb0e-d2638287cc8f",
+      "element_type": "subcategory",
+      "code": "DE.AE-08",
+      "parent_code": "DE.AE",
+      "title": "DE.AE-08",
+      "statement": "Incidents are declared when adverse events meet the defined incident criteria",
+      "sort_order": 105
+    },
+    {
+      "id": "20bede1b-1d1b-5c16-8112-43685e645c5c",
+      "element_type": "function",
+      "code": "RS",
+      "parent_code": null,
+      "title": "RESPOND",
+      "statement": "Actions regarding a detected cybersecurity incident are taken",
+      "sort_order": 106
+    },
+    {
+      "id": "3a094c11-ed1e-50d4-b39b-10b874f81753",
+      "element_type": "category",
+      "code": "RS.MA",
+      "parent_code": "RS",
+      "title": "Incident Management",
+      "statement": "Responses to detected cybersecurity incidents are managed",
+      "sort_order": 107
+    },
+    {
+      "id": "6f8a31f3-0851-5ef7-bf2a-e9858021b0bc",
+      "element_type": "subcategory",
+      "code": "RS.MA-01",
+      "parent_code": "RS.MA",
+      "title": "RS.MA-01",
+      "statement": "The incident response plan is executed in coordination with relevant third parties once an incident is declared",
+      "sort_order": 108
+    },
+    {
+      "id": "609bad0b-c2bc-5198-af0a-ad27743381c3",
+      "element_type": "subcategory",
+      "code": "RS.MA-02",
+      "parent_code": "RS.MA",
+      "title": "RS.MA-02",
+      "statement": "Incident reports are triaged and validated",
+      "sort_order": 109
+    },
+    {
+      "id": "20e23223-2155-5e13-8820-8d88e8840151",
+      "element_type": "subcategory",
+      "code": "RS.MA-03",
+      "parent_code": "RS.MA",
+      "title": "RS.MA-03",
+      "statement": "Incidents are categorized and prioritized",
+      "sort_order": 110
+    },
+    {
+      "id": "0fe79bf9-bbf2-5cc0-a5c9-52095b42e8b2",
+      "element_type": "subcategory",
+      "code": "RS.MA-04",
+      "parent_code": "RS.MA",
+      "title": "RS.MA-04",
+      "statement": "Incidents are escalated or elevated as needed",
+      "sort_order": 111
+    },
+    {
+      "id": "181a5a83-e3f3-5c36-b87e-0804faff9127",
+      "element_type": "subcategory",
+      "code": "RS.MA-05",
+      "parent_code": "RS.MA",
+      "title": "RS.MA-05",
+      "statement": "The criteria for initiating incident recovery are applied",
+      "sort_order": 112
+    },
+    {
+      "id": "fec33079-b0ef-5145-b03e-1560630b4e71",
+      "element_type": "category",
+      "code": "RS.AN",
+      "parent_code": "RS",
+      "title": "Incident Analysis",
+      "statement": "Investigations are conducted to ensure effective response and support forensics and recovery activities",
+      "sort_order": 113
+    },
+    {
+      "id": "032cefb5-3010-5abe-b8e6-122c4260d5e4",
+      "element_type": "subcategory",
+      "code": "RS.AN-03",
+      "parent_code": "RS.AN",
+      "title": "RS.AN-03",
+      "statement": "Analysis is performed to establish what has taken place during an incident and the root cause of the incident",
+      "sort_order": 114
+    },
+    {
+      "id": "ff2665cc-78ff-558a-9e48-45a0ad846774",
+      "element_type": "subcategory",
+      "code": "RS.AN-06",
+      "parent_code": "RS.AN",
+      "title": "RS.AN-06",
+      "statement": "Actions performed during an investigation are recorded, and the records' integrity and provenance are preserved",
+      "sort_order": 115
+    },
+    {
+      "id": "ff49b94a-6b57-5ef1-928d-6958a1d6fb5a",
+      "element_type": "subcategory",
+      "code": "RS.AN-07",
+      "parent_code": "RS.AN",
+      "title": "RS.AN-07",
+      "statement": "Incident data and metadata are collected, and their integrity and provenance are preserved",
+      "sort_order": 116
+    },
+    {
+      "id": "5e47369f-24da-51a8-b7ba-445a3882c734",
+      "element_type": "subcategory",
+      "code": "RS.AN-08",
+      "parent_code": "RS.AN",
+      "title": "RS.AN-08",
+      "statement": "An incident's magnitude is estimated and validated",
+      "sort_order": 117
+    },
+    {
+      "id": "8ceec8bb-b8c3-5e95-989d-06dee6fd35d5",
+      "element_type": "category",
+      "code": "RS.CO",
+      "parent_code": "RS",
+      "title": "Incident Response Reporting and Communication",
+      "statement": "Response activities are coordinated with internal and external stakeholders as required by laws, regulations, or policies",
+      "sort_order": 118
+    },
+    {
+      "id": "49a3b0e1-25e9-514a-bedd-2029c22d2b2c",
+      "element_type": "subcategory",
+      "code": "RS.CO-02",
+      "parent_code": "RS.CO",
+      "title": "RS.CO-02",
+      "statement": "Internal and external stakeholders are notified of incidents",
+      "sort_order": 119
+    },
+    {
+      "id": "ebe74f75-b292-51cb-8b36-6af2b2b52692",
+      "element_type": "subcategory",
+      "code": "RS.CO-03",
+      "parent_code": "RS.CO",
+      "title": "RS.CO-03",
+      "statement": "Information is shared with designated internal and external stakeholders",
+      "sort_order": 120
+    },
+    {
+      "id": "3f8c1ec9-bdcf-5bc6-b22a-36fd67087f4f",
+      "element_type": "category",
+      "code": "RS.MI",
+      "parent_code": "RS",
+      "title": "Incident Mitigation",
+      "statement": "Activities are performed to prevent expansion of an event and mitigate its effects",
+      "sort_order": 121
+    },
+    {
+      "id": "d7d1da90-4de4-592f-a589-fc6122e70eb5",
+      "element_type": "subcategory",
+      "code": "RS.MI-01",
+      "parent_code": "RS.MI",
+      "title": "RS.MI-01",
+      "statement": "Incidents are contained",
+      "sort_order": 122
+    },
+    {
+      "id": "118e5ef1-07c7-51cb-88ff-75347f67ed2e",
+      "element_type": "subcategory",
+      "code": "RS.MI-02",
+      "parent_code": "RS.MI",
+      "title": "RS.MI-02",
+      "statement": "Incidents are eradicated",
+      "sort_order": 123
+    },
+    {
+      "id": "5c80b5f5-f942-5ec8-a7f4-127cebb2da97",
+      "element_type": "function",
+      "code": "RC",
+      "parent_code": null,
+      "title": "RECOVER",
+      "statement": "Assets and operations affected by a cybersecurity incident are restored",
+      "sort_order": 124
+    },
+    {
+      "id": "e1d463fc-021e-5372-bcae-1378976fe51d",
+      "element_type": "category",
+      "code": "RC.RP",
+      "parent_code": "RC",
+      "title": "Incident Recovery Plan Execution",
+      "statement": "Restoration activities are performed to ensure operational availability of systems and services affected by cybersecurity incidents",
+      "sort_order": 125
+    },
+    {
+      "id": "8a06e820-2730-59c5-aeed-2f265eb84317",
+      "element_type": "subcategory",
+      "code": "RC.RP-01",
+      "parent_code": "RC.RP",
+      "title": "RC.RP-01",
+      "statement": "The recovery portion of the incident response plan is executed once initiated from the incident response process",
+      "sort_order": 126
+    },
+    {
+      "id": "d9e369e1-92e6-556f-9caa-4d205b377bf3",
+      "element_type": "subcategory",
+      "code": "RC.RP-02",
+      "parent_code": "RC.RP",
+      "title": "RC.RP-02",
+      "statement": "Recovery actions are selected, scoped, prioritized, and performed",
+      "sort_order": 127
+    },
+    {
+      "id": "663e6424-aa37-58e9-ab42-f5314973c725",
+      "element_type": "subcategory",
+      "code": "RC.RP-03",
+      "parent_code": "RC.RP",
+      "title": "RC.RP-03",
+      "statement": "The integrity of backups and other restoration assets is verified before using them for restoration",
+      "sort_order": 128
+    },
+    {
+      "id": "584a78fb-1a19-5842-b9d2-74009b7efa3d",
+      "element_type": "subcategory",
+      "code": "RC.RP-04",
+      "parent_code": "RC.RP",
+      "title": "RC.RP-04",
+      "statement": "Critical mission functions and cybersecurity risk management are considered to establish post-incident operational norms",
+      "sort_order": 129
+    },
+    {
+      "id": "e0d81abc-2c01-5385-8d7d-1ce898d394f5",
+      "element_type": "subcategory",
+      "code": "RC.RP-05",
+      "parent_code": "RC.RP",
+      "title": "RC.RP-05",
+      "statement": "The integrity of restored assets is verified, systems and services are restored, and normal operating status is confirmed",
+      "sort_order": 130
+    },
+    {
+      "id": "89a7f4e0-cf5b-52fc-af4c-38daa6b4404f",
+      "element_type": "subcategory",
+      "code": "RC.RP-06",
+      "parent_code": "RC.RP",
+      "title": "RC.RP-06",
+      "statement": "The end of incident recovery is declared based on criteria, and incident-related documentation is completed",
+      "sort_order": 131
+    },
+    {
+      "id": "48163add-cd9f-53f0-8dfd-aedcd9651008",
+      "element_type": "category",
+      "code": "RC.CO",
+      "parent_code": "RC",
+      "title": "Incident Recovery Communication",
+      "statement": "Restoration activities are coordinated with internal and external parties",
+      "sort_order": 132
+    },
+    {
+      "id": "3c6a04fb-0eeb-5800-aa3c-5d7cdb0c2a94",
+      "element_type": "subcategory",
+      "code": "RC.CO-03",
+      "parent_code": "RC.CO",
+      "title": "RC.CO-03",
+      "statement": "Recovery activities and progress in restoring operational capabilities are communicated to designated internal and external stakeholders",
+      "sort_order": 133
+    },
+    {
+      "id": "08bf6a20-99f1-5538-9964-aa9167e4f3c0",
+      "element_type": "subcategory",
+      "code": "RC.CO-04",
+      "parent_code": "RC.CO",
+      "title": "RC.CO-04",
+      "statement": "Public updates on incident recovery are shared using approved methods and messaging",
+      "sort_order": 134
+    }
+  ]
+}

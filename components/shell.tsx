@@ -6,6 +6,7 @@ import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react
 import { roleLabel } from "@/lib/catalog/access";
 import { cartIdsFor, subscribeCart } from "@/lib/catalog/cart-store";
 import { MAX_LOGO_FILE_BYTES } from "@/lib/catalog/logos";
+import { SHOP_FREE_BLUEPRINTS_LABEL } from "@/lib/catalog/shop-label";
 import type { Role, ServiceCodeMode } from "@/lib/catalog/types";
 import { useCatalog } from "@/components/catalog-provider";
 import { CartIcon } from "@/components/icons";
@@ -60,9 +61,16 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Link href="/catalog" aria-current={pathname.startsWith("/catalog") ? "page" : undefined}>
             Catalog
           </Link>
-          <Link href="/blueprints" aria-current={pathname.startsWith("/blueprints") ? "page" : undefined}>
+          <Link href="/coverage" aria-current={pathname.startsWith("/coverage") ? "page" : undefined}>
+            Coverage
+          </Link>
+          <Link
+            href="/blueprints"
+            aria-label={SHOP_FREE_BLUEPRINTS_LABEL}
+            aria-current={pathname.startsWith("/blueprints") ? "page" : undefined}
+          >
             <CartIcon />
-            Shop Blueprints
+            {SHOP_FREE_BLUEPRINTS_LABEL}
             {cartCount > 0 ? <span className="cart-badge">{cartCount}</span> : null}
           </Link>
           {api.canAdmin ? (

@@ -44,6 +44,18 @@ export function summarizeAudit(
 ): { title: string; changes: FieldChange[] } {
   const after = entry.after_data;
   const before = entry.before_data;
+  if (entry.table_name === "service_outcome_mappings") {
+    const source = entry.action === "delete" ? before : after;
+    const code = textOf(source?.element_code) || "outcome";
+    const coverage = textOf(source?.coverage);
+    const service = textOf(source?.service_code);
+    const verb = entry.action === "delete" ? "Removed" : entry.action === "insert" ? "Mapped" : "Updated";
+    const detail = [coverage, service].filter(Boolean).join(" · ");
+    return {
+      title: detail ? `${verb} ${code} · ${detail}` : `${verb} ${code}`,
+      changes: entry.action === "update" ? changedFields(before, after, labels) : [],
+    };
+  }
   if (entry.action === "insert") {
     const code = textOf(after?.service_code) || textOf(after?.code);
     const name = textOf(after?.name) || textOf(after?.label) || entry.table_name;
@@ -81,6 +93,10 @@ export function labelMap(fields: FieldDefinition[]): Map<string, string> {
   map.set("visibility", "Visibility");
   map.set("depth_level", "Depth");
   map.set("help_text", "Help text");
+  map.set("coverage", "Assessment");
+  map.set("rationale", "Rationale");
+  map.set("notes", "Notes");
+  map.set("element_code", "Outcome");
   return map;
 }
 

@@ -13,9 +13,16 @@ Leave the service-role key where it is.
 
 ## 2. Apply the schema
 
-Open **SQL Editor → New query**. Paste the full contents of `supabase/migrations/0001_v1_catalog_core.sql` and run it. Then run `supabase/migrations/0002_v1_1_polish.sql` so workspaces can store a logo and services can be archived.
+Open **SQL Editor → New query**. Paste and run each migration in order:
 
-That creates `tenants`, `tenant_members`, `field_definitions`, `lookup_options`, `services`, and `audit_log`, turns on row-level security, and loads the starter dropdowns and field definitions (rows with a null `tenant_id` are the template copied into each new workspace).
+1. `supabase/migrations/0001_v1_catalog_core.sql`
+2. `supabase/migrations/0002_v1_1_polish.sql`
+3. `supabase/migrations/0003_v1_2_blueprints_columns_import.sql`
+4. `supabase/migrations/0004_v2_csf_mappings.sql`
+
+`0002` stores a workspace logo and lets services be archived. `0004` loads the NIST CSF 2.0 core and the assessment table. The core wording and provenance are recorded in `docs/nist-csf-2.0-provenance.md`.
+
+That creates `tenants`, `tenant_members`, `field_definitions`, `lookup_options`, `services`, `audit_log`, `frameworks`, `framework_elements`, and `service_outcome_mappings`, turns on row-level security, and loads the starter dropdowns, field definitions, and the CSF 2.0 core. Rows with a null `tenant_id` are the template copied into each new workspace.
 
 Optional: paste `supabase/seed.sql` and run it. That adds two fictional workspaces, **Acme Corp** and **Meridian Health**, with sample services. Skip it if you want to start empty.
 

@@ -1,8 +1,8 @@
 # Security Service Catalog Builder
 
-**Status: V1.2.** A multi-tenant catalog for the security services an organization delivers. Enter each service once, shop a blueprint instead of starting from a blank form, keep internal notes out of public views, and export the audience you choose.
+**Status: V2.** A multi-tenant catalog for the security services an organization delivers. Enter each service once, shop a blueprint instead of starting from a blank form, map services to NIST CSF 2.0 outcomes, and see where coverage is explicit or missing.
 
-V1 includes the service form, the catalog list, dropdown and field administration, CSV export, workspace isolation, and an audit trail. Framework mapping, audience HTML/Word exports, linked artifacts, and assisted drafting come later.
+V1 includes the service form, the catalog list, dropdown and field administration, CSV export, workspace isolation, and an audit trail. V2 adds the CSF 2.0 core and workspace assessments. Audience HTML/Word exports, linked artifacts, and assisted drafting come later.
 
 ## What you can do
 
@@ -19,6 +19,8 @@ V1 includes the service form, the catalog list, dropdown and field administratio
 - Shop pre-built security service blueprints, including company-size and industry packs, review them in a cart, and add them to the catalog in one checkout.
 - Choose and reorder the columns on the catalog table. Admins can save a workspace default. Everyone else can keep a browser override.
 - Import a lookup group from CSV, including a large roster, with a template download and a column-mapping preview.
+- Map an active service to NIST CSF 2.0 subcategory outcomes as full, partial, or none, with a rationale and notes. Viewers can read the assessments. Editors and admins can change them.
+- Open Coverage to see the six Functions and drill into categories and outcomes. Counts are explicit assessments on active services. Archived services, blueprint hints, and the primary function dropdown are not coverage. A saved mapping is a workspace assessment, not a certification.
 
 ## Architecture
 
@@ -38,7 +40,7 @@ Supabase mode uses `@supabase/ssr` in the browser and in `proxy.ts` (session ref
 | `platform_owner` | Every workspace. Can create workspaces and grant the same role. |
 | `tenant_admin` | One workspace. Services, dropdowns, fields, and members. |
 | `editor` | One workspace. Create and edit services. |
-| `viewer` | One workspace. Read and export. |
+| `viewer` | One workspace. Read, export, and view coverage. |
 
 The first account on an empty project becomes the platform owner and receives a seeded Starter Workspace. Later accounts need a membership. Sample workspaces from `supabase/seed.sql` are visible to a platform owner.
 
@@ -74,7 +76,9 @@ Copy `.env.example` to `.env.local` only on your machine. `.env.local` is gitign
 - `supabase/migrations/0001_v1_catalog_core.sql` — tables, RLS, audit triggers, provision function, starter data
 - `supabase/migrations/0002_v1_1_polish.sql` — workspace `logo_url` and service `archived_at`
 - `supabase/migrations/0003_v1_2_blueprints_columns_import.sql` — catalog column defaults, bulk lookup import, and blueprint checkout
-- `supabase/seed.sql` — the same starter lookups, plus Acme Corp and Meridian Health
+- `supabase/migrations/0004_v2_csf_mappings.sql` — NIST CSF 2.0 core, outcome assessments, RLS, and audit
+- `supabase/seed.sql` — the same starter lookups, the CSF 2.0 core, plus Acme Corp and Meridian Health
+- `docs/nist-csf-2.0-provenance.md` — source, version, and content hash for the CSF core
 - `tests/` — computed fields, service IDs, CSV visibility and distribution markings, filters, archive, field retirement, depth behavior
 
 `npm run seed:sql` regenerates the starter rows in the SQL files from `lib/catalog/`. The TypeScript seed is what Demo Mode uses.
@@ -83,6 +87,6 @@ Intake methods and target audiences are included so those V1 dropdowns are usabl
 
 ## Later versions
 
-The sequence is unchanged. V2 maps services to NIST CSF 2.0 and shows gaps. V3 adds saved audience exports. V4 links tools, runbooks, and policies. V5 may suggest text, and a person approves every save.
+V2 maps services to NIST CSF 2.0 subcategory outcomes and shows gaps. V3 adds saved audience exports. V4 links tools, runbooks, and policies. V5 may suggest text, and a person approves every save.
 
 A license has not been selected yet.

@@ -1,11 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseColumnConfig } from "@/lib/catalog/columns";
 import { withComputed } from "@/lib/catalog/service";
+import type { FrameworkElement, FrameworkRelease } from "@/lib/catalog/framework";
 import type {
   AuditEntry,
   FieldDefinition,
   LookupOption,
   Member,
+  OutcomeMapping,
   Role,
   ServiceCodeMode,
   ServiceRecord,
@@ -39,14 +41,17 @@ export async function hydrateFromSupabase(supabase: SupabaseClient): Promise<Hyd
     return { db: { ...emptyDb(), session }, warning: null };
   }
 
-  const [fields, lookups, services, members, audit] = await Promise.all([
+  const [fields, lookups, services, members, audit, frameworks, elements, mappings] = await Promise.all([
     supabase.from("field_definitions").select("*").in("tenant_id", ids),
     supabase.from("lookup_options").select("*").in("tenant_id", ids),
     supabase.from("services").select("*").in("tenant_id", ids),
     supabase.rpc("list_visible_members"),
     supabase.from("audit_log").select("*").in("tenant_id", ids).order("created_at", { ascending: false }).limit(400),
+    supabase.from("frameworks").select("*").eq("is_active", true),
+    supabase.from("framework_elements").select("*").order("sort_order"),
+    supabase.from("service_outcome_mappings").select("*").in("tenant_id", ids),
   ]);
-  for (const result of [fields, lookups, services]) {
+  for (const result of [fields, lookups, services, frameworks, elements, mappings]) {
     if (result.error) throw new Error(result.error.message);
   }
   if (members.error) throw new Error(members.error.message);
@@ -64,6 +69,9 @@ export async function hydrateFromSupabase(supabase: SupabaseClient): Promise<Hyd
       fields: (fields.data ?? []).map(asField),
       lookups: (lookups.data ?? []).map(asLookup),
       services: (services.data ?? []).map(asService),
+      frameworks: (frameworks.data ?? []).map(asFramework),
+      elements: (elements.data ?? []).map(asElement),
+      mappings: (mappings.data ?? []).map(asMapping),
       audit: (audit.data ?? []).map(asAudit),
     },
     warning: null,
@@ -282,6 +290,83 @@ export async function checkoutBlueprintRows(supabase: SupabaseClient, tenantId: 
 export async function deleteServiceRow(supabase: SupabaseClient, serviceId: string): Promise<void> {
   const { error } = await supabase.from("services").delete().eq("id", serviceId);
   if (error) throw new Error(error.message);
+}
+
+export async function persistOutcomeMapping(supabase: SupabaseClient, mapping: OutcomeMapping): Promise<void> {
+  const { error } = await supabase.from("service_outcome_mappings").upsert(
+    {
+      id: mapping.id,
+      tenant_id: mapping.tenant_id,
+      service_id: mapping.service_id,
+      element_id: mapping.element_id,
+      coverage: mapping.coverage,
+      rationale: mapping.rationale,
+      notes: mapping.notes,
+    },
+    { onConflict: "service_id,element_id" },
+  );
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteOutcomeMappingRow(supabase: SupabaseClient, mappingId: string): Promise<void> {
+  const { error } = await supabase.from("service_outcome_mappings").delete().eq("id", mappingId);
+  if (error) throw new Error(error.message);
+}
+
+function asFramework(row: Record<string, unknown>): FrameworkRelease {
+  return {
+    id: String(row.id),
+    code: String(row.code),
+    version: String(row.version),
+    name: String(row.name),
+    published_on: String(row.published_on ?? ""),
+    publication: String(row.publication ?? ""),
+    publication_url: String(row.publication_url ?? ""),
+    source_title: String(row.source_title ?? ""),
+    source_tool: String(row.source_tool ?? ""),
+    source_url: String(row.source_url ?? ""),
+    reference_tool_url: String(row.reference_tool_url ?? ""),
+    retrieved_on: String(row.retrieved_on ?? ""),
+    export_change_log: String(row.export_change_log ?? ""),
+    export_generated_at: String(row.export_generated_at ?? ""),
+    export_sha256: String(row.export_sha256 ?? ""),
+    content_sha256: String(row.content_sha256 ?? ""),
+    id_namespace: String(row.id_namespace ?? ""),
+    excluded_withdrawn_rows: Number(row.excluded_withdrawn_rows ?? 0),
+    provenance: String(row.provenance ?? ""),
+    is_active: row.is_active !== false,
+  };
+}
+
+function asElement(row: Record<string, unknown>): FrameworkElement {
+  const elementType = row.element_type === "function" || row.element_type === "category" ? row.element_type : "subcategory";
+  return {
+    id: String(row.id),
+    framework_id: String(row.framework_id),
+    element_type: elementType,
+    code: String(row.code),
+    parent_id: row.parent_id == null ? null : String(row.parent_id),
+    title: String(row.title ?? ""),
+    statement: String(row.statement ?? ""),
+    sort_order: Number(row.sort_order ?? 0),
+  };
+}
+
+function asMapping(row: Record<string, unknown>): OutcomeMapping {
+  const coverage = row.coverage === "full" || row.coverage === "partial" || row.coverage === "none" ? row.coverage : "none";
+  return {
+    id: String(row.id),
+    tenant_id: String(row.tenant_id),
+    service_id: String(row.service_id),
+    element_id: String(row.element_id),
+    coverage,
+    rationale: textOrNull(row.rationale),
+    notes: textOrNull(row.notes),
+    created_by: textOrNull(row.created_by),
+    updated_by: textOrNull(row.updated_by),
+    created_at: String(row.created_at ?? ""),
+    updated_at: String(row.updated_at ?? ""),
+  };
 }
 
 function asTenant(row: Record<string, unknown>): Tenant {
