@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
+import { useAnchoredPanel } from "@/components/anchored-panel";
 import { downloadName, distributionMarking, servicesToCsv, type CsvVisibility } from "@/lib/catalog/csv";
 import {
   activeFilterCount,
@@ -34,7 +35,16 @@ export function FilterControl({
   onChange: (filters: CatalogFilters) => void;
   onComposer: (composer: FilterComposer) => void;
 }) {
-  const ref = useDismiss(composer.popupOpen, () => onComposer(closeFilterPopup(composer)));
+  const anchorRef = useRef<HTMLDivElement | null>(null);
+  const dismissRef = useDismiss(composer.popupOpen, () => onComposer(closeFilterPopup(composer)));
+  const setAnchor = useCallback(
+    (node: HTMLDivElement | null) => {
+      anchorRef.current = node;
+      dismissRef(node);
+    },
+    [dismissRef],
+  );
+  const panelStyle = useAnchoredPanel(composer.popupOpen, anchorRef);
   const count = activeFilterCount(filters);
   const activeFields = fields
     .filter((field) => field.is_active)
@@ -60,7 +70,7 @@ export function FilterControl({
   }
 
   return (
-    <div className="filter-anchor" ref={ref}>
+    <div className="filter-anchor" ref={setAnchor} data-control="filter">
       <button
         type="button"
         className="btn btn-secondary"
@@ -71,7 +81,7 @@ export function FilterControl({
         Filter{count > 0 ? ` · ${count}` : ""}
       </button>
       {composer.popupOpen ? (
-        <div className="filter-panel" role="dialog" aria-label="Filter services">
+        <div className="filter-panel" role="dialog" aria-label="Filter services" style={panelStyle}>
           <p className="micro">Catalog</p>
           <div className="segmented" role="radiogroup" aria-label="Service archive state">
             <button
@@ -175,20 +185,22 @@ export function FilterChipRow({
           </button>
         </span>
       ))}
-      <button type="button" className="btn btn-ghost" onClick={onAddAdditional}>
-        + Add additional filter
-      </button>
-      <button
-        type="button"
-        className="btn btn-ghost"
-        onClick={() => {
-          const cleared = clearFilterRules(filters);
-          onChange(cleared.filters);
-          onComposer(cleared.composer);
-        }}
-      >
-        Clear all
-      </button>
+      <div className="chip-actions">
+        <button type="button" className="btn btn-ghost" onClick={onAddAdditional}>
+          + Add additional filter
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={() => {
+            const cleared = clearFilterRules(filters);
+            onChange(cleared.filters);
+            onComposer(cleared.composer);
+          }}
+        >
+          Clear all
+        </button>
+      </div>
     </div>
   );
 }
