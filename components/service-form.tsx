@@ -379,7 +379,9 @@ function FieldControl({
         <input
           id={inputId}
           className="input"
-          type={field.input_type === "url" ? "url" : "text"}
+          type={field.field_key === "support_contact" ? "email" : field.input_type === "url" ? "url" : "text"}
+          inputMode={field.field_key === "support_contact" ? "email" : undefined}
+          autoComplete={field.field_key === "support_contact" ? "email" : undefined}
           disabled={disabled}
           value={typeof value === "string" ? value : ""}
           onChange={(event) => onChange(event.target.value)}

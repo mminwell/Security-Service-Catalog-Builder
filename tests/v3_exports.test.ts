@@ -86,8 +86,8 @@ describe("audience profiles and visibility", () => {
     expect(pub.fields.every((field) => field.visibility === "public")).toBe(true);
     expect(pub.fields.some((field) => field.field_key === "internal_notes")).toBe(false);
     expect(pub.excludedRetired).toEqual([]);
-    expect(pub.fields[0]?.field_key).toBe("service_code");
-    expect(pub.fields[1]?.field_key).toBe("name");
+    expect(pub.fields.map((field) => field.field_key)).toEqual(["name", "summary"]);
+    expect(pub.excludedInternal.map((field) => field.field_key)).toContain("service_code");
     expect(full.audience).toBe("internal");
     expect(full.requiresConfirmation).toBe(true);
     expect(full.fields.some((field) => field.field_key === "internal_notes")).toBe(true);
@@ -96,14 +96,14 @@ describe("audience profiles and visibility", () => {
     const tampered = resolveExportSelection({
       fields,
       declaredAudience: "public",
-      requestedKeys: ["summary", "internal_notes", "name"],
+      requestedKeys: ["service_code", "summary", "internal_notes", "name"],
       profileName: "Client safe",
       profileId: "p1",
     });
     expect(tampered.profileName).toBe("Client safe");
     expect(tampered.audience).toBe("public");
-    expect(tampered.fields.map((field) => field.field_key)).toEqual(["service_code", "name", "summary"]);
-    expect(tampered.excludedInternal.map((field) => field.field_key)).toContain("internal_notes");
+    expect(tampered.fields.map((field) => field.field_key)).toEqual(["name", "summary"]);
+    expect(tampered.excludedInternal.map((field) => field.field_key)).toEqual(expect.arrayContaining(["service_code", "internal_notes"]));
     expect(tampered.requiresConfirmation).toBe(false);
   });
 
@@ -111,7 +111,7 @@ describe("audience profiles and visibility", () => {
     const retired = fields.map((field) => (field.field_key === "summary" ? { ...field, is_active: false } : field));
     const custom = resolveExportSelection({
       fields: retired,
-      declaredAudience: "public",
+      declaredAudience: "internal",
       requestedKeys: ["summary", "category", "owner_team"],
       profileName: "Custom fields",
       profileId: null,
@@ -462,11 +462,14 @@ describe("framework selection", () => {
 
   it("uses the ServiceNow preset without claiming a connection and still guards internal fields", () => {
     const columns = resolveMappedColumns(fields, mappingFromPreset(SERVICENOW_PRESET), "public");
-    expect(mappedAudience(fields, mappingFromPreset(SERVICENOW_PRESET))).toBe("public");
+    expect(columns.columns.some((column) => column.field.field_key === "service_code")).toBe(false);
+    expect(columns.excludedInternal.map((field) => field.field_key)).toContain("service_code");
     const csv = buildMappedCsv({ services: services.slice(0, 1), lookups, columns: columns.columns });
     expect(csv).toContain("short_description");
     expect(csv).toContain("Enterprise Security Monitoring");
+    expect(csv).not.toContain("SVC-001");
     expect(csv).not.toContain(secret);
+    expect(mappedAudience(fields, mappingFromPreset(SERVICENOW_PRESET))).toBe("internal");
     expect(SERVICENOW_PRESET.disclaimer).toMatch(/does not connect/i);
     const internal = mappingFromPreset(SERVICENOW_PRESET).map((column, index) =>
       index === 0 ? { ...column, sourceKey: "internal_notes" } : column,

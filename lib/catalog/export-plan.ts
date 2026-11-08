@@ -1,4 +1,3 @@
-import { isIdentityField } from "@/lib/catalog/fields";
 import type { FieldDefinition, Visibility } from "@/lib/catalog/types";
 
 export const INTERNAL_EXPORT_CONFIRMATION =
@@ -21,7 +20,10 @@ export type ResolvedExport = {
   profileId: string | null;
 };
 
-const IDENTITY = ["service_code", "name"];
+/** Public files keep the service name. Service code is included only in a full export, or when an admin has marked that field public. */
+function forcedKeys(audience: Visibility): string[] {
+  return audience === "public" ? ["name"] : ["service_code", "name"];
+}
 
 export function resolveExportSelection(args: {
   fields: FieldDefinition[];
@@ -50,18 +52,21 @@ export function resolveExportSelection(args: {
       if (args.requestedKeys != null) excludedRetired.push(key);
       continue;
     }
-    if (args.declaredAudience === "public" && field.visibility === "internal" && !isIdentityField(field.field_key)) {
+    if (args.declaredAudience === "public" && field.visibility === "internal") {
       excludedInternal.push(field);
       continue;
     }
     ordered.push(field);
   }
 
-  const identity = IDENTITY.map((key) => args.fields.find((field) => field.field_key === key)).filter(
-    (field): field is FieldDefinition => Boolean(field && field.is_active),
-  );
-  const rest = ordered.filter((field) => !isIdentityField(field.field_key));
-  const fields = [...identity, ...rest];
+  const forced = forcedKeys(args.declaredAudience)
+    .map((key) => args.fields.find((field) => field.field_key === key))
+    .filter((field): field is FieldDefinition => {
+      if (!field || !field.is_active) return false;
+      return args.declaredAudience === "internal" || field.visibility === "public";
+    });
+  const forcedSet = new Set(forced.map((field) => field.field_key));
+  const fields = [...forced, ...ordered.filter((field) => !forcedSet.has(field.field_key))];
   const audience: Visibility = fields.some((field) => field.visibility === "internal") ? "internal" : "public";
 
   return {
@@ -96,7 +101,7 @@ export function fullPreset(fields: FieldDefinition[]): ResolvedExport {
   });
 }
 
-/** Saving a public profile cannot keep internal fields. Identity is always stored. */
+/** Saving a public profile cannot keep internal fields, including an internal service code. */
 export function keysForSavedProfile(fields: FieldDefinition[], requestedKeys: string[], audience: Visibility): string[] {
   const resolved = resolveExportSelection({
     fields,

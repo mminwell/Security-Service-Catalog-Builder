@@ -108,7 +108,7 @@ function documentXml(document: CatalogDocument): string {
       </w:tr>`,
         )
         .join("");
-      return `${heading(`${service.code} · ${service.name}`)}<w:tbl>
+      return `${heading(service.heading)}<w:tbl>
         <w:tblPr><w:tblW w:w="9360" w:type="dxa"/><w:tblBorders>
           <w:top w:val="single" w:sz="4" w:space="0" w:color="D1CFC5"/>
           <w:left w:val="single" w:sz="4" w:space="0" w:color="D1CFC5"/>

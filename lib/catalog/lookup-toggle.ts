@@ -52,6 +52,13 @@ export function lookupToggleFor(field: FieldDefinition): LookupToggle {
       reason: "This stores a web address. A lookup code would not stay a valid URL.",
     };
   }
+  if (field.field_key === "support_contact") {
+    return {
+      checked: false,
+      disabled: true,
+      reason: "This is an email mailbox. A lookup would store a code instead of an address.",
+    };
+  }
   if (field.input_type === "multi_select") {
     return {
       checked: true,

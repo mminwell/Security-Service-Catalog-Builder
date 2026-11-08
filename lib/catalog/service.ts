@@ -301,7 +301,27 @@ export function validateService(
   if (url && !/^https?:\/\//i.test(url)) {
     errors.intake_url = "Enter a URL starting with http:// or https://.";
   }
+  const supportRequired = fields.some((field) => field.field_key === "support_contact" && field.is_active && field.is_required);
+  const supportError = supportContactError(service.support_contact, supportRequired);
+  if (supportError) errors.support_contact = supportError;
   return errors;
+}
+
+/** One mailbox. Local part, domain, and a dot in the domain. Not a full RFC parser. */
+export function isReasonableEmail(value: string): boolean {
+  const email = value.trim();
+  if (email.length < 6 || email.length > 254) return false;
+  if (email.includes(" ") || email.includes("..")) return false;
+  return /^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/.test(email);
+}
+
+export function supportContactError(value: string | null | undefined, required: boolean): string | null {
+  const text = value?.trim() ?? "";
+  if (!text) {
+    return required ? "Support / Escalation needs an email address." : null;
+  }
+  if (isReasonableEmail(text)) return null;
+  return "Support / Escalation must be an email address. This saved value is not an email, so correct it or clear it before saving. It stays stored until you do.";
 }
 
 export function normalizeService(service: ServiceRecord): ServiceRecord {

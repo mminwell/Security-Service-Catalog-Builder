@@ -1,5 +1,6 @@
 import { parseColumnConfig } from "@/lib/catalog/columns";
 import { materializeFields, STARTER_FIELDS, type FieldGroupId } from "@/lib/catalog/fields";
+import { migrateStockField } from "@/lib/catalog/stock-fields";
 import { FRAMEWORK_CATALOG } from "@/lib/catalog/framework-catalog";
 import { CSF_ELEMENTS, CSF_FRAMEWORK, type FrameworkElement } from "@/lib/catalog/framework";
 import { STARTER_LOOKUPS } from "@/lib/catalog/lookups";
@@ -130,13 +131,14 @@ function normalizeStoredField(input: unknown): FieldDefinition {
     is_active: row.is_active !== false,
     is_standard: row.is_standard !== false,
     field_group: group,
+    visibility_overridden: row.visibility_overridden === true,
   };
   if (next.field_key === "primary_csf_function" && next.help_text === PREVIOUS_CSF_HELP) {
     next.help_text = CURRENT_CSF_HELP;
   }
   const known = STARTER_FIELDS.find((field) => field.field_key === next.field_key);
   if (known?.field_group && !next.field_group) next.field_group = known.field_group;
-  return next;
+  return migrateStockField(next);
 }
 
 const OPTIONAL_FIELDS = STARTER_FIELDS.filter((field) => field.field_group);

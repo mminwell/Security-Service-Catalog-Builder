@@ -402,6 +402,7 @@ export function saveField(db: CatalogDb, input: FieldDefinition, now = new Date(
     label: input.label.trim() || current.label,
     help_text: input.help_text,
     visibility: input.visibility,
+    visibility_overridden: input.visibility !== current.visibility ? true : current.visibility_overridden,
     depth_level: input.depth_level,
     is_required: input.is_required,
     is_active: input.is_active,

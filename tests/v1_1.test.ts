@@ -194,13 +194,13 @@ describe("field retirement", () => {
     expect(completenessPercent(shown, retiredFields)).toBe(Math.round((filled / active.length) * 100));
     expect(active.some((field) => field.field_key === "summary")).toBe(false);
 
-    const hidden = servicesToCsv([shown], retiredFields, lookups, "all");
-    expect(hidden).not.toContain("Executive Summary");
+    const hidden = servicesToCsv([shown], retiredFields, lookups, "all").replace(/^\uFEFF/, "");
+    expect(hidden.split("\r\n")[0]?.split(",")).not.toContain("Service Description");
     expect(hidden).not.toContain(service.summary ?? "");
 
     db = saveField(db, { ...summary, is_active: true }, "2026-11-06T12:05:00.000Z");
     const restored = servicesToCsv([shown], tenantFields(), lookups, "public");
-    expect(restored).toContain("Executive Summary");
+    expect(restored).toContain("Service Description");
     expect(restored).toContain(service.summary ?? "");
     expect(db.services.find((item) => item.id === service.id)?.summary).toBe(service.summary);
   });

@@ -21,6 +21,7 @@ Open **SQL Editor → New query**. Paste and run each migration in order:
 4. `supabase/migrations/0004_v2_csf_mappings.sql`
 5. `supabase/migrations/0005_v3_exports_frameworks.sql`
 6. `supabase/migrations/0006_v3_field_lookup_toggle.sql`
+7. `supabase/migrations/0007_v3_public_defaults.sql`
 
 `0002` stores a workspace logo and lets services be archived. `0004` loads the NIST CSF 2.0 core and the assessment table. The core wording and provenance are recorded in `docs/nist-csf-2.0-provenance.md`. `0005` adds export profiles, optional geography and privacy fields, and the framework registry. It does not add control text for the licensed frameworks.
 

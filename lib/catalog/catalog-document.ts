@@ -11,7 +11,7 @@ export type CatalogDocument = {
   generatedOn: string;
   serviceCount: number;
   fieldLabels: string[];
-  services: Array<{ code: string; name: string; rows: Array<{ label: string; value: string }> }>;
+  services: Array<{ code: string; name: string; heading: string; rows: Array<{ label: string; value: string }> }>;
   notes: string[];
 };
 
@@ -47,6 +47,9 @@ export function buildCatalogDocument(args: {
     services: args.services.map((service) => ({
       code: service.service_code,
       name: service.name,
+      heading: args.fields.some((field) => field.field_key === "service_code")
+        ? `${service.service_code} · ${service.name}`
+        : service.name,
       rows: args.fields.map((field) => ({
         label: field.label,
         value: displayExportValue(formatExportValue(service, field, args.lookups)),

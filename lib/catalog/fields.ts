@@ -26,7 +26,7 @@ const RAW: Array<Omit<FieldSeed, "sort_order">> = [
     input_type: "text",
     lookup_field_key: null,
     is_required: true,
-    visibility: "public",
+    visibility: "internal",
     depth_level: 1,
   },
   {
@@ -72,8 +72,8 @@ const RAW: Array<Omit<FieldSeed, "sort_order">> = [
   },
   {
     field_key: "summary",
-    label: "Executive Summary",
-    help_text: "One or two sentences a leader or client can read without the full description.",
+    label: "Service Description",
+    help_text: "One or two sentences a client can read. This is the service description.",
     input_type: "textarea",
     lookup_field_key: null,
     is_required: true,
@@ -112,8 +112,8 @@ const RAW: Array<Omit<FieldSeed, "sort_order">> = [
   },
   {
     field_key: "description",
-    label: "Full Description",
-    help_text: "Complete narrative of how the service is delivered.",
+    label: "Full Service Description",
+    help_text: "The longer narrative of how the service is delivered.",
     input_type: "textarea",
     lookup_field_key: null,
     is_required: false,
@@ -253,7 +253,7 @@ const RAW: Array<Omit<FieldSeed, "sort_order">> = [
   {
     field_key: "support_contact",
     label: "Support / Escalation",
-    help_text: "Where to escalate when the normal path is not enough.",
+    help_text: "Shared mailbox for support and escalation. One email address.",
     input_type: "text",
     lookup_field_key: null,
     is_required: false,
@@ -532,9 +532,12 @@ const RAW: Array<Omit<FieldSeed, "sort_order">> = [
   },
 ];
 
+const PUBLIC_FIELD_KEYS = new Set(["name", "summary"]);
+
 export const STARTER_FIELDS: FieldSeed[] = RAW.map((field, index) => ({
   ...field,
   sort_order: (index + 1) * 10,
+  visibility: PUBLIC_FIELD_KEYS.has(field.field_key) ? "public" : "internal",
 }));
 
 export function materializeFields(tenantId: string | null, idFor: (fieldKey: string) => string): FieldDefinition[] {
@@ -548,6 +551,7 @@ export function materializeFields(tenantId: string | null, idFor: (fieldKey: str
     lookup_field_key: field.lookup_field_key,
     lookup_bound: false,
     lookup_restore: null,
+    visibility_overridden: false,
     is_required: field.is_required,
     visibility: field.visibility,
     depth_level: field.depth_level,

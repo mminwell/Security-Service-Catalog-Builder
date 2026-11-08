@@ -183,6 +183,7 @@ export async function persistField(supabase: SupabaseClient, field: FieldDefinit
       lookup_field_key: field.lookup_field_key,
       lookup_bound: field.lookup_bound,
       lookup_restore: field.lookup_restore,
+      visibility_overridden: field.visibility_overridden,
     })
     .eq("id", field.id);
   if (error) throw new Error(error.message);
@@ -455,6 +456,7 @@ function asField(row: Record<string, unknown>): FieldDefinition {
     lookup_field_key: row.lookup_field_key == null ? null : String(row.lookup_field_key),
     lookup_bound: row.lookup_bound === true,
     lookup_restore: row.lookup_restore === "dropdown" ? "dropdown" : null,
+    visibility_overridden: row.visibility_overridden === true,
     is_required: Boolean(row.is_required),
     visibility: row.visibility === "internal" ? "internal" : "public",
     depth_level: Number(row.depth_level) as FieldDefinition["depth_level"],

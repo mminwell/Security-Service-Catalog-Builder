@@ -1,5 +1,4 @@
 import { formatExportValue } from "@/lib/catalog/export-value";
-import { isIdentityField } from "@/lib/catalog/fields";
 import { csvEscape } from "@/lib/catalog/spreadsheet-text";
 import type { FieldDefinition, LookupOption, ServiceRecord, Visibility } from "@/lib/catalog/types";
 
@@ -98,7 +97,7 @@ export type MappedColumn = {
   field: FieldDefinition;
 };
 
-/** Column order follows the mapping. Service code and name are added when the mapping omits them. */
+/** Column order follows the mapping. A public file does not gain an internal service code. The service name is added when it is allowed and missing. */
 export function resolveMappedColumns(
   fields: FieldDefinition[],
   mappings: Array<Pick<TargetMapping, "target" | "sourceKey">>,
@@ -112,7 +111,7 @@ export function resolveMappedColumns(
     if (!target || seenTargets.has(target.toLowerCase())) continue;
     const field = fields.find((item) => item.field_key === mapping.sourceKey);
     if (!field || !field.is_active) continue;
-    if (audience === "public" && field.visibility === "internal" && !isIdentityField(field.field_key)) {
+    if (audience === "public" && field.visibility === "internal") {
       excludedInternal.push(field);
       continue;
     }
@@ -120,10 +119,12 @@ export function resolveMappedColumns(
     columns.push({ target, field });
   }
   const withIdentity: MappedColumn[] = [];
-  for (const key of ["service_code", "name"]) {
+  const required = audience === "public" ? ["name"] : ["service_code", "name"];
+  for (const key of required) {
     if (columns.some((column) => column.field.field_key === key)) continue;
     const field = fields.find((item) => item.field_key === key && item.is_active);
     if (!field) continue;
+    if (audience === "public" && field.visibility === "internal") continue;
     withIdentity.push({ target: field.label, field });
   }
   return { columns: [...withIdentity, ...columns], excludedInternal };

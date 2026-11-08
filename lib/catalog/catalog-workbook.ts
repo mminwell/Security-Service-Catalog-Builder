@@ -87,6 +87,7 @@ function lookupsSheet(fields: FieldDefinition[], lookups: LookupOption[], markin
 
 function mappingsSheet(args: {
   services: ServiceRecord[];
+  fields: FieldDefinition[];
   mappings: OutcomeMapping[];
   elements: FrameworkElement[];
   frameworks: FrameworkRelease[];
@@ -95,7 +96,10 @@ function mappingsSheet(args: {
   marking: string | null;
 }): WorkbookSheet {
   const internal = args.audience === "internal";
-  const header = ["Framework", "Version", "Code", "Title", "Service code", "Service name", "Assessment"];
+  const includeCode = args.fields.some((field) => field.field_key === "service_code");
+  const header = includeCode
+    ? ["Framework", "Version", "Code", "Title", "Service code", "Service name", "Assessment"]
+    : ["Framework", "Version", "Code", "Title", "Service name", "Assessment"];
   if (internal) header.push("Rationale", "Notes");
   const serviceById = new Map(args.services.map((service) => [service.id, service]));
   const body: string[][] = [];
@@ -109,31 +113,30 @@ function mappingsSheet(args: {
       if (!service || service.archived_at) continue;
       const element = byId.get(mapping.element_id);
       if (!element) continue;
-      const row = [
-        framework.code,
-        framework.version,
-        element.code,
-        element.title,
-        service.service_code,
-        service.name,
-        COVERAGE_LABEL[mapping.coverage],
-      ];
+      const row = includeCode
+        ? [framework.code, framework.version, element.code, element.title, service.service_code, service.name, COVERAGE_LABEL[mapping.coverage]]
+        : [framework.code, framework.version, element.code, element.title, service.name, COVERAGE_LABEL[mapping.coverage]];
       if (internal) row.push(mapping.rationale ?? "", mapping.notes ?? "");
       body.push(row);
     }
   }
-  const rows = body.length > 0 ? body : [["", "", "No assessments for the services in this export.", "", "", "", ""]];
+  const empty = includeCode
+    ? ["", "", "No assessments for the services in this export.", "", "", "", ""]
+    : ["", "", "No assessments for the services in this export.", "", "", ""];
+  const rows = body.length > 0 ? body : [empty];
   return { name: "Mappings", ...withMarking(args.marking, header, rows) };
 }
 
 function coverageSheet(args: {
   services: ServiceRecord[];
+  fields: FieldDefinition[];
   mappings: OutcomeMapping[];
   elements: FrameworkElement[];
   frameworks: FrameworkRelease[];
   tenantId: string;
   marking: string | null;
 }): WorkbookSheet {
+  const includeCode = args.fields.some((field) => field.field_key === "service_code");
   const header = ["Framework", "Version", "Code", "Title", "Status", "Active services in this export"];
   const note = [
     "Counts use only this framework's subcategory outcomes and the active services in this export. They are not a certification, a maturity score, or a crosswalk.",
@@ -159,8 +162,12 @@ function coverageSheet(args: {
     });
     for (const outcome of report.outcomes) {
       const names = outcome.contributions
-        .map((item) => args.services.find((service) => service.id === item.serviceId)?.service_code)
-        .filter((code): code is string => Boolean(code));
+        .map((item) => {
+          const service = args.services.find((row) => row.id === item.serviceId);
+          if (!service) return null;
+          return includeCode ? service.service_code : service.name;
+        })
+        .filter((label): label is string => Boolean(label));
       body.push([
         framework.code,
         framework.version,

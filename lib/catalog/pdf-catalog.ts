@@ -67,7 +67,7 @@ export async function buildCatalogPdf(document: CatalogDocument, fonts: PdfFonts
     push("No services are in this export.", sans, 11, SLATE, 16, clean.sans);
   }
   for (const service of document.services) {
-    push(`${service.code} · ${service.name}`, serif, 14, SLATE, 16, clean.serif);
+    push(service.heading, serif, 14, SLATE, 16, clean.serif);
     for (const row of service.rows) {
       push(row.label, bold, 9, CLAY, 7, clean.bold);
       push(row.value, sans, 11, SLATE, 1, clean.sans);

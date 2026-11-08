@@ -55,6 +55,8 @@ export type FieldDefinition = {
   lookup_bound: boolean;
   /** Set when a native dropdown is shown as text, so Lookup can restore that dropdown. */
   lookup_restore: "dropdown" | null;
+  /** True after an admin changes visibility, so a stock migration does not overwrite that choice. */
+  visibility_overridden: boolean;
   is_required: boolean;
   visibility: Visibility;
   depth_level: DepthLevel;

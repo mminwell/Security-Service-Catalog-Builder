@@ -18,7 +18,6 @@ import {
 import {
   buildMappedCsv,
   JIRA_PRESET,
-  mappedAudience,
   mappingFromPreset,
   mappingTemplateCsv,
   previewMappedRows,
@@ -26,7 +25,6 @@ import {
   SERVICENOW_PRESET,
   type TargetMapping,
 } from "@/lib/catalog/import-presets";
-import { isIdentityField } from "@/lib/catalog/fields";
 import { buildCatalogPdf, loadPdfFonts } from "@/lib/catalog/pdf-catalog";
 import { localToday } from "@/lib/catalog/present";
 import type { FrameworkElement, FrameworkRelease } from "@/lib/catalog/framework";
@@ -38,6 +36,10 @@ import type {
   ServiceRecord,
   Visibility,
 } from "@/lib/catalog/types";
+
+function pinnedPublicName(field: FieldDefinition): boolean {
+  return field.field_key === "name" && field.visibility === "public";
+}
 
 const FORMATS: Array<{ id: ExportFormat; label: string; hint: string }> = [
   { id: "csv", label: "CSV", hint: "One sheet of the selected fields." },
@@ -108,8 +110,7 @@ export function ExportDialog({
   );
   const resolved = useMemo(() => resolveChoice(choice, fields, profiles, customKeys), [choice, fields, profiles, customKeys]);
   const preset = format === "jira" ? jiraMap : snowMap;
-  const presetAudience = format === "jira" || format === "servicenow" ? mappedAudience(fields, preset) : resolved.audience;
-  const audience: Visibility = format === "jira" || format === "servicenow" ? presetAudience : resolved.audience;
+  const audience: Visibility = resolved.audience;
   const mapped =
     format === "jira" || format === "servicenow" ? resolveMappedColumns(fields, preset, audience) : null;
   const requiresConfirmation = audience === "internal";
@@ -246,7 +247,7 @@ export function ExportDialog({
         <h2 id="export-title">Export catalog</h2>
         <p className="lede">
           {services.length} {services.length === 1 ? "service" : "services"} in the current search and filters. Retired
-          fields stay out. Service code and name stay in.
+          fields stay out. A public file includes the service name and other public fields. Service code is included when that field is public, or in a full export.
         </p>
 
         <fieldset className="export-set">
@@ -494,7 +495,7 @@ function FieldPicker({
   onChange: (keys: string[]) => void;
 }) {
   function toggle(field: FieldDefinition) {
-    if (isIdentityField(field.field_key)) return;
+    if (pinnedPublicName(field)) return;
     if (keys.includes(field.field_key)) onChange(keys.filter((key) => key !== field.field_key));
     else onChange([...keys, field.field_key]);
   }
@@ -512,14 +513,14 @@ function FieldPicker({
       <p className="micro">Fields for this download</p>
       <ul>
         {fields.map((field) => {
-          const checked = isIdentityField(field.field_key) || keys.includes(field.field_key);
+          const checked = pinnedPublicName(field) || keys.includes(field.field_key);
           return (
             <li key={field.field_key}>
               <label>
                 <input
                   type="checkbox"
                   checked={checked}
-                  disabled={isIdentityField(field.field_key)}
+                  disabled={pinnedPublicName(field)}
                   onChange={() => toggle(field)}
                 />
                 <span>
@@ -528,7 +529,7 @@ function FieldPicker({
                   {field.field_group ? ` · ${field.field_group}` : ""}
                 </span>
               </label>
-              {checked && !isIdentityField(field.field_key) ? (
+              {checked && !pinnedPublicName(field) ? (
                 <span className="row-actions">
                   <button type="button" className="btn btn-ghost" onClick={() => move(field.field_key, -1)} aria-label={`Move ${field.label} up`}>
                     Up
