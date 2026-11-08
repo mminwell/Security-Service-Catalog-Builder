@@ -179,6 +179,10 @@ export async function persistField(supabase: SupabaseClient, field: FieldDefinit
       is_required: field.is_required,
       is_active: field.is_active,
       sort_order: field.sort_order,
+      input_type: field.input_type,
+      lookup_field_key: field.lookup_field_key,
+      lookup_bound: field.lookup_bound,
+      lookup_restore: field.lookup_restore,
     })
     .eq("id", field.id);
   if (error) throw new Error(error.message);
@@ -449,6 +453,8 @@ function asField(row: Record<string, unknown>): FieldDefinition {
     help_text: String(row.help_text ?? ""),
     input_type: row.input_type as FieldDefinition["input_type"],
     lookup_field_key: row.lookup_field_key == null ? null : String(row.lookup_field_key),
+    lookup_bound: row.lookup_bound === true,
+    lookup_restore: row.lookup_restore === "dropdown" ? "dropdown" : null,
     is_required: Boolean(row.is_required),
     visibility: row.visibility === "internal" ? "internal" : "public",
     depth_level: Number(row.depth_level) as FieldDefinition["depth_level"],

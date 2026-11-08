@@ -121,6 +121,8 @@ function normalizeStoredField(input: unknown): FieldDefinition {
     help_text: typeof row.help_text === "string" ? row.help_text : "",
     input_type: row.input_type ?? "text",
     lookup_field_key: typeof row.lookup_field_key === "string" ? row.lookup_field_key : null,
+    lookup_bound: row.lookup_bound === true,
+    lookup_restore: row.lookup_restore === "dropdown" ? "dropdown" : null,
     is_required: Boolean(row.is_required),
     visibility: row.visibility === "internal" ? "internal" : "public",
     depth_level: row.depth_level === 2 || row.depth_level === 3 ? row.depth_level : 1,

@@ -1,3 +1,4 @@
+import { fieldUsesLookup } from "@/lib/catalog/lookup-toggle";
 import { optionLabel } from "@/lib/catalog/lookups";
 import { readField, withComputed } from "@/lib/catalog/service";
 import type { FieldDefinition, LookupOption, ServiceRecord } from "@/lib/catalog/types";
@@ -19,7 +20,7 @@ export function formatExportValue(
     const fieldKey = field.lookup_field_key ?? field.field_key;
     return value.map((code) => optionLabel(lookups, fieldKey, String(code))).join("; ");
   }
-  if (field.input_type === "dropdown" && field.lookup_field_key) {
+  if (fieldUsesLookup(field) && field.lookup_field_key) {
     return optionLabel(lookups, field.lookup_field_key, String(value));
   }
   if (typeof value === "number") return String(value);

@@ -161,11 +161,17 @@ export function LookupSelect({
   const ref = useDismiss(open, () => setOpen(false));
   const listId = useId();
   const selected = options.find((option) => option.code === value) ?? null;
-  const choices = [{ code: "", label: placeholder, description: null as string | null }, ...options.map((option) => ({
-    code: option.code,
-    label: option.label,
-    description: option.description,
-  }))];
+  const legacy =
+    value && !selected ? [{ code: value, label: value, description: null as string | null }] : [];
+  const choices = [
+    { code: "", label: placeholder, description: null as string | null },
+    ...legacy,
+    ...options.map((option) => ({
+      code: option.code,
+      label: option.label,
+      description: option.description,
+    })),
+  ];
 
   function choose(code: string) {
     onChange(code || null);
@@ -196,7 +202,7 @@ export function LookupSelect({
           }
         }}
       >
-        <span>{selected?.label ?? placeholder}</span>
+        <span>{selected?.label ?? (value ? value : placeholder)}</span>
         <span aria-hidden="true" className="muted">▾</span>
       </button>
       {open ? (

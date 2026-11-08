@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { isIdentityField, type FieldGroupId } from "@/lib/catalog/fields";
+import { lookupToggleFor } from "@/lib/catalog/lookup-toggle";
 import { DEPTH_META, type DepthLevel, type FieldDefinition, type Visibility } from "@/lib/catalog/types";
 import { useCatalog } from "@/components/catalog-provider";
 import { Badge, VisibilityBadge } from "@/components/widgets";
@@ -79,6 +80,26 @@ function GroupToggle({ group, title }: { group: FieldGroupId; title: string }) {
   );
 }
 
+function LookupToggle({ field }: { field: FieldDefinition }) {
+  const api = useCatalog();
+  const toggle = lookupToggleFor(field);
+  return (
+    <div style={{ marginTop: 8 }}>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={toggle.checked}
+          disabled={toggle.disabled}
+          aria-label={`${field.field_key} Lookup`}
+          onChange={(event) => void api.setFieldLookup(field.id, event.target.checked)}
+        />
+        Lookup
+      </label>
+      {toggle.reason ? <p className="hint">{toggle.reason}</p> : null}
+    </div>
+  );
+}
+
 function FieldRow({ field }: { field: FieldDefinition }) {
   const api = useCatalog();
   const [label, setLabel] = useState(field.label);
@@ -141,6 +162,7 @@ function FieldRow({ field }: { field: FieldDefinition }) {
           />
           Required
         </label>
+        <LookupToggle field={field} />
       </div>
       <label>
         <span className="micro">Sort</span>

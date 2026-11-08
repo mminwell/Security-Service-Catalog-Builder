@@ -51,6 +51,10 @@ export type FieldDefinition = {
   help_text: string;
   input_type: InputType;
   lookup_field_key: string | null;
+  /** Text or textarea rendered from `lookup_field_key` until an admin turns Lookup off. */
+  lookup_bound: boolean;
+  /** Set when a native dropdown is shown as text, so Lookup can restore that dropdown. */
+  lookup_restore: "dropdown" | null;
   is_required: boolean;
   visibility: Visibility;
   depth_level: DepthLevel;

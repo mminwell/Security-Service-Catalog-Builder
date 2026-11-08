@@ -546,6 +546,8 @@ export function materializeFields(tenantId: string | null, idFor: (fieldKey: str
     help_text: field.help_text,
     input_type: field.input_type,
     lookup_field_key: field.lookup_field_key,
+    lookup_bound: false,
+    lookup_restore: null,
     is_required: field.is_required,
     visibility: field.visibility,
     depth_level: field.depth_level,

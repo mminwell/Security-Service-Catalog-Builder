@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { fieldUsesLookup } from "@/lib/catalog/lookup-toggle";
 import { activeOptions, optionByCode } from "@/lib/catalog/lookups";
 import { completenessTone, formatDate, gapText } from "@/lib/catalog/present";
 import { suggestServiceCode } from "@/lib/catalog/service-code";
@@ -365,7 +366,7 @@ function FieldControl({
           <span className="micro">Computed</span>
         </div>
       ) : null}
-      {field.input_type === "dropdown" && field.lookup_field_key ? (
+      {fieldUsesLookup(field) && field.lookup_field_key ? (
         <LookupSelect
           id={inputId}
           value={typeof value === "number" ? String(value) : typeof value === "string" ? value : null}
@@ -374,7 +375,7 @@ function FieldControl({
           onChange={onChange}
         />
       ) : null}
-      {field.input_type === "text" || field.input_type === "url" ? (
+      {(field.input_type === "text" || field.input_type === "url") && !fieldUsesLookup(field) ? (
         <input
           id={inputId}
           className="input"
@@ -384,7 +385,7 @@ function FieldControl({
           onChange={(event) => onChange(event.target.value)}
         />
       ) : null}
-      {field.input_type === "textarea" ? (
+      {field.input_type === "textarea" && !fieldUsesLookup(field) ? (
         <textarea
           id={inputId}
           className="textarea"

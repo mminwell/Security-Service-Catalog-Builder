@@ -3,6 +3,7 @@ import { isExplicitCoverage } from "@/lib/catalog/coverage";
 import { sanitizeExportLog, type ExportLogMeta } from "@/lib/catalog/export-plan";
 import { keysForSavedProfile } from "@/lib/catalog/export-plan";
 import { type FieldGroupId, isIdentityField, materializeFields } from "@/lib/catalog/fields";
+import { applyLookupToggle, lookupToggleFor } from "@/lib/catalog/lookup-toggle";
 import { applyFrameworkImport, type PlannedElement } from "@/lib/catalog/framework-import";
 import { FRAMEWORK_CATALOG } from "@/lib/catalog/framework-catalog";
 import { CSF_ELEMENTS, CSF_FRAMEWORK, type FrameworkElement, type FrameworkRelease } from "@/lib/catalog/framework";
@@ -340,6 +341,47 @@ export function addLookup(
         action: "insert",
         before: null,
         after: { ...option },
+        now,
+      }),
+      ...db.audit,
+    ],
+  };
+}
+
+export function setFieldLookup(db: CatalogDb, fieldId: string, enabled: boolean, now = new Date().toISOString()): CatalogDb {
+  const actor = requireSession(db);
+  const tenantId = requireActive(db);
+  assertAdmin(db, tenantId, actor.userId, "Only a workspace admin can change whether a field is a lookup.");
+  const current = db.fields.find((field) => field.id === fieldId && field.tenant_id === tenantId);
+  if (!current) throw new Error("That field is not in this workspace.");
+  const toggle = lookupToggleFor(current);
+  if (toggle.disabled) throw new Error(toggle.reason ?? "Lookup cannot be changed for this field.");
+  const next = applyLookupToggle(current, enabled);
+  if (next === current) return db;
+  return {
+    ...db,
+    fields: db.fields.map((field) => (field.id === next.id ? next : field)),
+    audit: [
+      auditEntry({
+        tenantId,
+        actor,
+        table: "field_definitions",
+        rowId: next.id,
+        action: "update",
+        before: {
+          field_key: current.field_key,
+          input_type: current.input_type,
+          lookup_field_key: current.lookup_field_key,
+          lookup_bound: current.lookup_bound,
+          lookup_restore: current.lookup_restore,
+        },
+        after: {
+          field_key: next.field_key,
+          input_type: next.input_type,
+          lookup_field_key: next.lookup_field_key,
+          lookup_bound: next.lookup_bound,
+          lookup_restore: next.lookup_restore,
+        },
         now,
       }),
       ...db.audit,

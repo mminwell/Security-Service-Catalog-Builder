@@ -104,6 +104,10 @@ export function labelMap(fields: FieldDefinition[]): Map<string, string> {
   map.set("visibility", "Visibility");
   map.set("depth_level", "Depth");
   map.set("help_text", "Help text");
+  map.set("lookup_bound", "Lookup");
+  map.set("lookup_field_key", "Lookup group");
+  map.set("lookup_restore", "Lookup restore");
+  map.set("input_type", "Input");
   map.set("coverage", "Assessment");
   map.set("rationale", "Rationale");
   map.set("notes", "Notes");

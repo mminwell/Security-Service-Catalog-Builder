@@ -48,6 +48,7 @@ import {
   recordExport as recordExportRow,
   saveExportProfile as saveExportProfileRow,
   saveField as saveFieldRow,
+  setFieldLookup as setFieldLookupRow,
   saveLookup as saveLookupRow,
   saveOutcomeMapping as saveOutcomeMappingRow,
   saveService as saveServiceRow,
@@ -127,6 +128,7 @@ type CatalogApi = {
     sort_order: number;
   }) => Promise<void>;
   saveField: (field: FieldDefinition) => Promise<void>;
+  setFieldLookup: (fieldId: string, enabled: boolean) => Promise<void>;
   addMember: (email: string, role: Role) => Promise<void>;
   setTenantLogo: (logoUrl: string | null) => Promise<void>;
   archiveService: (serviceId: string, archived: boolean) => Promise<ServiceRecord>;
@@ -412,6 +414,21 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
             is_active: true,
           };
           await insertLookup(supabase, option);
+          await reload();
+        }),
+      setFieldLookup: (fieldId, enabled) =>
+        guard(async () => {
+          if (!db) throw new Error("The catalog is still loading.");
+          const next = setFieldLookupRow(db, fieldId, enabled);
+          if (mode === "demo") {
+            commit(next);
+            return;
+          }
+          const supabase = supabaseRef.current;
+          if (!supabase) throw new Error("Supabase is not connected.");
+          const saved = next.fields.find((field) => field.id === fieldId);
+          if (!saved) throw new Error("That field is not in this workspace.");
+          await persistField(supabase, saved);
           await reload();
         }),
       saveField: (field: FieldDefinition) =>

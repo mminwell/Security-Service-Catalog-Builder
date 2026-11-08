@@ -32,6 +32,32 @@ function rows(
   }));
 }
 
+export function visibleLookupGroups(
+  fields: Array<Pick<FieldDefinitionLite, "field_key" | "label" | "lookup_field_key">>,
+  lookups: Array<Pick<LookupSeed, "field_key">>,
+): LookupGroup[] {
+  const titles = new Map(LOOKUP_GROUPS.map((group) => [group.field_key, group]));
+  const extras = new Map<string, string>();
+  for (const field of fields) {
+    if (field.lookup_field_key && !titles.has(field.lookup_field_key)) {
+      extras.set(field.lookup_field_key, field.label);
+    }
+  }
+  for (const option of lookups) {
+    if (!titles.has(option.field_key) && !extras.has(option.field_key)) extras.set(option.field_key, option.field_key);
+  }
+  const extraGroups = [...extras.entries()]
+    .sort((a, b) => a[1].localeCompare(b[1]) || a[0].localeCompare(b[0]))
+    .map(([field_key, title]) => ({
+      field_key,
+      title,
+      blurb: "Options for this field. Add, edit, reorder, retire, or import them. Retired options stay on services that already use them.",
+    }));
+  return [...LOOKUP_GROUPS, ...extraGroups];
+}
+
+type FieldDefinitionLite = { field_key: string; label: string; lookup_field_key: string | null };
+
 export const LOOKUP_GROUPS: LookupGroup[] = [
   {
     field_key: "service_tier",
