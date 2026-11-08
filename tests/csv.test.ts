@@ -64,7 +64,10 @@ describe("CSV export visibility", () => {
     const fullCsv = servicesToCsv(filtered, fields, lookups, "all").replace(/^\uFEFF/, "");
 
     expect(publicCsv).toContain("Enterprise Security Monitoring");
-    expect(publicCsv).toContain("Security Operations & Monitoring");
+    expect(publicCsv).toContain("Service Description");
+    expect(publicCsv).not.toContain("Service Code");
+    expect(publicCsv).not.toContain("SVC-001");
+    expect(publicCsv).not.toContain("Security Operations & Monitoring");
     expect(publicCsv).not.toContain("SVC-002");
     expect(publicCsv).not.toContain(secret);
     expect(publicCsv).not.toContain("Internal Notes");
@@ -111,12 +114,13 @@ describe("CSV export visibility", () => {
     const withMark = servicesToCsv(services, fields, lookups, "public", { marking: publicMark }).replace(/^\uFEFF/, "");
     const lines = withMark.split("\r\n");
     expect(lines[0]).toBe(publicMark);
-    expect(lines[1]).toContain("Service Code");
+    expect(lines[1]).toContain("Service Name");
+    expect(lines[1]).not.toContain("Service Code");
     expect(withMark).not.toContain("DO NOT DISTRIBUTE EXTERNALLY");
     expect(withMark).not.toContain(secret);
 
     const without = servicesToCsv(services, fields, lookups, "public").replace(/^\uFEFF/, "");
-    expect(without.split("\r\n")[0]).toContain("Service Code");
+    expect(without.split("\r\n")[0]).toContain("Service Name");
     expect(without).not.toContain("APPROVED FOR CLIENT");
 
     const full = servicesToCsv(services, fields, lookups, "all", { marking: fullMark }).replace(/^\uFEFF/, "");

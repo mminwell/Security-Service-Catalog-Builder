@@ -192,7 +192,7 @@ export function formatCatalogCell(
     };
   }
 
-  if (inputType === "dropdown" && field?.lookup_field_key) {
+  if (field?.lookup_field_key && (inputType === "dropdown" || field.lookup_bound)) {
     const label = optionLabel(lookups, field.lookup_field_key, String(value)) || String(value);
     return clipText(label);
   }

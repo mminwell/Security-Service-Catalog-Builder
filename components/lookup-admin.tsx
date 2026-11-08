@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { LOOKUP_GROUPS } from "@/lib/catalog/lookups";
+import { visibleLookupGroups } from "@/lib/catalog/lookups";
 import type { LookupOption } from "@/lib/catalog/types";
 import { useCatalog } from "@/components/catalog-provider";
 import { LookupImportControls } from "@/components/lookup-import";
@@ -9,9 +9,10 @@ import { LookupImportControls } from "@/components/lookup-import";
 export function LookupAdmin() {
   const api = useCatalog();
   const [fieldKey, setFieldKey] = useState("service_tier");
-  const group = LOOKUP_GROUPS.find((item) => item.field_key === fieldKey) ?? LOOKUP_GROUPS[0];
+  const groups = visibleLookupGroups(api.fields, api.lookups);
+  const group = groups.find((item) => item.field_key === fieldKey) ?? groups[0];
   const options = api.lookups
-    .filter((option) => option.field_key === group.field_key)
+    .filter((option) => option.field_key === group?.field_key)
     .sort((a, b) => Number(b.is_active) - Number(a.is_active) || a.sort_order - b.sort_order);
   const [code, setCode] = useState("");
   const [label, setLabel] = useState("");
@@ -25,6 +26,7 @@ export function LookupAdmin() {
       </section>
     );
   }
+  if (!group) return null;
 
   return (
     <>
@@ -40,7 +42,7 @@ export function LookupAdmin() {
       </div>
       <div className="admin-layout">
         <nav className="panel group-nav" aria-label="Lookup groups">
-          {LOOKUP_GROUPS.map((item) => (
+          {groups.map((item) => (
             <button
               type="button"
               key={item.field_key}

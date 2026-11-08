@@ -1,5 +1,7 @@
 import type { DepthLevel, FieldDefinition, InputType, Visibility } from "@/lib/catalog/types";
 
+export type FieldGroupId = "geography" | "privacy";
+
 export type FieldSeed = {
   field_key: string;
   label: string;
@@ -10,6 +12,9 @@ export type FieldSeed = {
   visibility: Visibility;
   depth_level: DepthLevel;
   sort_order: number;
+  /** Absent means active. Geography and privacy ship inactive so completeness stays put. */
+  is_active?: boolean;
+  field_group?: FieldGroupId | null;
 };
 
 const RAW: Array<Omit<FieldSeed, "sort_order">> = [
@@ -21,7 +26,7 @@ const RAW: Array<Omit<FieldSeed, "sort_order">> = [
     input_type: "text",
     lookup_field_key: null,
     is_required: true,
-    visibility: "public",
+    visibility: "internal",
     depth_level: 1,
   },
   {
@@ -67,8 +72,8 @@ const RAW: Array<Omit<FieldSeed, "sort_order">> = [
   },
   {
     field_key: "summary",
-    label: "Executive Summary",
-    help_text: "One or two sentences a leader or client can read without the full description.",
+    label: "Service Description",
+    help_text: "One or two sentences a client can read. This is the service description.",
     input_type: "textarea",
     lookup_field_key: null,
     is_required: true,
@@ -107,8 +112,8 @@ const RAW: Array<Omit<FieldSeed, "sort_order">> = [
   },
   {
     field_key: "description",
-    label: "Full Description",
-    help_text: "Complete narrative of how the service is delivered.",
+    label: "Full Service Description",
+    help_text: "The longer narrative of how the service is delivered.",
     input_type: "textarea",
     lookup_field_key: null,
     is_required: false,
@@ -248,7 +253,7 @@ const RAW: Array<Omit<FieldSeed, "sort_order">> = [
   {
     field_key: "support_contact",
     label: "Support / Escalation",
-    help_text: "Where to escalate when the normal path is not enough.",
+    help_text: "Shared mailbox for support and escalation. One email address.",
     input_type: "text",
     lookup_field_key: null,
     is_required: false,
@@ -460,11 +465,79 @@ const RAW: Array<Omit<FieldSeed, "sort_order">> = [
     visibility: "public",
     depth_level: 3,
   },
+  {
+    field_key: "data_residency_regions",
+    label: "Data residency regions",
+    help_text:
+      "Regions this workspace has recorded for where the service runs or stores data. A recorded region is not a legal residency determination.",
+    input_type: "multi_select",
+    lookup_field_key: "data_residency_region",
+    is_required: false,
+    visibility: "public",
+    depth_level: 2,
+    is_active: false,
+    field_group: "geography",
+  },
+  {
+    field_key: "hosting_model",
+    label: "Hosting model",
+    help_text:
+      "Where the workspace says this service is hosted. This is an operational note, not a finding about sovereignty or a contract.",
+    input_type: "dropdown",
+    lookup_field_key: "hosting_model",
+    is_required: false,
+    visibility: "public",
+    depth_level: 2,
+    is_active: false,
+    field_group: "geography",
+  },
+  {
+    field_key: "personal_data_recorded",
+    label: "Personal data recorded",
+    help_text:
+      "Whether this workspace has recorded that the service handles personal data. Yes is not a legal classification and does not mean a privacy law applies.",
+    input_type: "dropdown",
+    lookup_field_key: "personal_data_recorded",
+    is_required: false,
+    visibility: "public",
+    depth_level: 2,
+    is_active: false,
+    field_group: "privacy",
+  },
+  {
+    field_key: "recorded_jurisdictions",
+    label: "Recorded jurisdictions",
+    help_text:
+      "Jurisdictions the workspace has noted for people whose data the service may handle. This is not a finding that a privacy law applies.",
+    input_type: "multi_select",
+    lookup_field_key: "recorded_jurisdiction",
+    is_required: false,
+    visibility: "public",
+    depth_level: 2,
+    is_active: false,
+    field_group: "privacy",
+  },
+  {
+    field_key: "privacy_operations_notes",
+    label: "Privacy operations notes",
+    help_text:
+      "Operational privacy notes for this service. This catalog does not conclude that a law, contract, or framework is met.",
+    input_type: "textarea",
+    lookup_field_key: null,
+    is_required: false,
+    visibility: "public",
+    depth_level: 3,
+    is_active: false,
+    field_group: "privacy",
+  },
 ];
+
+const PUBLIC_FIELD_KEYS = new Set(["name", "summary"]);
 
 export const STARTER_FIELDS: FieldSeed[] = RAW.map((field, index) => ({
   ...field,
   sort_order: (index + 1) * 10,
+  visibility: PUBLIC_FIELD_KEYS.has(field.field_key) ? "public" : "internal",
 }));
 
 export function materializeFields(tenantId: string | null, idFor: (fieldKey: string) => string): FieldDefinition[] {
@@ -476,12 +549,16 @@ export function materializeFields(tenantId: string | null, idFor: (fieldKey: str
     help_text: field.help_text,
     input_type: field.input_type,
     lookup_field_key: field.lookup_field_key,
+    lookup_bound: false,
+    lookup_restore: null,
+    visibility_overridden: false,
     is_required: field.is_required,
     visibility: field.visibility,
     depth_level: field.depth_level,
     sort_order: field.sort_order,
-    is_active: true,
+    is_active: field.is_active !== false,
     is_standard: true,
+    field_group: field.field_group ?? null,
   }));
 }
 

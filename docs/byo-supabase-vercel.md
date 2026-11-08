@@ -19,10 +19,13 @@ Open **SQL Editor → New query**. Paste and run each migration in order:
 2. `supabase/migrations/0002_v1_1_polish.sql`
 3. `supabase/migrations/0003_v1_2_blueprints_columns_import.sql`
 4. `supabase/migrations/0004_v2_csf_mappings.sql`
+5. `supabase/migrations/0005_v3_exports_frameworks.sql`
+6. `supabase/migrations/0006_v3_field_lookup_toggle.sql`
+7. `supabase/migrations/0007_v3_public_defaults.sql`
 
-`0002` stores a workspace logo and lets services be archived. `0004` loads the NIST CSF 2.0 core and the assessment table. The core wording and provenance are recorded in `docs/nist-csf-2.0-provenance.md`.
+`0002` stores a workspace logo and lets services be archived. `0004` loads the NIST CSF 2.0 core and the assessment table. The core wording and provenance are recorded in `docs/nist-csf-2.0-provenance.md`. `0005` adds export profiles, optional geography and privacy fields, and the framework registry. It does not add control text for the licensed frameworks.
 
-That creates `tenants`, `tenant_members`, `field_definitions`, `lookup_options`, `services`, `audit_log`, `frameworks`, `framework_elements`, and `service_outcome_mappings`, turns on row-level security, and loads the starter dropdowns, field definitions, and the CSF 2.0 core. Rows with a null `tenant_id` are the template copied into each new workspace.
+That creates `tenants`, `tenant_members`, `field_definitions`, `lookup_options`, `services`, `audit_log`, `frameworks`, `framework_elements`, `service_outcome_mappings`, and `export_profiles`, turns on row-level security, and loads the starter dropdowns, field definitions, and the CSF 2.0 core. Rows with a null `tenant_id` are the template copied into each new workspace.
 
 Optional: paste `supabase/seed.sql` and run it. That adds two fictional workspaces, **Acme Corp** and **Meridian Health**, with sample services. Skip it if you want to start empty.
 

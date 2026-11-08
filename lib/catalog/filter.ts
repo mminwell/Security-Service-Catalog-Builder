@@ -101,7 +101,7 @@ export function clearFilterRules(filters: CatalogFilters): { filters: CatalogFil
 export function valueKind(field: FieldDefinition): ValueKind {
   if (field.input_type === "boolean") return "boolean";
   if (field.input_type === "multi_select") return "multi";
-  if (field.input_type === "dropdown") return "lookup";
+  if (field.input_type === "dropdown" || (field.lookup_bound && field.lookup_field_key)) return "lookup";
   if (field.input_type === "date" || field.field_key === "next_review_date") return "date";
   if (field.field_key === "maturity_gap") return "number";
   return "text";

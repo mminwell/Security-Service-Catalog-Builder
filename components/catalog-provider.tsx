@@ -13,7 +13,11 @@ import {
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { canAdminister, canProvision, canWriteServices } from "@/lib/catalog/access";
 import { planBlueprintCheckout } from "@/lib/catalog/checkout";
+import type { ExportLogMeta } from "@/lib/catalog/export-plan";
+import type { FieldGroupId } from "@/lib/catalog/fields";
 import { isIdentityField } from "@/lib/catalog/fields";
+import type { PlannedElement } from "@/lib/catalog/framework-import";
+import type { ExportProfile } from "@/lib/catalog/types";
 import { optionByCode } from "@/lib/catalog/lookups";
 import { normalizeLogoInput } from "@/lib/catalog/logos";
 import { localToday } from "@/lib/catalog/present";
@@ -34,17 +38,23 @@ import {
   createTenant as createTenantRow,
   loadSampleServices as loadSampleRows,
   checkoutServices,
+  deleteExportProfile as deleteExportProfileRow,
   deleteService as deleteServiceRecord,
+  importFrameworkRows,
   importLookups as importLookupRowsModel,
   removeOutcomeMapping as removeOutcomeMappingRow,
   resetDemo,
   roleFor,
+  recordExport as recordExportRow,
+  saveExportProfile as saveExportProfileRow,
   saveField as saveFieldRow,
+  setFieldLookup as setFieldLookupRow,
   saveLookup as saveLookupRow,
   saveOutcomeMapping as saveOutcomeMappingRow,
   saveService as saveServiceRow,
   setServiceArchived,
   setCatalogColumns as setCatalogColumnsRow,
+  setFieldGroup as setFieldGroupRow,
   setServiceCodeMode as setModeRow,
   setTenantLogo as setTenantLogoRow,
   signInDemo,
@@ -54,9 +64,13 @@ import {
 } from "@/lib/data/model";
 import {
   checkoutBlueprintRows,
+  deleteExportProfileRow as deleteExportProfileRemote,
   deleteOutcomeMappingRow as deleteOutcomeMappingRemote,
   deleteServiceRow,
   hydrateFromSupabase,
+  importFrameworkRowsRemote,
+  logCatalogExport,
+  persistExportProfile,
   importLookupRows,
   insertLookup,
   persistCatalogColumns,
@@ -90,8 +104,10 @@ type CatalogApi = {
   lookups: LookupOption[];
   services: ServiceRecord[];
   framework: FrameworkRelease | null;
+  frameworks: FrameworkRelease[];
   elements: FrameworkElement[];
   mappings: OutcomeMapping[];
+  exportProfiles: ExportProfile[];
   audit: AuditEntryLike[];
   members: Member[];
   signIn: (email: string, password: string) => Promise<void>;
@@ -112,6 +128,7 @@ type CatalogApi = {
     sort_order: number;
   }) => Promise<void>;
   saveField: (field: FieldDefinition) => Promise<void>;
+  setFieldLookup: (fieldId: string, enabled: boolean) => Promise<void>;
   addMember: (email: string, role: Role) => Promise<void>;
   setTenantLogo: (logoUrl: string | null) => Promise<void>;
   archiveService: (serviceId: string, archived: boolean) => Promise<ServiceRecord>;
@@ -127,6 +144,17 @@ type CatalogApi = {
     deliveryTeam: string | null;
   }) => Promise<void>;
   saveCatalogColumns: (keys: string[]) => Promise<void>;
+  setFieldGroup: (group: FieldGroupId, active: boolean) => Promise<void>;
+  saveExportProfile: (input: {
+    id?: string;
+    name: string;
+    audience: "public" | "internal";
+    fieldKeys: string[];
+    isDefault: boolean;
+  }) => Promise<void>;
+  deleteExportProfile: (profileId: string) => Promise<void>;
+  importFramework: (frameworkId: string, planned: PlannedElement[]) => Promise<void>;
+  recordExport: (meta: ExportLogMeta) => Promise<void>;
   saveOutcomeMapping: (input: {
     serviceId: string;
     elementId: string;
@@ -216,6 +244,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     const lookups = db?.lookups.filter((option) => option.tenant_id === tenantId) ?? [];
     const services = db?.services.filter((service) => service.tenant_id === tenantId) ?? [];
     const mappings = db?.mappings.filter((mapping) => mapping.tenant_id === tenantId) ?? [];
+    const exportProfiles = db?.exportProfiles.filter((profile) => profile.tenant_id === tenantId) ?? [];
     const audit = db?.audit.filter((entry) => entry.tenant_id === tenantId) ?? [];
     const members = db?.members.filter((member) => member.tenant_id === tenantId) ?? [];
 
@@ -235,9 +264,11 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       fields,
       lookups,
       services,
-      framework: db?.frameworks.find((item) => item.is_active) ?? null,
+      framework: db?.frameworks.find((item) => item.is_active && item.code === "NIST-CSF") ?? null,
+      frameworks: db?.frameworks.filter((item) => item.is_active) ?? [],
       elements: db?.elements ?? [],
       mappings,
+      exportProfiles,
       audit,
       members,
       signIn: (email, password) =>
@@ -383,6 +414,21 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
             is_active: true,
           };
           await insertLookup(supabase, option);
+          await reload();
+        }),
+      setFieldLookup: (fieldId, enabled) =>
+        guard(async () => {
+          if (!db) throw new Error("The catalog is still loading.");
+          const next = setFieldLookupRow(db, fieldId, enabled);
+          if (mode === "demo") {
+            commit(next);
+            return;
+          }
+          const supabase = supabaseRef.current;
+          if (!supabase) throw new Error("Supabase is not connected.");
+          const saved = next.fields.find((field) => field.id === fieldId);
+          if (!saved) throw new Error("That field is not in this workspace.");
+          await persistField(supabase, saved);
           await reload();
         }),
       saveField: (field: FieldDefinition) =>
@@ -532,6 +578,84 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           const supabase = supabaseRef.current;
           if (!supabase) throw new Error("Supabase is not connected.");
           await deleteOutcomeMappingRemote(supabase, mappingId);
+          await reload();
+        }),
+      setFieldGroup: (group, active) =>
+        guard(async () => {
+          if (!db) throw new Error("The catalog is still loading.");
+          if (mode === "demo") {
+            commit(setFieldGroupRow(db, group, active));
+            return;
+          }
+          const supabase = supabaseRef.current;
+          if (!supabase || !tenantId) throw new Error("Supabase is not connected.");
+          const next = setFieldGroupRow(db, group, active);
+          const changed = next.fields.filter((field) => field.tenant_id === tenantId && field.field_group === group);
+          for (const field of changed) await persistField(supabase, field);
+          await reload();
+        }),
+      saveExportProfile: (input) =>
+        guard(async () => {
+          if (!db) throw new Error("The catalog is still loading.");
+          const next = saveExportProfileRow(db, input);
+          if (mode === "demo") {
+            commit(next);
+            return;
+          }
+          const supabase = supabaseRef.current;
+          if (!supabase || !tenantId) throw new Error("Supabase is not connected.");
+          const saved = next.exportProfiles.find(
+            (profile) => profile.tenant_id === tenantId && profile.name.trim().toLowerCase() === input.name.trim().toLowerCase(),
+          );
+          if (!saved) throw new Error("The profile could not be saved.");
+          await persistExportProfile(supabase, saved);
+          if (saved.is_default) {
+            for (const profile of next.exportProfiles) {
+              if (profile.tenant_id === tenantId && profile.id !== saved.id && profile.is_default === false) {
+                const previous = db.exportProfiles.find((item) => item.id === profile.id);
+                if (previous?.is_default) await persistExportProfile(supabase, profile);
+              }
+            }
+          }
+          await reload();
+        }),
+      deleteExportProfile: (profileId) =>
+        guard(async () => {
+          if (!db) throw new Error("The catalog is still loading.");
+          const next = deleteExportProfileRow(db, profileId);
+          if (mode === "demo") {
+            commit(next);
+            return;
+          }
+          const supabase = supabaseRef.current;
+          if (!supabase) throw new Error("Supabase is not connected.");
+          await deleteExportProfileRemote(supabase, profileId);
+          await reload();
+        }),
+      importFramework: (frameworkId, planned) =>
+        guard(async () => {
+          if (!db) throw new Error("The catalog is still loading.");
+          const framework = db.frameworks.find((item) => item.id === frameworkId);
+          const next = importFrameworkRows(db, frameworkId, planned);
+          if (mode === "demo") {
+            commit(next);
+            return;
+          }
+          const supabase = supabaseRef.current;
+          if (!supabase || !tenantId || !framework) throw new Error("Supabase is not connected.");
+          await importFrameworkRowsRemote(supabase, tenantId, frameworkId, framework.version, planned);
+          await reload();
+        }),
+      recordExport: (meta) =>
+        guard(async () => {
+          if (!db || !tenantId) throw new Error("The catalog is still loading.");
+          if (mode === "demo") {
+            commit(recordExportRow(db, meta));
+            return;
+          }
+          const supabase = supabaseRef.current;
+          if (!supabase) throw new Error("Supabase is not connected.");
+          await logCatalogExport(supabase, tenantId, meta);
           await reload();
         }),
       saveCatalogColumns: (keys) =>

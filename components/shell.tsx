@@ -6,6 +6,7 @@ import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react
 import { roleLabel } from "@/lib/catalog/access";
 import { cartIdsFor, subscribeCart } from "@/lib/catalog/cart-store";
 import { MAX_LOGO_FILE_BYTES } from "@/lib/catalog/logos";
+import { primaryNavFor } from "@/lib/catalog/primary-nav";
 import { SHOP_FREE_BLUEPRINTS_LABEL } from "@/lib/catalog/shop-label";
 import type { Role, ServiceCodeMode } from "@/lib/catalog/types";
 import { useCatalog } from "@/components/catalog-provider";
@@ -58,31 +59,24 @@ export function AppShell({ children }: { children: ReactNode }) {
           <span>Catalog builder</span>
         </Link>
         <nav className="nav" aria-label="Primary">
-          <Link href="/catalog" aria-current={pathname.startsWith("/catalog") ? "page" : undefined}>
-            Catalog
-          </Link>
-          <Link href="/coverage" aria-current={pathname.startsWith("/coverage") ? "page" : undefined}>
-            Coverage
-          </Link>
-          <Link
-            href="/blueprints"
-            aria-label={SHOP_FREE_BLUEPRINTS_LABEL}
-            aria-current={pathname.startsWith("/blueprints") ? "page" : undefined}
-          >
-            <CartIcon />
-            {SHOP_FREE_BLUEPRINTS_LABEL}
-            {cartCount > 0 ? <span className="cart-badge">{cartCount}</span> : null}
-          </Link>
-          {api.canAdmin ? (
-            <>
-              <Link href="/admin/lookups" aria-current={pathname.startsWith("/admin/lookups") ? "page" : undefined}>
-                Lookups
+          {primaryNavFor(api.canAdmin).map((item) =>
+            item.cart ? (
+              <Link
+                key={item.href}
+                href="/blueprints"
+                aria-label={SHOP_FREE_BLUEPRINTS_LABEL}
+                aria-current={pathname.startsWith(item.href) ? "page" : undefined}
+              >
+                <CartIcon />
+                {SHOP_FREE_BLUEPRINTS_LABEL}
+                {cartCount > 0 ? <span className="cart-badge">{cartCount}</span> : null}
               </Link>
-              <Link href="/admin/fields" aria-current={pathname.startsWith("/admin/fields") ? "page" : undefined}>
-                Fields
+            ) : (
+              <Link key={item.href} href={item.href} aria-current={pathname.startsWith(item.href) ? "page" : undefined}>
+                {item.label}
               </Link>
-            </>
-          ) : null}
+            ),
+          )}
         </nav>
         <div className="top-spacer" />
         {api.mode === "demo" ? <span className="demo-pill">Interactive Demo</span> : null}

@@ -1,5 +1,5 @@
-import { optionLabel } from "@/lib/catalog/lookups";
-import { readField, withComputed } from "@/lib/catalog/service";
+import { formatExportValue } from "@/lib/catalog/export-value";
+import { csvEscape } from "@/lib/catalog/spreadsheet-text";
 import type { FieldDefinition, LookupOption, ServiceRecord, Visibility } from "@/lib/catalog/types";
 
 export type CsvVisibility = "public" | "all";
@@ -14,6 +14,8 @@ export function exportColumns(fields: FieldDefinition[], visibility: CsvVisibili
 export type CsvExportOptions = {
   /** When set, row 1 is this corporate distribution marking and the header moves to row 2. */
   marking?: string | null;
+  /** When set, these columns are used in this order instead of the preset field list. */
+  columns?: FieldDefinition[];
 };
 
 export function distributionMarking(companyName: string, visibility: CsvVisibility): string {
@@ -32,41 +34,14 @@ export function servicesToCsv(
   visibility: CsvVisibility,
   options?: CsvExportOptions,
 ): string {
-  const columns = exportColumns(fields, visibility);
+  const columns = options?.columns ?? exportColumns(fields, visibility);
   const header = columns.map((column) => csvEscape(column.label)).join(",");
-  const lines = services.map((service) => {
-    const shown = withComputed(service);
-    return columns
-      .map((column) => csvEscape(formatExportValue(shown, column, lookups)))
-      .join(",");
-  });
+  const lines = services.map((service) =>
+    columns.map((column) => csvEscape(formatExportValue(service, column, lookups))).join(","),
+  );
   const marking = options?.marking?.trim();
   const rows = marking ? [csvEscape(marking), header, ...lines] : [header, ...lines];
   return `\uFEFF${rows.join("\r\n")}`;
-}
-
-export function csvEscape(value: string): string {
-  if (/[",\r\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-  return value;
-}
-
-function formatExportValue(
-  service: ServiceRecord,
-  field: FieldDefinition,
-  lookups: LookupOption[],
-): string {
-  const value = readField(service, field.field_key);
-  if (value == null) return "";
-  if (field.input_type === "boolean") return value ? "Yes" : "No";
-  if (field.input_type === "multi_select" && Array.isArray(value)) {
-    const fieldKey = field.lookup_field_key ?? field.field_key;
-    return value.map((code) => optionLabel(lookups, fieldKey, String(code))).join("; ");
-  }
-  if (field.input_type === "dropdown" && field.lookup_field_key) {
-    return optionLabel(lookups, field.lookup_field_key, String(value));
-  }
-  if (typeof value === "number") return String(value);
-  return String(value);
 }
 
 export function downloadName(slug: string, visibility: CsvVisibility): string {

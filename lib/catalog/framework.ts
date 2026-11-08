@@ -24,6 +24,9 @@ export type FrameworkRelease = {
   excluded_withdrawn_rows: number;
   provenance: string;
   is_active: boolean;
+  /** `seeded` means this release ships the core. `not_loaded` means no control text is included. */
+  content_state: "seeded" | "not_loaded";
+  license_note: string;
 };
 
 /** Function, category, or subcategory outcome. `statement` is the official wording. */
@@ -36,6 +39,8 @@ export type FrameworkElement = {
   title: string;
   statement: string;
   sort_order: number;
+  /** Null for the shared reference core. Set for workspace-imported rows. */
+  tenant_id: string | null;
 };
 
 const ELEMENT_TYPES = new Set<FrameworkElementType>(["function", "category", "subcategory"]);
@@ -51,6 +56,8 @@ const idByCode = new Map(sourceElements.map((element) => [element.code, element.
 export const CSF_FRAMEWORK: FrameworkRelease = {
   ...core.framework,
   is_active: true,
+  content_state: "seeded",
+  license_note: "NIST publications are used here as the public CSF 2.0 core. A mapping is a workspace assessment, not NIST certification.",
 };
 
 export const CSF_ELEMENTS: FrameworkElement[] = sourceElements.map((element) => ({
@@ -62,6 +69,7 @@ export const CSF_ELEMENTS: FrameworkElement[] = sourceElements.map((element) => 
   title: element.title,
   statement: element.statement,
   sort_order: element.sort_order,
+  tenant_id: null,
 }));
 
 export const CSF_FUNCTIONS = CSF_ELEMENTS.filter((element) => element.element_type === "function");

@@ -44,6 +44,17 @@ export function summarizeAudit(
 ): { title: string; changes: FieldChange[] } {
   const after = entry.after_data;
   const before = entry.before_data;
+  if (entry.table_name === "catalog_exports") {
+    const format = textOf(after?.format) || "catalog";
+    const audience = textOf(after?.audience) || "audience";
+    const rows = typeof after?.row_count === "number" ? after.row_count : 0;
+    return { title: `Exported ${format} · ${audience} · ${rows} rows`, changes: [] };
+  }
+  if (entry.table_name === "export_profiles") {
+    const name = textOf(after?.name) || textOf(before?.name) || "profile";
+    const verb = entry.action === "delete" ? "Deleted" : entry.action === "insert" ? "Saved" : "Updated";
+    return { title: `${verb} export profile ${name}`, changes: [] };
+  }
   if (entry.table_name === "service_outcome_mappings") {
     const source = entry.action === "delete" ? before : after;
     const code = textOf(source?.element_code) || "outcome";
@@ -93,6 +104,10 @@ export function labelMap(fields: FieldDefinition[]): Map<string, string> {
   map.set("visibility", "Visibility");
   map.set("depth_level", "Depth");
   map.set("help_text", "Help text");
+  map.set("lookup_bound", "Lookup");
+  map.set("lookup_field_key", "Lookup group");
+  map.set("lookup_restore", "Lookup restore");
+  map.set("input_type", "Input");
   map.set("coverage", "Assessment");
   map.set("rationale", "Rationale");
   map.set("notes", "Notes");
