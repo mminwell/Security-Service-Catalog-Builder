@@ -3,9 +3,11 @@ import { materializeFields, STARTER_FIELDS, type FieldGroupId } from "@/lib/cata
 import { migrateStockField } from "@/lib/catalog/stock-fields";
 import { FRAMEWORK_CATALOG } from "@/lib/catalog/framework-catalog";
 import { CSF_ELEMENTS, CSF_FRAMEWORK, type FrameworkElement } from "@/lib/catalog/framework";
+import { sampleArtifactsForTenants } from "@/lib/catalog/artifact-samples";
+import { ARTIFACT_STATUS_KEY, ARTIFACT_TYPE_KEY, withArtifactComputed } from "@/lib/catalog/artifacts";
 import { STARTER_LOOKUPS } from "@/lib/catalog/lookups";
 import { builtinLogoForSlug } from "@/lib/catalog/logos";
-import type { ExportProfile, FieldDefinition, LookupOption, OutcomeMapping, ServiceRecord, Tenant } from "@/lib/catalog/types";
+import type { Artifact, ArtifactLink, ExportProfile, FieldDefinition, LookupOption, OutcomeMapping, ServiceRecord, Tenant, Visibility } from "@/lib/catalog/types";
 import { freshDemo, type CatalogDb } from "@/lib/data/model";
 
 const PREVIOUS_CSF_HELP = "Primary NIST CSF 2.0 function. Detailed control mapping comes in a later version.";
@@ -36,6 +38,9 @@ export function loadDemoDb(): CatalogDb {
  * Optional geography and privacy fields are added inactive when missing.
  * Missing outcome-assessment dropdowns are added without rewriting lookup
  * groups the workspace already edited.
+ * A cache from before artifacts receives the sample artifacts for Acme Corp and
+ * Meridian Health when those workspaces are still present. An existing artifact
+ * list is kept, including an empty list after someone deletes the samples.
  * Returns null when the payload is not a catalog.
  */
 export function migrateDemoState(raw: unknown): CatalogDb | null {
@@ -47,12 +52,31 @@ export function migrateDemoState(raw: unknown): CatalogDb | null {
     }
     const tenants = parsed.tenants.map(normalizeTenant);
     const tenantIds = tenants.map((tenant) => tenant.id);
-    const lookups = ensureOptionalLookups(ensureCoverageLookups(parsed.lookups, tenantIds), tenantIds);
+    const lookups = ensureArtifactLookups(
+      ensureOptionalLookups(ensureCoverageLookups(parsed.lookups, tenantIds), tenantIds),
+      tenantIds,
+    );
     const fields = ensureOptionalFields(
       Array.isArray(parsed.fields) ? parsed.fields.map(normalizeStoredField) : [],
       tenantIds,
     );
     const library = mergeFrameworkLibrary(parsed.elements);
+    const services = parsed.services.map(normalizeStoredService);
+    const hadArtifacts = Array.isArray((parsed as { artifacts?: unknown }).artifacts);
+    const storedArtifacts = normalizeStoredArtifacts((parsed as { artifacts?: unknown }).artifacts);
+    const storedLinks = normalizeStoredLinks((parsed as { artifactLinks?: unknown }).artifactLinks);
+    const seeded = hadArtifacts
+      ? { artifacts: storedArtifacts, links: storedLinks }
+      : sampleArtifactsForTenants(
+          tenantIds,
+          services.map((service) => service.id),
+        );
+    const artifacts = hadArtifacts ? storedArtifacts : seeded.artifacts;
+    const artifactIds = new Set(artifacts.map((artifact) => artifact.id));
+    const serviceIds = new Set(services.map((service) => service.id));
+    const artifactLinks = (hadArtifacts ? storedLinks : seeded.links).filter(
+      (link) => artifactIds.has(link.artifact_id) && serviceIds.has(link.service_id),
+    );
     return {
       session: parsed.session ?? null,
       activeTenantId: typeof parsed.activeTenantId === "string" ? parsed.activeTenantId : null,
@@ -60,7 +84,9 @@ export function migrateDemoState(raw: unknown): CatalogDb | null {
       members: Array.isArray(parsed.members) ? parsed.members : [],
       fields,
       lookups,
-      services: parsed.services.map(normalizeStoredService),
+      services,
+      artifacts,
+      artifactLinks,
       frameworks: library.frameworks,
       elements: library.elements,
       mappings: normalizeStoredMappings(parsed.mappings),
@@ -256,6 +282,96 @@ function normalizeProfiles(input: unknown, tenantIds: string[]): ExportProfile[]
     defaults.add(profile.tenant_id);
     return profile;
   });
+}
+
+const ARTIFACT_LOOKUP_KEYS = new Set([ARTIFACT_TYPE_KEY, ARTIFACT_STATUS_KEY]);
+
+function ensureArtifactLookups(lookups: LookupOption[], tenantIds: string[]): LookupOption[] {
+  const seeds = STARTER_LOOKUPS.filter((row) => ARTIFACT_LOOKUP_KEYS.has(row.field_key));
+  const next = lookups.slice();
+  for (const tenantId of tenantIds) {
+    if (!tenantId) continue;
+    for (const fieldKey of ARTIFACT_LOOKUP_KEYS) {
+      if (next.some((option) => option.tenant_id === tenantId && option.field_key === fieldKey)) continue;
+      for (const seed of seeds.filter((row) => row.field_key === fieldKey)) {
+        next.push({
+          id: `lookup:${tenantId}:${seed.field_key}:${seed.code}`,
+          tenant_id: tenantId,
+          field_key: seed.field_key,
+          code: seed.code,
+          label: seed.label,
+          description: seed.description,
+          code_prefix: seed.code_prefix,
+          sort_order: seed.sort_order,
+          is_active: true,
+        });
+      }
+    }
+  }
+  return next;
+}
+
+function normalizeStoredArtifacts(input: unknown): Artifact[] {
+  if (!Array.isArray(input)) return [];
+  const artifacts: Artifact[] = [];
+  const seen = new Set<string>();
+  for (const item of input) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Partial<Artifact>;
+    if (typeof row.id !== "string" || typeof row.tenant_id !== "string" || typeof row.name !== "string") continue;
+    const name = row.name.trim();
+    if (!name || seen.has(row.id)) continue;
+    seen.add(row.id);
+    const visibility: Visibility = row.visibility === "public" ? "public" : "internal";
+    artifacts.push(
+      withArtifactComputed({
+        id: row.id,
+        tenant_id: row.tenant_id,
+        name,
+        artifact_type: typeof row.artifact_type === "string" ? row.artifact_type : "",
+        owner_team: typeof row.owner_team === "string" && row.owner_team.trim() ? row.owner_team : null,
+        status: typeof row.status === "string" && row.status.trim() ? row.status : null,
+        version: typeof row.version === "string" && row.version.trim() ? row.version : null,
+        review_cadence: typeof row.review_cadence === "string" && row.review_cadence.trim() ? row.review_cadence : null,
+        last_reviewed_date: typeof row.last_reviewed_date === "string" && /^\d{4}-\d{2}-\d{2}/.test(row.last_reviewed_date) ? row.last_reviewed_date.slice(0, 10) : null,
+        next_review_date: null,
+        link_url: typeof row.link_url === "string" && row.link_url.trim() ? row.link_url.trim() : null,
+        description: typeof row.description === "string" && row.description.trim() ? row.description : null,
+        visibility,
+        created_by: typeof row.created_by === "string" ? row.created_by : null,
+        updated_by: typeof row.updated_by === "string" ? row.updated_by : null,
+        created_at: typeof row.created_at === "string" ? row.created_at : "",
+        updated_at: typeof row.updated_at === "string" ? row.updated_at : "",
+      }),
+    );
+  }
+  return artifacts;
+}
+
+function normalizeStoredLinks(input: unknown): ArtifactLink[] {
+  if (!Array.isArray(input)) return [];
+  const links: ArtifactLink[] = [];
+  const seen = new Set<string>();
+  for (const item of input) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Partial<ArtifactLink>;
+    if (typeof row.id !== "string" || typeof row.tenant_id !== "string") continue;
+    if (typeof row.artifact_id !== "string" || typeof row.service_id !== "string") continue;
+    const pair = `${row.tenant_id}:${row.artifact_id}:${row.service_id}`;
+    if (seen.has(pair)) continue;
+    seen.add(pair);
+    const note = typeof row.relationship_note === "string" ? row.relationship_note.trim() : "";
+    links.push({
+      id: row.id,
+      tenant_id: row.tenant_id,
+      artifact_id: row.artifact_id,
+      service_id: row.service_id,
+      relationship_note: note ? note : null,
+      created_by: typeof row.created_by === "string" ? row.created_by : null,
+      created_at: typeof row.created_at === "string" ? row.created_at : "",
+    });
+  }
+  return links;
 }
 
 const COVERAGE_SEEDS = STARTER_LOOKUPS.filter((row) => row.field_key === "outcome_coverage");

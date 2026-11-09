@@ -22,7 +22,10 @@ import { optionByCode } from "@/lib/catalog/lookups";
 import { normalizeLogoInput } from "@/lib/catalog/logos";
 import { localToday } from "@/lib/catalog/present";
 import type { FrameworkElement, FrameworkRelease } from "@/lib/catalog/framework";
+import type { PlannedArtifactImport } from "@/lib/catalog/artifacts";
 import type {
+  Artifact,
+  ArtifactLink,
   FieldDefinition,
   LookupOption,
   Member,
@@ -39,7 +42,10 @@ import {
   loadSampleServices as loadSampleRows,
   checkoutServices,
   deleteExportProfile as deleteExportProfileRow,
+  deleteArtifact as deleteArtifactRowModel,
+  deleteArtifactLink as deleteArtifactLinkModel,
   deleteService as deleteServiceRecord,
+  importArtifacts as importArtifactRows,
   importFrameworkRows,
   importLookups as importLookupRowsModel,
   removeOutcomeMapping as removeOutcomeMappingRow,
@@ -51,6 +57,8 @@ import {
   setFieldLookup as setFieldLookupRow,
   saveLookup as saveLookupRow,
   saveOutcomeMapping as saveOutcomeMappingRow,
+  saveArtifact as saveArtifactRow,
+  saveArtifactLink as saveArtifactLinkRow,
   saveService as saveServiceRow,
   setServiceArchived,
   setCatalogColumns as setCatalogColumnsRow,
@@ -66,10 +74,14 @@ import {
   checkoutBlueprintRows,
   deleteExportProfileRow as deleteExportProfileRemote,
   deleteOutcomeMappingRow as deleteOutcomeMappingRemote,
+  deleteArtifactLinkRow,
+  deleteArtifactRow,
   deleteServiceRow,
   hydrateFromSupabase,
   importFrameworkRowsRemote,
   logCatalogExport,
+  persistArtifact,
+  persistArtifactLink,
   persistExportProfile,
   importLookupRows,
   insertLookup,
@@ -103,6 +115,8 @@ type CatalogApi = {
   fields: FieldDefinition[];
   lookups: LookupOption[];
   services: ServiceRecord[];
+  artifacts: Artifact[];
+  artifactLinks: ArtifactLink[];
   framework: FrameworkRelease | null;
   frameworks: FrameworkRelease[];
   elements: FrameworkElement[];
@@ -118,6 +132,11 @@ type CatalogApi = {
   setServiceCodeMode: (mode: ServiceCodeMode) => Promise<void>;
   loadSampleServices: () => Promise<void>;
   saveService: (service: ServiceRecord) => Promise<string>;
+  saveArtifact: (artifact: Artifact) => Promise<string>;
+  deleteArtifact: (artifactId: string) => Promise<void>;
+  saveArtifactLink: (input: { id?: string; artifactId: string; serviceId: string; relationshipNote?: string | null }) => Promise<void>;
+  deleteArtifactLink: (linkId: string) => Promise<void>;
+  importArtifacts: (rows: PlannedArtifactImport[]) => Promise<{ created: number; updated: number }>;
   saveLookup: (option: LookupOption) => Promise<void>;
   addLookup: (input: {
     field_key: string;
@@ -243,6 +262,8 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     const fields = db?.fields.filter((field) => field.tenant_id === tenantId) ?? [];
     const lookups = db?.lookups.filter((option) => option.tenant_id === tenantId) ?? [];
     const services = db?.services.filter((service) => service.tenant_id === tenantId) ?? [];
+    const artifacts = db?.artifacts.filter((artifact) => artifact.tenant_id === tenantId) ?? [];
+    const artifactLinks = db?.artifactLinks.filter((link) => link.tenant_id === tenantId) ?? [];
     const mappings = db?.mappings.filter((mapping) => mapping.tenant_id === tenantId) ?? [];
     const exportProfiles = db?.exportProfiles.filter((profile) => profile.tenant_id === tenantId) ?? [];
     const audit = db?.audit.filter((entry) => entry.tenant_id === tenantId) ?? [];
@@ -264,6 +285,8 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       fields,
       lookups,
       services,
+      artifacts,
+      artifactLinks,
       framework: db?.frameworks.find((item) => item.is_active && item.code === "NIST-CSF") ?? null,
       frameworks: db?.frameworks.filter((item) => item.is_active) ?? [],
       elements: db?.elements ?? [],
@@ -669,6 +692,84 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           if (!supabase) throw new Error("Supabase is not connected.");
           await persistCatalogColumns(supabase, tenantId, keys);
           await reload();
+        }),
+      saveArtifact: (artifact) =>
+        guard(async () => {
+          if (!db) throw new Error("The catalog is still loading.");
+          const next = saveArtifactRow(db, artifact);
+          if (mode === "demo") {
+            commit(next);
+            return artifact.id;
+          }
+          const saved = next.artifacts.find((row) => row.id === artifact.id);
+          if (!saved) throw new Error("Could not save that artifact.");
+          const supabase = supabaseRef.current;
+          if (!supabase) throw new Error("Supabase is not connected.");
+          await persistArtifact(supabase, saved);
+          await reload();
+          return artifact.id;
+        }),
+      deleteArtifact: (artifactId) =>
+        guard(async () => {
+          if (!db) return;
+          const next = deleteArtifactRowModel(db, artifactId);
+          if (mode === "demo") {
+            commit(next);
+            return;
+          }
+          const supabase = supabaseRef.current;
+          if (!supabase) throw new Error("Supabase is not connected.");
+          await deleteArtifactRow(supabase, artifactId);
+          await reload();
+        }),
+      saveArtifactLink: (input) =>
+        guard(async () => {
+          if (!db) return;
+          const next = saveArtifactLinkRow(db, input);
+          if (mode === "demo") {
+            commit(next);
+            return;
+          }
+          const saved = next.artifactLinks.find(
+            (link) => link.artifact_id === input.artifactId && link.service_id === input.serviceId,
+          );
+          if (!saved) throw new Error("Could not save that link.");
+          const supabase = supabaseRef.current;
+          if (!supabase) throw new Error("Supabase is not connected.");
+          await persistArtifactLink(supabase, saved);
+          await reload();
+        }),
+      deleteArtifactLink: (linkId) =>
+        guard(async () => {
+          if (!db) return;
+          const next = deleteArtifactLinkModel(db, linkId);
+          if (mode === "demo") {
+            commit(next);
+            return;
+          }
+          const supabase = supabaseRef.current;
+          if (!supabase) throw new Error("Supabase is not connected.");
+          await deleteArtifactLinkRow(supabase, linkId);
+          await reload();
+        }),
+      importArtifacts: (rows) =>
+        guard(async () => {
+          if (!db) throw new Error("The catalog is still loading.");
+          const result = importArtifactRows(db, rows);
+          if (mode === "demo") {
+            commit(result.db);
+            return { created: result.created, updated: result.updated };
+          }
+          const supabase = supabaseRef.current;
+          if (!supabase || !tenantId) throw new Error("Supabase is not connected.");
+          for (const row of rows) {
+            const saved = result.db.artifacts.find(
+              (artifact) => artifact.tenant_id === tenantId && artifact.name.toLowerCase() === row.name.toLowerCase(),
+            );
+            if (saved) await persistArtifact(supabase, saved);
+          }
+          await reload();
+          return { created: result.created, updated: result.updated };
         }),
       resetDemoData: () => {
         if (!db || mode !== "demo") return;

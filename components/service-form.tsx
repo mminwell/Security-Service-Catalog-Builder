@@ -18,6 +18,7 @@ import {
 } from "@/lib/catalog/service";
 import { DEPTH_META, type DepthLevel, type FieldDefinition, type ServiceRecord } from "@/lib/catalog/types";
 import { useCatalog } from "@/components/catalog-provider";
+import { ServiceArtifacts } from "@/components/service-artifacts";
 import { ServiceMappingSection } from "@/components/outcome-mapping";
 import { AuditDrawer, Badge, ConfirmDialog, DepthToggle, FieldHelp, InfoTip, LookupSelect } from "@/components/widgets";
 
@@ -266,6 +267,15 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
         </section>
       ) : (
         <ServiceMappingSection serviceId={draft.id} />
+      )}
+
+      {isNew ? (
+        <section className="form-section" id="supporting-artifacts">
+          <h2>Supporting Artifacts</h2>
+          <p className="lede">Save the service before linking a policy, standard, procedure, or tool.</p>
+        </section>
+      ) : (
+        <ServiceArtifacts serviceId={draft.id} />
       )}
 
       {history && !isNew ? (

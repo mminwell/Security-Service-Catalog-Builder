@@ -22,6 +22,7 @@ import {
   writeBlueprintView,
   type BlueprintView,
 } from "@/lib/catalog/blueprint-view";
+import { hintsForBlueprint } from "@/lib/catalog/artifacts";
 import { addPackToCart, toggleCart } from "@/lib/catalog/cart";
 import { cartIdsFor, setCartIdsFor, subscribeCart } from "@/lib/catalog/cart-store";
 import { STARTER_FIELDS } from "@/lib/catalog/fields";
@@ -499,12 +500,38 @@ function PreviewBody({
           ) : null}
         </section>
       ))}
+      <ArtifactHints blueprintId={blueprint.id} lookups={lookups} />
       <section>
         <h3>Suggested NIST CSF 2.0 subcategories</h3>
         <p>{blueprint.nist_csf.join(", ")}</p>
         <p className="hint">Hints only. Checkout stores them on the service and does not count them as coverage until someone saves an assessment.</p>
       </section>
     </div>
+  );
+}
+
+function ArtifactHints({
+  blueprintId,
+  lookups,
+}: {
+  blueprintId: string;
+  lookups: import("@/lib/catalog/types").LookupOption[];
+}) {
+  const hints = hintsForBlueprint(blueprintId);
+  if (hints.length === 0) return null;
+  return (
+    <section>
+      <h3>Typical supporting artifacts</h3>
+      {hints.map((hint) => (
+        <div className="preview-row" key={`${hint.artifact_type}-${hint.name}`}>
+          <span className="micro">{optionLabel(lookups, "artifact_type", hint.artifact_type) || hint.artifact_type}</span>
+          <p>
+            {hint.name}. {hint.note}
+          </p>
+        </div>
+      ))}
+      <p className="hint">Hints only. Adding this blueprint does not create these documents.</p>
+    </section>
   );
 }
 

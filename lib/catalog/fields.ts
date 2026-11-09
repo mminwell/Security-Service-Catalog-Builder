@@ -315,7 +315,7 @@ const RAW: Array<Omit<FieldSeed, "sort_order">> = [
   {
     field_key: "current_tooling_notes",
     label: "Current Tooling",
-    help_text: "Tools used to run the service today. Internal until linked artifacts exist.",
+    help_text: "Tools used to run the service today. Linked artifacts are the inventory. This note stays internal.",
     input_type: "textarea",
     lookup_field_key: null,
     is_required: false,

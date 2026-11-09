@@ -27,6 +27,34 @@ type Line = {
   gap: number;
 };
 
+type PdfBlock = { text: string; kind: "title" | "workspace" | "meta" | "note" | "fields" | "empty" | "section" | "heading" | "label" | "value" };
+
+/** Body text drawn in the PDF, in order. Header and footer chrome are separate. */
+export function catalogPdfBlocks(document: CatalogDocument): PdfBlock[] {
+  const blocks: PdfBlock[] = [
+    { text: "Service catalog", kind: "title" },
+    { text: document.workspaceName, kind: "workspace" },
+    { text: `Prepared ${document.generatedOn}.`, kind: "meta" },
+    ...document.notes.map((text) => ({ text, kind: "note" as const })),
+    { text: `Fields: ${document.fieldLabels.join(", ")}.`, kind: "fields" },
+  ];
+  if (document.services.length === 0) blocks.push({ text: "No services are in this export.", kind: "empty" });
+  for (const service of document.services) {
+    blocks.push({ text: service.heading, kind: "heading" });
+    for (const row of service.rows) {
+      blocks.push({ text: row.label, kind: "label" }, { text: row.value, kind: "value" });
+    }
+  }
+  blocks.push({ text: "Supporting artifacts", kind: "section" });
+  for (const artifact of document.artifacts) {
+    blocks.push({ text: artifact.heading, kind: "heading" });
+    for (const row of artifact.rows) {
+      blocks.push({ text: row.label, kind: "label" }, { text: row.value, kind: "value" });
+    }
+  }
+  return blocks;
+}
+
 export async function buildCatalogPdf(document: CatalogDocument, fonts: PdfFonts): Promise<Uint8Array> {
   const fontkit = (await import("@pdf-lib/fontkit")).default;
   const pdf = await PDFDocument.create();
@@ -57,21 +85,17 @@ export async function buildCatalogPdf(document: CatalogDocument, fonts: PdfFonts
     });
   };
 
-  push("Service catalog", serif, 22, SLATE, 0, clean.serif);
-  push(document.workspaceName, bold, 12, SLATE, 8, clean.bold);
-  push(`Prepared ${document.generatedOn}.`, sans, 10, GRAY, 4, clean.sans);
-  for (const note of document.notes) push(note, sans, 10, SLATE, 3, clean.sans);
-  push(`Fields: ${document.fieldLabels.join(", ")}.`, sans, 10, SLATE, 8, clean.sans);
-
-  if (document.services.length === 0) {
-    push("No services are in this export.", sans, 11, SLATE, 16, clean.sans);
-  }
-  for (const service of document.services) {
-    push(service.heading, serif, 14, SLATE, 16, clean.serif);
-    for (const row of service.rows) {
-      push(row.label, bold, 9, CLAY, 7, clean.bold);
-      push(row.value, sans, 11, SLATE, 1, clean.sans);
-    }
+  for (const block of catalogPdfBlocks(document)) {
+    if (block.kind === "title") push(block.text, serif, 22, SLATE, 0, clean.serif);
+    else if (block.kind === "workspace") push(block.text, bold, 12, SLATE, 8, clean.bold);
+    else if (block.kind === "meta") push(block.text, sans, 10, GRAY, 4, clean.sans);
+    else if (block.kind === "note") push(block.text, sans, 10, SLATE, 3, clean.sans);
+    else if (block.kind === "fields") push(block.text, sans, 10, SLATE, 8, clean.sans);
+    else if (block.kind === "empty") push(block.text, sans, 11, SLATE, 16, clean.sans);
+    else if (block.kind === "section") push(block.text, serif, 16, SLATE, 22, clean.serif);
+    else if (block.kind === "heading") push(block.text, serif, 14, SLATE, 16, clean.serif);
+    else if (block.kind === "label") push(block.text, bold, 9, CLAY, 7, clean.bold);
+    else push(block.text, sans, 11, SLATE, 1, clean.sans);
   }
 
   const pages = pack(lines);

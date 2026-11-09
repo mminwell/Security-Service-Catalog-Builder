@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync } from "node:fs";
+import { sampleArtifactRecords } from "../lib/catalog/artifact-samples";
 import { ADDITIONAL_FRAMEWORKS } from "../lib/catalog/framework-catalog";
 import { STARTER_FIELDS } from "../lib/catalog/fields";
 import { CSF_ELEMENTS, CSF_FRAMEWORK, type FrameworkRelease } from "../lib/catalog/framework";
@@ -170,6 +171,47 @@ begin
   ) values
 ${rows};
 end $$;`;
+}
+
+function artifactSeed(): string {
+  const { artifacts, links } = sampleArtifactRecords();
+  const artifactValues = artifacts
+    .map((artifact) => {
+      return `  (${quote(artifact.id)}::uuid, ${quote(artifact.tenant_id)}::uuid, ${quote(artifact.name)}, ${quote(artifact.artifact_type)}, ${sqlText(artifact.owner_team)}, ${sqlText(artifact.status)}, ${sqlText(artifact.version)}, ${sqlText(artifact.review_cadence)}, ${artifact.last_reviewed_date ? `${quote(artifact.last_reviewed_date)}::date` : "null"}, ${sqlText(artifact.link_url)}, ${sqlText(artifact.description)}, ${quote(artifact.visibility)})`;
+    })
+    .join(",\n");
+  const linkValues = links
+    .map((link) => {
+      return `  (${quote(link.id)}::uuid, ${quote(link.tenant_id)}::uuid, ${quote(link.artifact_id)}::uuid, ${quote(link.service_id)}::uuid, ${sqlText(link.relationship_note)})`;
+    })
+    .join(",\n");
+  return `-- Fictional artifact inventory. Inserts only when the sample workspace and service already exist.
+insert into public.artifacts (
+  id, tenant_id, name, artifact_type, owner_team, status, version, review_cadence,
+  last_reviewed_date, link_url, description, visibility
+)
+select v.id, v.tenant_id, v.name, v.artifact_type, v.owner_team, v.status, v.version, v.review_cadence,
+  v.last_reviewed_date, v.link_url, v.description, v.visibility
+from (values
+${artifactValues}
+) as v(id, tenant_id, name, artifact_type, owner_team, status, version, review_cadence, last_reviewed_date, link_url, description, visibility)
+where exists (select 1 from public.tenants t where t.id = v.tenant_id)
+on conflict (id) do nothing;
+
+insert into public.artifact_service_links (
+  id, tenant_id, artifact_id, service_id, relationship_note
+)
+select v.id, v.tenant_id, v.artifact_id, v.service_id, v.relationship_note
+from (values
+${linkValues}
+) as v(id, tenant_id, artifact_id, service_id, relationship_note)
+where exists (select 1 from public.artifacts a where a.id = v.artifact_id and a.tenant_id = v.tenant_id)
+  and exists (select 1 from public.services s where s.id = v.service_id and s.tenant_id = v.tenant_id)
+  and not exists (
+    select 1 from public.artifact_service_links existing
+    where existing.artifact_id = v.artifact_id and existing.service_id = v.service_id
+  )
+on conflict (id) do nothing;`;
 }
 
 function frameworkSeed(conflict: string): string {
@@ -442,6 +484,9 @@ const seed = `-- Optional sample data for Security Service Catalog Builder.
 -- supabase/migrations/0003_v1_2_blueprints_columns_import.sql
 -- supabase/migrations/0004_v2_csf_mappings.sql
 -- supabase/migrations/0005_v3_exports_frameworks.sql
+-- supabase/migrations/0006_v3_field_lookup_toggle.sql
+-- supabase/migrations/0007_v3_public_defaults.sql
+-- supabase/migrations/0008_v4_artifacts.sql
 -- No real client names, credentials, or project URLs.
 -- The CSF 2.0 core is loaded by 0004. The block below repeats it so a later seed stays idempotent.
 -- Optional field groups and the unloaded framework registry are repeated from 0005.
@@ -466,6 +511,8 @@ ${SAMPLE_TENANTS.map((tenant) =>
     builtinLogoForSlug(tenant.slug),
   ),
 ).join("\n\n")}
+
+${artifactSeed()}
 `;
 
 writeFileSync("supabase/seed.sql", seed);

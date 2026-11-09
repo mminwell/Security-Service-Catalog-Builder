@@ -131,6 +131,8 @@ function documentXml(document: CatalogDocument): string {
     ${intro}
     ${fields}
     ${services || paragraph("No services are in this export.")}
+    ${heading("Supporting artifacts")}
+    ${artifactBlocks(document)}
     <w:sectPr>
       <w:headerReference w:type="default" r:id="rIdHeader"/>
       <w:footerReference w:type="default" r:id="rIdFooter"/>
@@ -139,6 +141,32 @@ function documentXml(document: CatalogDocument): string {
     </w:sectPr>
   </w:body>
 </w:document>`;
+}
+
+function artifactBlocks(document: CatalogDocument): string {
+  return document.artifacts
+    .map((artifact) => {
+      const rows = artifact.rows
+        .map(
+          (row) => `<w:tr>
+        <w:tc><w:tcPr><w:tcW w:w="2400" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F0EEE6"/></w:tcPr>${paragraph(row.label, true)}</w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="6960" w:type="dxa"/></w:tcPr>${paragraphs(row.value)}</w:tc>
+      </w:tr>`,
+        )
+        .join("");
+      return `${heading(artifact.heading)}<w:tbl>
+        <w:tblPr><w:tblW w:w="9360" w:type="dxa"/><w:tblBorders>
+          <w:top w:val="single" w:sz="4" w:space="0" w:color="D1CFC5"/>
+          <w:left w:val="single" w:sz="4" w:space="0" w:color="D1CFC5"/>
+          <w:bottom w:val="single" w:sz="4" w:space="0" w:color="D1CFC5"/>
+          <w:right w:val="single" w:sz="4" w:space="0" w:color="D1CFC5"/>
+          <w:insideH w:val="single" w:sz="4" w:space="0" w:color="D1CFC5"/>
+          <w:insideV w:val="single" w:sz="4" w:space="0" w:color="D1CFC5"/>
+        </w:tblBorders></w:tblPr>
+        ${rows}
+      </w:tbl>`;
+    })
+    .join("");
 }
 
 function headerXml(document: CatalogDocument, hasLogo: boolean): string {

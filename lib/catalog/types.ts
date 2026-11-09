@@ -149,6 +149,42 @@ export type OutcomeMapping = {
   updated_at: string;
 };
 
+/**
+ * A policy, standard, procedure, tool, or other supporting document.
+ * The catalog stores a link. It does not host the file.
+ * `review_cadence` reuses the service Review Cadences lookup so next review is computed the same way.
+ */
+export type Artifact = {
+  id: string;
+  tenant_id: string;
+  name: string;
+  artifact_type: string;
+  owner_team: string | null;
+  status: string | null;
+  version: string | null;
+  review_cadence: string | null;
+  last_reviewed_date: string | null;
+  next_review_date: string | null;
+  link_url: string | null;
+  description: string | null;
+  visibility: Visibility;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Many-to-many link between one artifact and one service. */
+export type ArtifactLink = {
+  id: string;
+  tenant_id: string;
+  artifact_id: string;
+  service_id: string;
+  relationship_note: string | null;
+  created_by: string | null;
+  created_at: string;
+};
+
 /** Workspace-scoped export profile. Visibility is enforced when the profile is used. */
 export type ExportProfile = {
   id: string;

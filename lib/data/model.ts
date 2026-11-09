@@ -8,12 +8,16 @@ import { applyFrameworkImport, type PlannedElement } from "@/lib/catalog/framewo
 import { FRAMEWORK_CATALOG } from "@/lib/catalog/framework-catalog";
 import { CSF_ELEMENTS, CSF_FRAMEWORK, type FrameworkElement, type FrameworkRelease } from "@/lib/catalog/framework";
 import { builtinLogoForSlug, normalizeLogoInput } from "@/lib/catalog/logos";
+import { sampleArtifactRecords } from "@/lib/catalog/artifact-samples";
+import { normalizeArtifact, type PlannedArtifactImport } from "@/lib/catalog/artifacts";
 import { STARTER_LOOKUPS } from "@/lib/catalog/lookups";
 import { SAMPLE_TENANTS, STARTER_PACK } from "@/lib/catalog/samples";
 import { buildService, normalizeService, withComputed } from "@/lib/catalog/service";
 import { uniqueSlug } from "@/lib/catalog/service-code";
 import {
   DEMO_USER_ID,
+  type Artifact,
+  type ArtifactLink,
   type AuditEntry,
   type FieldDefinition,
   type LookupOption,
@@ -35,6 +39,8 @@ export type CatalogDb = {
   fields: FieldDefinition[];
   lookups: LookupOption[];
   services: ServiceRecord[];
+  artifacts: Artifact[];
+  artifactLinks: ArtifactLink[];
   frameworks: FrameworkRelease[];
   elements: FrameworkElement[];
   mappings: OutcomeMapping[];
@@ -53,6 +59,8 @@ export function emptyDb(): CatalogDb {
     fields: [],
     lookups: [],
     services: [],
+    artifacts: [],
+    artifactLinks: [],
     frameworks: [],
     elements: [],
     mappings: [],
@@ -67,6 +75,7 @@ export function freshDemo(): CatalogDb {
   const fields: FieldDefinition[] = [];
   const lookups: LookupOption[] = [];
   const services: ServiceRecord[] = [];
+  const seeded = sampleArtifactRecords(SEEDED_AT);
 
   for (const sample of SAMPLE_TENANTS) {
     tenants.push({
@@ -103,6 +112,8 @@ export function freshDemo(): CatalogDb {
     fields,
     lookups,
     services,
+    artifacts: seeded.artifacts,
+    artifactLinks: seeded.links,
     frameworks: FRAMEWORK_CATALOG.map((framework) => ({ ...framework })),
     elements: CSF_ELEMENTS.map((element) => ({ ...element })),
     mappings: [],
@@ -547,6 +558,7 @@ export function deleteService(db: CatalogDb, serviceId: string, now = new Date()
     ...db,
     services: db.services.filter((service) => service.id !== serviceId),
     mappings: db.mappings.filter((mapping) => mapping.service_id !== serviceId),
+    artifactLinks: db.artifactLinks.filter((link) => link.service_id !== serviceId),
     audit: [
       auditEntry({
         tenantId,
@@ -995,6 +1007,182 @@ export function recordExport(db: CatalogDb, meta: ExportLogMeta, now = new Date(
   };
 }
 
+export function saveArtifact(db: CatalogDb, input: Artifact, now = new Date().toISOString()): CatalogDb {
+  const actor = requireSession(db);
+  const tenantId = requireActive(db);
+  assertArtifactWrite(db, tenantId, actor.userId);
+  if (input.tenant_id !== tenantId) throw new Error("That artifact belongs to another workspace.");
+  const current = db.artifacts.find((artifact) => artifact.id === input.id);
+  if (current && current.tenant_id !== tenantId) throw new Error("That artifact belongs to another workspace.");
+  const normalized = normalizeArtifact({
+    ...input,
+    tenant_id: tenantId,
+    updated_at: now,
+    updated_by: actor.userId,
+    created_at: current?.created_at ?? now,
+    created_by: current?.created_by ?? actor.userId,
+  });
+  const artifacts = current
+    ? db.artifacts.map((artifact) => (artifact.id === normalized.id ? normalized : artifact))
+    : [...db.artifacts, normalized];
+  return {
+    ...db,
+    artifacts,
+    audit: [
+      auditEntry({
+        tenantId,
+        actor,
+        table: "artifacts",
+        rowId: normalized.id,
+        action: current ? "update" : "insert",
+        before: current ? artifactSnapshot(current) : null,
+        after: artifactSnapshot(normalized),
+        now,
+      }),
+      ...db.audit,
+    ],
+  };
+}
+
+export function deleteArtifact(db: CatalogDb, artifactId: string, now = new Date().toISOString()): CatalogDb {
+  const actor = requireSession(db);
+  const tenantId = requireActive(db);
+  assertAdmin(db, tenantId, actor.userId, "Only a workspace admin can permanently delete an artifact.");
+  const current = db.artifacts.find((artifact) => artifact.id === artifactId && artifact.tenant_id === tenantId);
+  if (!current) throw new Error("That artifact is not in this workspace.");
+  return {
+    ...db,
+    artifacts: db.artifacts.filter((artifact) => artifact.id !== artifactId),
+    artifactLinks: db.artifactLinks.filter((link) => link.artifact_id !== artifactId),
+    audit: [
+      auditEntry({
+        tenantId,
+        actor,
+        table: "artifacts",
+        rowId: artifactId,
+        action: "delete",
+        before: artifactSnapshot(current),
+        after: null,
+        now,
+      }),
+      ...db.audit,
+    ],
+  };
+}
+
+export function saveArtifactLink(
+  db: CatalogDb,
+  input: { id?: string; artifactId: string; serviceId: string; relationshipNote?: string | null },
+  now = new Date().toISOString(),
+): CatalogDb {
+  const actor = requireSession(db);
+  const tenantId = requireActive(db);
+  assertArtifactWrite(db, tenantId, actor.userId);
+  const artifact = db.artifacts.find((row) => row.id === input.artifactId && row.tenant_id === tenantId);
+  if (!artifact) throw new Error("That artifact is not in this workspace.");
+  const service = db.services.find((row) => row.id === input.serviceId && row.tenant_id === tenantId);
+  if (!service) throw new Error("That service is not in this workspace.");
+  const note = cleanLinkNote(input.relationshipNote);
+  const current =
+    db.artifactLinks.find((link) => link.id === input.id && link.tenant_id === tenantId) ??
+    db.artifactLinks.find((link) => link.tenant_id === tenantId && link.artifact_id === artifact.id && link.service_id === service.id);
+  const next: ArtifactLink = {
+    id: current?.id ?? input.id ?? crypto.randomUUID(),
+    tenant_id: tenantId,
+    artifact_id: artifact.id,
+    service_id: service.id,
+    relationship_note: note,
+    created_by: current?.created_by ?? actor.userId,
+    created_at: current?.created_at ?? now,
+  };
+  const artifactLinks = current
+    ? db.artifactLinks.map((link) => (link.id === next.id ? next : link))
+    : [...db.artifactLinks, next];
+  return {
+    ...db,
+    artifactLinks,
+    audit: [
+      auditEntry({
+        tenantId,
+        actor,
+        table: "artifact_service_links",
+        rowId: next.id,
+        action: current ? "update" : "insert",
+        before: current ? { artifact_id: current.artifact_id, service_id: current.service_id, relationship_note: current.relationship_note } : null,
+        after: { artifact_id: next.artifact_id, service_id: next.service_id, relationship_note: next.relationship_note, artifact_name: artifact.name, service_code: service.service_code },
+        now,
+      }),
+      ...db.audit,
+    ],
+  };
+}
+
+export function deleteArtifactLink(db: CatalogDb, linkId: string, now = new Date().toISOString()): CatalogDb {
+  const actor = requireSession(db);
+  const tenantId = requireActive(db);
+  assertArtifactWrite(db, tenantId, actor.userId);
+  const current = db.artifactLinks.find((link) => link.id === linkId && link.tenant_id === tenantId);
+  if (!current) throw new Error("That link is not in this workspace.");
+  return {
+    ...db,
+    artifactLinks: db.artifactLinks.filter((link) => link.id !== linkId),
+    audit: [
+      auditEntry({
+        tenantId,
+        actor,
+        table: "artifact_service_links",
+        rowId: linkId,
+        action: "delete",
+        before: { artifact_id: current.artifact_id, service_id: current.service_id, relationship_note: current.relationship_note },
+        after: null,
+        now,
+      }),
+      ...db.audit,
+    ],
+  };
+}
+
+export function importArtifacts(
+  db: CatalogDb,
+  rows: PlannedArtifactImport[],
+  now = new Date().toISOString(),
+): { db: CatalogDb; created: number; updated: number } {
+  const actor = requireSession(db);
+  const tenantId = requireActive(db);
+  assertArtifactWrite(db, tenantId, actor.userId);
+  let next = db;
+  let created = 0;
+  let updated = 0;
+  for (const row of rows) {
+    const existing = row.matchId
+      ? next.artifacts.find((artifact) => artifact.id === row.matchId && artifact.tenant_id === tenantId)
+      : next.artifacts.find((artifact) => artifact.tenant_id === tenantId && artifact.name.toLowerCase() === row.name.toLowerCase());
+    const id = existing?.id ?? crypto.randomUUID();
+    next = saveArtifact(next, {
+      id,
+      tenant_id: tenantId,
+      name: row.name,
+      artifact_type: row.artifact_type,
+      owner_team: row.owner_team,
+      status: row.status,
+      version: row.version,
+      review_cadence: row.review_cadence,
+      last_reviewed_date: row.last_reviewed_date,
+      next_review_date: null,
+      link_url: row.link_url,
+      description: row.description,
+      visibility: row.visibility,
+      created_by: existing?.created_by ?? null,
+      updated_by: null,
+      created_at: existing?.created_at ?? now,
+      updated_at: now,
+    }, now);
+    if (existing) updated += 1;
+    else created += 1;
+  }
+  return { db: next, created, updated };
+}
+
 export function resetDemo(db: CatalogDb): CatalogDb {
   const fresh = freshDemo();
   if (!db.session) return fresh;
@@ -1045,6 +1233,12 @@ function assertWrite(db: CatalogDb, tenantId: string, userId: string): void {
   }
 }
 
+function assertArtifactWrite(db: CatalogDb, tenantId: string, userId: string): void {
+  if (!canWriteServices(roleFor(db, tenantId, userId))) {
+    throw new Error("You do not have permission to change artifacts in this workspace.");
+  }
+}
+
 function assertAdmin(db: CatalogDb, tenantId: string, userId: string, message: string): void {
   if (!canAdminister(roleFor(db, tenantId, userId))) throw new Error(message);
 }
@@ -1075,6 +1269,28 @@ function auditEntry(args: {
 
 function serviceRecordData(service: ServiceRecord): Record<string, unknown> {
   return { ...withComputed(service) };
+}
+
+function artifactSnapshot(artifact: Artifact): Record<string, unknown> {
+  return {
+    name: artifact.name,
+    artifact_type: artifact.artifact_type,
+    owner_team: artifact.owner_team,
+    status: artifact.status,
+    version: artifact.version,
+    visibility: artifact.visibility,
+    link_url: artifact.link_url,
+    description: artifact.description,
+    review_cadence: artifact.review_cadence,
+    last_reviewed_date: artifact.last_reviewed_date,
+    next_review_date: artifact.next_review_date,
+  };
+}
+
+function cleanLinkNote(value: string | null | undefined): string | null {
+  const text = value?.trim() ?? "";
+  if (text.length > 500) throw new Error("Keep the relationship note under 500 characters.");
+  return text.length > 0 ? text : null;
 }
 
 function cleanNote(value: string | null | undefined): string | null {

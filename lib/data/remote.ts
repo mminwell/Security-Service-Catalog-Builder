@@ -1,8 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseColumnConfig } from "@/lib/catalog/columns";
+import { withArtifactComputed } from "@/lib/catalog/artifacts";
 import { withComputed } from "@/lib/catalog/service";
 import type { FrameworkElement, FrameworkRelease } from "@/lib/catalog/framework";
 import type {
+  Artifact,
+  ArtifactLink,
   AuditEntry,
   ExportProfile,
   FieldDefinition,
@@ -13,6 +16,7 @@ import type {
   ServiceCodeMode,
   ServiceRecord,
   Tenant,
+  Visibility,
 } from "@/lib/catalog/types";
 import type { ExportLogMeta } from "@/lib/catalog/export-plan";
 import type { PlannedElement } from "@/lib/catalog/framework-import";
@@ -44,7 +48,7 @@ export async function hydrateFromSupabase(supabase: SupabaseClient): Promise<Hyd
     return { db: { ...emptyDb(), session }, warning: null };
   }
 
-  const [fields, lookups, services, members, audit, frameworks, elements, mappings, profiles] = await Promise.all([
+  const [fields, lookups, services, members, audit, frameworks, elements, mappings, profiles, artifacts, artifactLinks] = await Promise.all([
     supabase.from("field_definitions").select("*").in("tenant_id", ids),
     supabase.from("lookup_options").select("*").in("tenant_id", ids),
     supabase.from("services").select("*").in("tenant_id", ids),
@@ -54,8 +58,10 @@ export async function hydrateFromSupabase(supabase: SupabaseClient): Promise<Hyd
     supabase.from("framework_elements").select("*").order("sort_order"),
     supabase.from("service_outcome_mappings").select("*").in("tenant_id", ids),
     supabase.from("export_profiles").select("*").in("tenant_id", ids),
+    supabase.from("artifacts").select("*").in("tenant_id", ids).order("name"),
+    supabase.from("artifact_service_links").select("*").in("tenant_id", ids),
   ]);
-  for (const result of [fields, lookups, services, frameworks, elements, mappings, profiles]) {
+  for (const result of [fields, lookups, services, frameworks, elements, mappings, profiles, artifacts, artifactLinks]) {
     if (result.error) throw new Error(result.error.message);
   }
   if (members.error) throw new Error(members.error.message);
@@ -73,6 +79,8 @@ export async function hydrateFromSupabase(supabase: SupabaseClient): Promise<Hyd
       fields: (fields.data ?? []).map(asField),
       lookups: (lookups.data ?? []).map(asLookup),
       services: (services.data ?? []).map(asService),
+      artifacts: (artifacts.data ?? []).map(asArtifact),
+      artifactLinks: (artifactLinks.data ?? []).map(asArtifactLink),
       frameworks: (frameworks.data ?? []).map(asFramework),
       elements: (elements.data ?? []).map(asElement),
       mappings: (mappings.data ?? []).map(asMapping),
@@ -136,6 +144,51 @@ export async function persistService(supabase: SupabaseClient, service: ServiceR
     updated_by: service.updated_by,
   };
   const { error } = await supabase.from("services").upsert(row);
+  if (error) throw new Error(error.message);
+}
+
+export async function persistArtifact(supabase: SupabaseClient, artifact: Artifact): Promise<void> {
+  const row = {
+    id: artifact.id,
+    tenant_id: artifact.tenant_id,
+    name: artifact.name,
+    artifact_type: artifact.artifact_type,
+    owner_team: artifact.owner_team,
+    status: artifact.status,
+    version: artifact.version,
+    review_cadence: artifact.review_cadence,
+    last_reviewed_date: artifact.last_reviewed_date,
+    link_url: artifact.link_url,
+    description: artifact.description,
+    visibility: artifact.visibility,
+    created_at: artifact.created_at,
+    created_by: artifact.created_by,
+    updated_by: artifact.updated_by,
+  };
+  const { error } = await supabase.from("artifacts").upsert(row);
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteArtifactRow(supabase: SupabaseClient, artifactId: string): Promise<void> {
+  const { error } = await supabase.from("artifacts").delete().eq("id", artifactId);
+  if (error) throw new Error(error.message);
+}
+
+export async function persistArtifactLink(supabase: SupabaseClient, link: ArtifactLink): Promise<void> {
+  const { error } = await supabase.from("artifact_service_links").upsert({
+    id: link.id,
+    tenant_id: link.tenant_id,
+    artifact_id: link.artifact_id,
+    service_id: link.service_id,
+    relationship_note: link.relationship_note,
+    created_by: link.created_by,
+    created_at: link.created_at,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteArtifactLinkRow(supabase: SupabaseClient, linkId: string): Promise<void> {
+  const { error } = await supabase.from("artifact_service_links").delete().eq("id", linkId);
   if (error) throw new Error(error.message);
 }
 
@@ -554,6 +607,41 @@ function asService(row: Record<string, unknown>): ServiceRecord {
     created_at: String(row.created_at ?? new Date().toISOString()),
     updated_at: String(row.updated_at ?? new Date().toISOString()),
   });
+}
+
+function asArtifact(row: Record<string, unknown>): Artifact {
+  const visibility: Visibility = row.visibility === "public" ? "public" : "internal";
+  return withArtifactComputed({
+    id: String(row.id),
+    tenant_id: String(row.tenant_id),
+    name: String(row.name ?? ""),
+    artifact_type: String(row.artifact_type ?? ""),
+    owner_team: textOrNull(row.owner_team),
+    status: textOrNull(row.status),
+    version: textOrNull(row.version),
+    review_cadence: textOrNull(row.review_cadence),
+    last_reviewed_date: textOrNull(row.last_reviewed_date),
+    next_review_date: textOrNull(row.next_review_date),
+    link_url: textOrNull(row.link_url),
+    description: textOrNull(row.description),
+    visibility,
+    created_by: textOrNull(row.created_by),
+    updated_by: textOrNull(row.updated_by),
+    created_at: String(row.created_at ?? new Date().toISOString()),
+    updated_at: String(row.updated_at ?? new Date().toISOString()),
+  });
+}
+
+function asArtifactLink(row: Record<string, unknown>): ArtifactLink {
+  return {
+    id: String(row.id),
+    tenant_id: String(row.tenant_id),
+    artifact_id: String(row.artifact_id),
+    service_id: String(row.service_id),
+    relationship_note: textOrNull(row.relationship_note),
+    created_by: textOrNull(row.created_by),
+    created_at: String(row.created_at ?? new Date().toISOString()),
+  };
 }
 
 type MemberRow = {

@@ -193,6 +193,8 @@ export function CatalogScreen() {
           frameworks={api.frameworks}
           mappings={api.mappings}
           tenantId={tenant.id}
+          artifacts={api.artifacts}
+          artifactLinks={api.artifactLinks}
           onClose={() => setExportOpen(false)}
           onSaveProfile={(input) => api.saveExportProfile(input)}
           onDeleteProfile={(profileId) => api.deleteExportProfile(profileId)}

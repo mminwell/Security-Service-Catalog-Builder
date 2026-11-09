@@ -22,6 +22,7 @@ describe("primary navigation", () => {
     expect(primaryNavFor(true).map((item) => item.label)).toEqual([
       "Catalog",
       "Coverage",
+      "Artifacts",
       "Fields",
       "Lookups",
       SHOP_FREE_BLUEPRINTS_LABEL,
@@ -29,12 +30,14 @@ describe("primary navigation", () => {
     expect(primaryNavFor(false).map((item) => item.label)).toEqual([
       "Catalog",
       "Coverage",
+      "Artifacts",
       SHOP_FREE_BLUEPRINTS_LABEL,
     ]);
     expect(primaryNavFor(true).find((item) => item.cart)?.href).toBe("/blueprints");
     expect(primaryNavFor(true).map((item) => item.href)).toEqual([
       "/catalog",
       "/coverage",
+      "/artifacts",
       "/admin/fields",
       "/admin/lookups",
       "/blueprints",

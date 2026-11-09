@@ -157,7 +157,7 @@ describe("workbook, Word, and PDF", () => {
       audience: "public",
       marking: distributionMarking("Acme Corp", "public"),
     });
-    expect(sheets.map((sheet) => sheet.name)).toEqual(["Services", "Fields", "Lookups", "Mappings", "Coverage"]);
+    expect(sheets.map((sheet) => sheet.name)).toEqual(["Services", "Fields", "Lookups", "Mappings", "Coverage", "Artifacts"]);
     const bytes = buildXlsx(sheets);
     expect(String.fromCharCode(...bytes.slice(0, 2))).toBe("PK");
     const sheet = zipText(bytes, "xl/worksheets/sheet1.xml");

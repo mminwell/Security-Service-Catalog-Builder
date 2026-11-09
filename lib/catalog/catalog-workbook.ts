@@ -1,8 +1,10 @@
+import { artifactExportMatrix } from "@/lib/catalog/artifacts";
 import { aggregateCoverage } from "@/lib/catalog/coverage";
+import { localToday } from "@/lib/catalog/present";
 import { formatExportValue } from "@/lib/catalog/export-value";
 import { elementsInScope } from "@/lib/catalog/framework-catalog";
 import type { FrameworkElement, FrameworkRelease } from "@/lib/catalog/framework";
-import type { FieldDefinition, LookupOption, OutcomeMapping, ServiceRecord, Visibility } from "@/lib/catalog/types";
+import type { Artifact, ArtifactLink, FieldDefinition, LookupOption, OutcomeMapping, ServiceRecord, Visibility } from "@/lib/catalog/types";
 import { buildXlsx, type WorkbookSheet } from "@/lib/catalog/xlsx";
 
 const COVERAGE_LABEL = { full: "Full", partial: "Partial", none: "None", unmapped: "Unmapped" } as const;
@@ -17,6 +19,9 @@ export function buildCatalogWorkbook(args: {
   tenantId: string;
   audience: Visibility;
   marking: string | null;
+  artifacts?: Artifact[];
+  artifactLinks?: ArtifactLink[];
+  today?: string;
 }): Uint8Array {
   const sheets = catalogSheets(args);
   return buildXlsx(sheets);
@@ -32,6 +37,9 @@ export function catalogSheets(args: {
   tenantId: string;
   audience: Visibility;
   marking: string | null;
+  artifacts?: Artifact[];
+  artifactLinks?: ArtifactLink[];
+  today?: string;
 }): WorkbookSheet[] {
   return [
     servicesSheet(args.services, args.fields, args.lookups, args.marking),
@@ -39,6 +47,7 @@ export function catalogSheets(args: {
     lookupsSheet(args.fields, args.lookups, args.marking),
     mappingsSheet(args),
     coverageSheet(args),
+    artifactsSheet(args),
   ];
 }
 
@@ -46,6 +55,29 @@ function withMarking(marking: string | null, header: string[], body: string[][])
   if (!marking) return { rows: [header, ...body], headerRow: 0 };
   const banner = [marking, ...Array.from({ length: Math.max(0, header.length - 1) }, () => "")];
   return { rows: [banner, header, ...body], headerRow: 1 };
+}
+
+function artifactsSheet(args: {
+  services: ServiceRecord[];
+  fields: FieldDefinition[];
+  lookups: LookupOption[];
+  artifacts?: Artifact[];
+  artifactLinks?: ArtifactLink[];
+  audience: Visibility;
+  marking: string | null;
+  today?: string;
+}): WorkbookSheet {
+  const table = artifactExportMatrix({
+    audience: args.audience,
+    includeServiceCode: args.fields.some((field) => field.field_key === "service_code"),
+    services: args.services,
+    artifacts: args.artifacts ?? [],
+    links: args.artifactLinks ?? [],
+    lookups: args.lookups,
+    today: args.today ?? localToday(),
+  });
+  const body = table.body.length > 0 ? table.body : [["No artifacts in this export."]];
+  return { name: "Artifacts", ...withMarking(args.marking, table.header, body) };
 }
 
 function servicesSheet(
