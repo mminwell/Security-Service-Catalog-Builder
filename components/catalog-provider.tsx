@@ -11,15 +11,44 @@ import {
   type ReactNode,
 } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { canAdminister, canProvision, canWriteServices } from "@/lib/catalog/access";
+import {
+  archiveServiceAction,
+  checkoutBlueprintsAction,
+  createWorkspaceAction,
+  deleteArtifactAction,
+  deleteArtifactLinkAction,
+  deleteExportProfileAction,
+  deleteServiceAction,
+  importArtifactsAction,
+  importFrameworkAction,
+  importLookupsAction,
+  insertLookupAction,
+  inviteMemberAction,
+  loadSampleCatalogAction,
+  recordExportAction,
+  removeOutcomeMappingAction,
+  saveArtifactAction,
+  saveArtifactLinkAction,
+  saveCatalogColumnsAction,
+  saveExportProfilesAction,
+  saveFieldAction,
+  saveFieldsAction,
+  saveLookupAction,
+  saveOutcomeMappingAction,
+  saveServiceAction,
+  setServiceCodeModeAction,
+  setTenantLogoAction,
+} from "@/app/actions/catalog";
+import { friendlyAuthError } from "@/lib/auth/messages";
+import { normalizeEmail, validateEmail, validatePassword } from "@/lib/auth/credentials";
+import { canAdminister, canGrantPlatformOwner, canProvision, canWriteServices, roleLabel } from "@/lib/catalog/access";
 import { planBlueprintCheckout } from "@/lib/catalog/checkout";
 import type { ExportLogMeta } from "@/lib/catalog/export-plan";
 import type { FieldGroupId } from "@/lib/catalog/fields";
 import { isIdentityField } from "@/lib/catalog/fields";
 import type { PlannedElement } from "@/lib/catalog/framework-import";
-import type { ExportProfile } from "@/lib/catalog/types";
+import type { ExportProfile, Invitation } from "@/lib/catalog/types";
 import { optionByCode } from "@/lib/catalog/lookups";
-import { normalizeLogoInput } from "@/lib/catalog/logos";
 import { localToday } from "@/lib/catalog/present";
 import type { FrameworkElement, FrameworkRelease } from "@/lib/catalog/framework";
 import type { PlannedArtifactImport } from "@/lib/catalog/artifacts";
@@ -36,72 +65,24 @@ import type {
   Tenant,
 } from "@/lib/catalog/types";
 import {
-  addLookup as addLookupRow,
-  addMember as addMemberRow,
-  createTenant as createTenantRow,
-  loadSampleServices as loadSampleRows,
-  checkoutServices,
-  deleteExportProfile as deleteExportProfileRow,
-  deleteArtifact as deleteArtifactRowModel,
-  deleteArtifactLink as deleteArtifactLinkModel,
-  deleteService as deleteServiceRecord,
   importArtifacts as importArtifactRows,
-  importFrameworkRows,
-  importLookups as importLookupRowsModel,
-  removeOutcomeMapping as removeOutcomeMappingRow,
-  resetDemo,
   roleFor,
-  recordExport as recordExportRow,
   saveExportProfile as saveExportProfileRow,
-  saveField as saveFieldRow,
   setFieldLookup as setFieldLookupRow,
-  saveLookup as saveLookupRow,
   saveOutcomeMapping as saveOutcomeMappingRow,
   saveArtifact as saveArtifactRow,
   saveArtifactLink as saveArtifactLinkRow,
-  saveService as saveServiceRow,
-  setServiceArchived,
-  setCatalogColumns as setCatalogColumnsRow,
   setFieldGroup as setFieldGroupRow,
-  setServiceCodeMode as setModeRow,
-  setTenantLogo as setTenantLogoRow,
-  signInDemo,
-  signOutDemo,
   switchTenant as switchTenantRow,
   type CatalogDb,
 } from "@/lib/data/model";
-import {
-  checkoutBlueprintRows,
-  deleteExportProfileRow as deleteExportProfileRemote,
-  deleteOutcomeMappingRow as deleteOutcomeMappingRemote,
-  deleteArtifactLinkRow,
-  deleteArtifactRow,
-  deleteServiceRow,
-  hydrateFromSupabase,
-  importFrameworkRowsRemote,
-  logCatalogExport,
-  persistArtifact,
-  persistArtifactLink,
-  persistExportProfile,
-  importLookupRows,
-  insertLookup,
-  persistCatalogColumns,
-  persistField,
-  persistLookup,
-  persistOutcomeMapping,
-  persistService,
-  persistServiceArchived,
-  persistTenantLogo,
-  persistTenantMode,
-} from "@/lib/data/remote";
-import { loadDemoDb, persistDemoDb, writeActiveTenantId } from "@/lib/data/storage";
+import { hydrateFromSupabase } from "@/lib/data/remote";
+import { writeActiveTenantId } from "@/lib/data/storage";
 import { createBrowserSupabase } from "@/lib/supabase/browser";
-import { isSupabaseConfigured } from "@/lib/supabase/env";
-import { uniqueSlug } from "@/lib/catalog/service-code";
+import type { ActionResult } from "@/lib/server/result";
 
 type CatalogApi = {
   ready: boolean;
-  mode: "demo" | "supabase";
   error: string | null;
   warning: string | null;
   clearError: () => void;
@@ -112,6 +93,7 @@ type CatalogApi = {
   canWrite: boolean;
   canAdmin: boolean;
   canCreateWorkspace: boolean;
+  canGrantOwner: boolean;
   fields: FieldDefinition[];
   lookups: LookupOption[];
   services: ServiceRecord[];
@@ -124,8 +106,11 @@ type CatalogApi = {
   exportProfiles: ExportProfile[];
   audit: AuditEntryLike[];
   members: Member[];
+  invitations: Invitation[];
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<string | null>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
   signOut: () => Promise<void>;
   switchTenant: (tenantId: string) => void;
   createTenant: (name: string) => Promise<void>;
@@ -148,7 +133,7 @@ type CatalogApi = {
   }) => Promise<void>;
   saveField: (field: FieldDefinition) => Promise<void>;
   setFieldLookup: (fieldId: string, enabled: boolean) => Promise<void>;
-  addMember: (email: string, role: Role) => Promise<void>;
+  addMember: (email: string, role: Role) => Promise<string>;
   setTenantLogo: (logoUrl: string | null) => Promise<void>;
   archiveService: (serviceId: string, archived: boolean) => Promise<ServiceRecord>;
   deleteService: (serviceId: string) => Promise<void>;
@@ -182,7 +167,6 @@ type CatalogApi = {
     notes?: string | null;
   }) => Promise<void>;
   removeOutcomeMapping: (mappingId: string) => Promise<void>;
-  resetDemoData: () => void;
 };
 
 type AuditEntryLike = CatalogDb["audit"][number];
@@ -190,28 +174,32 @@ type AuditEntryLike = CatalogDb["audit"][number];
 const CatalogContext = createContext<CatalogApi | null>(null);
 
 export function CatalogProvider({ children }: { children: ReactNode }) {
-  const mode = isSupabaseConfigured() ? "supabase" : "demo";
   const [db, setDb] = useState<CatalogDb | null>(null);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const supabaseRef = useRef<SupabaseClient | null>(null);
 
+  const reload = useCallback(async () => {
+    const supabase = supabaseRef.current;
+    if (!supabase) return;
+    const result = await hydrateFromSupabase(supabase);
+    setDb(result.db);
+    setInvitations(result.invitations);
+    setWarning(result.warning);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        if (mode === "demo") {
-          const next = loadDemoDb();
-          persistDemoDb(next);
-          if (!cancelled) setDb(next);
-          return;
-        }
         const supabase = createBrowserSupabase();
         supabaseRef.current = supabase;
         const result = await hydrateFromSupabase(supabase);
         if (!cancelled) {
           setDb(result.db);
+          setInvitations(result.invitations);
           setWarning(result.warning);
         }
       } catch (err) {
@@ -224,22 +212,10 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [mode]);
+  }, []);
 
-  const commit = useCallback(
-    (next: CatalogDb) => {
-      setDb(next);
-      if (mode === "demo") persistDemoDb(next);
-    },
-    [mode],
-  );
-
-  const reload = useCallback(async () => {
-    const supabase = supabaseRef.current;
-    if (!supabase) return;
-    const result = await hydrateFromSupabase(supabase);
-    setDb(result.db);
-    setWarning(result.warning);
+  const commit = useCallback((next: CatalogDb) => {
+    setDb(next);
   }, []);
 
   const guard = useCallback(async <T,>(action: () => Promise<T>): Promise<T> => {
@@ -268,10 +244,10 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     const exportProfiles = db?.exportProfiles.filter((profile) => profile.tenant_id === tenantId) ?? [];
     const audit = db?.audit.filter((entry) => entry.tenant_id === tenantId) ?? [];
     const members = db?.members.filter((member) => member.tenant_id === tenantId) ?? [];
+    const pendingInvites = invitations.filter((invite) => invite.tenant_id === tenantId);
 
     return {
       ready,
-      mode,
       error,
       warning,
       clearError: () => setError(null),
@@ -282,6 +258,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       canWrite: canWriteServices(role),
       canAdmin: canAdminister(role),
       canCreateWorkspace: canProvision(role),
+      canGrantOwner: canGrantPlatformOwner(role),
       fields,
       lookups,
       services,
@@ -294,45 +271,64 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       exportProfiles,
       audit,
       members,
+      invitations: pendingInvites,
       signIn: (email, password) =>
         guard(async () => {
-          if (mode === "demo") {
-            if (!db) return;
-            void password;
-            commit(signInDemo(db, email));
-            return;
-          }
-          const supabase = supabaseRef.current ?? createBrowserSupabase();
-          supabaseRef.current = supabase;
-          const { error: signError } = await supabase.auth.signInWithPassword({ email, password });
-          if (signError) throw new Error(signError.message);
+          const emailError = validateEmail(email);
+          if (emailError) throw new Error(emailError);
+          const passwordError = validatePassword(password);
+          if (passwordError) throw new Error(passwordError);
+          const supabase = browserSupabase(supabaseRef);
+          const { error: signError } = await supabase.auth.signInWithPassword({
+            email: normalizeEmail(email),
+            password,
+          });
+          if (signError) throw new Error(friendlyAuthError(signError.message));
           await reload();
         }),
       signUp: (email, password) =>
         guard(async () => {
-          if (mode === "demo") {
-            if (!db) return null;
-            commit(signInDemo(db, email));
-            return null;
-          }
-          const supabase = supabaseRef.current ?? createBrowserSupabase();
-          supabaseRef.current = supabase;
-          const { data, error: signError } = await supabase.auth.signUp({ email, password });
-          if (signError) throw new Error(signError.message);
-          if (!data.session) {
-            return "Check your email to confirm the account, then sign in. For a local project, turn off email confirmation in the Supabase Auth settings.";
-          }
+          const emailError = validateEmail(email);
+          if (emailError) throw new Error(emailError);
+          const passwordError = validatePassword(password);
+          if (passwordError) throw new Error(passwordError);
+          const supabase = browserSupabase(supabaseRef);
+          const origin = window.location.origin;
+          const { data, error: signError } = await supabase.auth.signUp({
+            email: normalizeEmail(email),
+            password,
+            options: { emailRedirectTo: `${origin}/auth/callback?next=/catalog` },
+          });
+          if (signError) throw new Error(friendlyAuthError(signError.message));
+          if (!data.session) return "Check your email to confirm the account, then sign in.";
           await reload();
           return null;
         }),
+      requestPasswordReset: (email) =>
+        guard(async () => {
+          const emailError = validateEmail(email);
+          if (emailError) throw new Error(emailError);
+          const supabase = browserSupabase(supabaseRef);
+          const { error: resetError } = await supabase.auth.resetPasswordForEmail(normalizeEmail(email), {
+            redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset`,
+          });
+          if (resetError && /rate/i.test(resetError.message)) throw new Error(friendlyAuthError(resetError.message));
+        }),
+      updatePassword: (password) =>
+        guard(async () => {
+          const passwordError = validatePassword(password);
+          if (passwordError) throw new Error(passwordError);
+          const supabase = browserSupabase(supabaseRef);
+          const { data } = await supabase.auth.getUser();
+          if (!data.user) throw new Error("Open the reset link from your email, then choose a new password.");
+          const { error: updateError } = await supabase.auth.updateUser({ password });
+          if (updateError) throw new Error(friendlyAuthError(updateError.message));
+        }),
       signOut: () =>
         guard(async () => {
-          if (mode === "demo") {
-            if (db) commit(signOutDemo(db));
-            return;
-          }
           await supabaseRef.current?.auth.signOut();
           setDb((current) => (current ? { ...current, session: null } : current));
+          setInvitations([]);
           setWarning(null);
         }),
       switchTenant: (nextId: string) => {
@@ -342,177 +338,89 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       },
       createTenant: (name: string) =>
         guard(async () => {
-          if (!db) return;
-          if (mode === "demo") {
-            const next = createTenantRow(db, name);
-            commit(next);
-            if (next.activeTenantId) writeActiveTenantId(next.activeTenantId);
-            return;
-          }
-          const supabase = supabaseRef.current;
-          if (!supabase) throw new Error("Supabase is not connected.");
-          const slug = uniqueSlug(
-            name,
-            db.tenants.map((tenant) => tenant.slug),
-          );
-          const { data, error: rpcError } = await supabase.rpc("provision_tenant", {
-            p_name: name.trim(),
-            p_slug: slug,
-          });
-          if (rpcError) throw new Error(rpcError.message);
-          if (typeof data === "string") writeActiveTenantId(data);
+          const created = await unwrap(createWorkspaceAction(name));
+          writeActiveTenantId(created.id);
           await reload();
         }),
       setServiceCodeMode: (nextMode: ServiceCodeMode) =>
         guard(async () => {
-          if (!db || !tenantId) return;
-          if (mode === "demo") {
-            commit(setModeRow(db, nextMode));
-            return;
-          }
-          const supabase = supabaseRef.current;
-          if (!supabase) throw new Error("Supabase is not connected.");
-          await persistTenantMode(supabase, tenantId, nextMode);
+          if (!tenantId) return;
+          await unwrap(setServiceCodeModeAction(tenantId, nextMode));
           await reload();
         }),
       loadSampleServices: () =>
         guard(async () => {
-          if (!db) return;
-          if (mode === "demo") {
-            commit(loadSampleRows(db));
-            return;
-          }
-          const supabase = supabaseRef.current;
-          if (!supabase || !tenantId) throw new Error("Choose a workspace first.");
-          const { error: rpcError } = await supabase.rpc("load_starter_sample_services", {
-            p_tenant_id: tenantId,
-          });
-          if (rpcError) throw new Error(rpcError.message);
+          if (!tenantId) throw new Error("Choose a workspace first.");
+          await unwrap(loadSampleCatalogAction(tenantId));
           await reload();
         }),
       saveService: (service: ServiceRecord) =>
         guard(async () => {
           if (!db) throw new Error("The catalog is still loading.");
-          if (mode === "demo") {
-            commit(saveServiceRow(db, service));
-            return service.id;
-          }
-          const supabase = supabaseRef.current;
-          if (!supabase) throw new Error("Supabase is not connected.");
-          await persistService(supabase, service);
+          await unwrap(saveServiceAction(service));
           await reload();
           return service.id;
         }),
       saveLookup: (option: LookupOption) =>
         guard(async () => {
-          if (!db) return;
-          if (mode === "demo") {
-            commit(saveLookupRow(db, option));
-            return;
-          }
-          const supabase = supabaseRef.current;
-          if (!supabase) throw new Error("Supabase is not connected.");
-          await persistLookup(supabase, option);
+          await unwrap(saveLookupAction(option));
           await reload();
         }),
       addLookup: (input) =>
         guard(async () => {
-          if (!db || !tenantId) return;
-          if (mode === "demo") {
-            commit(addLookupRow(db, input));
-            return;
-          }
-          const supabase = supabaseRef.current;
-          if (!supabase) throw new Error("Supabase is not connected.");
-          const code = input.code.trim().toLowerCase();
+          if (!tenantId) return;
           const option: LookupOption = {
             id: crypto.randomUUID(),
             tenant_id: tenantId,
             field_key: input.field_key,
-            code,
+            code: input.code.trim().toLowerCase(),
             label: input.label.trim(),
             description: input.description.trim() || null,
             code_prefix: input.code_prefix.trim() ? input.code_prefix.trim().toUpperCase() : null,
             sort_order: input.sort_order,
             is_active: true,
           };
-          await insertLookup(supabase, option);
+          await unwrap(insertLookupAction(option));
           await reload();
         }),
       setFieldLookup: (fieldId, enabled) =>
         guard(async () => {
           if (!db) throw new Error("The catalog is still loading.");
           const next = setFieldLookupRow(db, fieldId, enabled);
-          if (mode === "demo") {
-            commit(next);
-            return;
-          }
-          const supabase = supabaseRef.current;
-          if (!supabase) throw new Error("Supabase is not connected.");
           const saved = next.fields.find((field) => field.id === fieldId);
           if (!saved) throw new Error("That field is not in this workspace.");
-          await persistField(supabase, saved);
+          await unwrap(saveFieldAction(saved));
           await reload();
         }),
       saveField: (field: FieldDefinition) =>
         guard(async () => {
-          if (!db) return;
           if (isIdentityField(field.field_key) && field.is_active === false) {
             throw new Error("Service code and name stay active so every service remains identifiable.");
           }
-          if (mode === "demo") {
-            commit(saveFieldRow(db, field));
-            return;
-          }
-          const supabase = supabaseRef.current;
-          if (!supabase) throw new Error("Supabase is not connected.");
-          await persistField(supabase, field);
+          await unwrap(saveFieldAction(field));
           await reload();
         }),
       addMember: (email: string, memberRole: Role) =>
         guard(async () => {
-          if (!db || !tenantId) return;
-          if (mode === "demo") {
-            commit(addMemberRow(db, email, memberRole));
-            return;
-          }
-          const supabase = supabaseRef.current;
-          if (!supabase) throw new Error("Supabase is not connected.");
-          const { error: rpcError } = await supabase.rpc("add_tenant_member", {
-            p_tenant: tenantId,
-            p_email: email.trim(),
-            p_role: memberRole,
-          });
-          if (rpcError) throw new Error(rpcError.message);
+          if (!tenantId) throw new Error("Choose a workspace.");
+          const result = await unwrap(inviteMemberAction(tenantId, email, memberRole));
           await reload();
+          if (result.status === "invited") {
+            return `Invitation saved. They join this workspace when they sign up with that email.`;
+          }
+          return `Added as ${roleLabel(memberRole)}.`;
         }),
       setTenantLogo: (logoUrl: string | null) =>
         guard(async () => {
-          if (!db || !tenantId) throw new Error("Choose a workspace.");
-          const normalized = normalizeLogoInput(logoUrl);
-          if (mode === "demo") {
-            commit(setTenantLogoRow(db, normalized));
-            return;
-          }
-          const supabase = supabaseRef.current;
-          if (!supabase) throw new Error("Supabase is not connected.");
-          await persistTenantLogo(supabase, tenantId, normalized);
+          if (!tenantId) throw new Error("Choose a workspace.");
+          await unwrap(setTenantLogoAction(tenantId, logoUrl));
           await reload();
         }),
       archiveService: (serviceId: string, archived: boolean) =>
         guard(async () => {
           if (!db) throw new Error("The catalog is still loading.");
-          if (mode === "demo") {
-            const next = setServiceArchived(db, serviceId, archived);
-            commit(next);
-            const saved = next.services.find((service) => service.id === serviceId);
-            if (!saved) throw new Error("That service is not in this workspace.");
-            return saved;
-          }
-          const supabase = supabaseRef.current;
-          if (!supabase) throw new Error("Supabase is not connected.");
           const now = new Date().toISOString();
-          await persistServiceArchived(supabase, serviceId, archived ? now : null);
+          await unwrap(archiveServiceAction(serviceId, archived ? now : null));
           await reload();
           const current = db.services.find((service) => service.id === serviceId);
           if (!current) throw new Error("That service is not in this workspace.");
@@ -521,29 +429,14 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       deleteService: (serviceId: string) =>
         guard(async () => {
           if (!db) throw new Error("The catalog is still loading.");
-          if (!canAdminister(role)) {
-            throw new Error("Only a workspace admin can permanently delete a service.");
-          }
-          if (mode === "demo") {
-            commit(deleteServiceRecord(db, serviceId));
-            return;
-          }
-          const supabase = supabaseRef.current;
-          if (!supabase) throw new Error("Supabase is not connected.");
-          await deleteServiceRow(supabase, serviceId);
+          if (!canAdminister(role)) throw new Error("Only an Admin can permanently delete a service.");
+          await unwrap(deleteServiceAction(serviceId));
           await reload();
         }),
       importLookups: (fieldKey, rows) =>
         guard(async () => {
-          if (!db || !tenantId) throw new Error("Choose a workspace.");
-          if (mode === "demo") {
-            const result = importLookupRowsModel(db, fieldKey, rows);
-            commit(result.db);
-            return { created: result.created, updated: result.updated };
-          }
-          const supabase = supabaseRef.current;
-          if (!supabase) throw new Error("Supabase is not connected.");
-          const result = await importLookupRows(supabase, tenantId, fieldKey, rows);
+          if (!tenantId) throw new Error("Choose a workspace.");
+          const result = await unwrap(importLookupsAction(tenantId, fieldKey, rows));
           await reload();
           return result;
         }),
@@ -564,220 +457,125 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
             now: new Date().toISOString(),
           });
           if (planned.length === 0) throw new Error("Nothing in the cart matches a blueprint.");
-          if (mode === "demo") {
-            commit(checkoutServices(db, planned));
-            return;
-          }
-          const supabase = supabaseRef.current;
-          if (!supabase) throw new Error("Supabase is not connected.");
-          await checkoutBlueprintRows(supabase, tenantId, planned);
+          await unwrap(checkoutBlueprintsAction(tenantId, planned));
           await reload();
         }),
       saveOutcomeMapping: (input) =>
         guard(async () => {
           if (!db) throw new Error("The catalog is still loading.");
           const next = saveOutcomeMappingRow(db, input);
-          if (mode === "demo") {
-            commit(next);
-            return;
-          }
-          const supabase = supabaseRef.current;
-          if (!supabase) throw new Error("Supabase is not connected.");
           const mapping = next.mappings.find(
             (item) => item.service_id === input.serviceId && item.element_id === input.elementId,
           );
           if (!mapping) throw new Error("The assessment could not be saved.");
-          await persistOutcomeMapping(supabase, mapping);
+          await unwrap(saveOutcomeMappingAction(mapping));
           await reload();
         }),
       removeOutcomeMapping: (mappingId: string) =>
         guard(async () => {
-          if (!db) throw new Error("The catalog is still loading.");
-          const next = removeOutcomeMappingRow(db, mappingId);
-          if (mode === "demo") {
-            commit(next);
-            return;
-          }
-          const supabase = supabaseRef.current;
-          if (!supabase) throw new Error("Supabase is not connected.");
-          await deleteOutcomeMappingRemote(supabase, mappingId);
+          await unwrap(removeOutcomeMappingAction(mappingId));
           await reload();
         }),
       setFieldGroup: (group, active) =>
         guard(async () => {
-          if (!db) throw new Error("The catalog is still loading.");
-          if (mode === "demo") {
-            commit(setFieldGroupRow(db, group, active));
-            return;
-          }
-          const supabase = supabaseRef.current;
-          if (!supabase || !tenantId) throw new Error("Supabase is not connected.");
+          if (!db || !tenantId) throw new Error("The catalog is still loading.");
           const next = setFieldGroupRow(db, group, active);
           const changed = next.fields.filter((field) => field.tenant_id === tenantId && field.field_group === group);
-          for (const field of changed) await persistField(supabase, field);
+          await unwrap(saveFieldsAction(changed));
           await reload();
         }),
       saveExportProfile: (input) =>
         guard(async () => {
-          if (!db) throw new Error("The catalog is still loading.");
+          if (!db || !tenantId) throw new Error("The catalog is still loading.");
           const next = saveExportProfileRow(db, input);
-          if (mode === "demo") {
-            commit(next);
-            return;
-          }
-          const supabase = supabaseRef.current;
-          if (!supabase || !tenantId) throw new Error("Supabase is not connected.");
           const saved = next.exportProfiles.find(
             (profile) => profile.tenant_id === tenantId && profile.name.trim().toLowerCase() === input.name.trim().toLowerCase(),
           );
           if (!saved) throw new Error("The profile could not be saved.");
-          await persistExportProfile(supabase, saved);
+          const profiles = [saved];
           if (saved.is_default) {
             for (const profile of next.exportProfiles) {
               if (profile.tenant_id === tenantId && profile.id !== saved.id && profile.is_default === false) {
                 const previous = db.exportProfiles.find((item) => item.id === profile.id);
-                if (previous?.is_default) await persistExportProfile(supabase, profile);
+                if (previous?.is_default) profiles.push(profile);
               }
             }
           }
+          await unwrap(saveExportProfilesAction(profiles));
           await reload();
         }),
       deleteExportProfile: (profileId) =>
         guard(async () => {
-          if (!db) throw new Error("The catalog is still loading.");
-          const next = deleteExportProfileRow(db, profileId);
-          if (mode === "demo") {
-            commit(next);
-            return;
-          }
-          const supabase = supabaseRef.current;
-          if (!supabase) throw new Error("Supabase is not connected.");
-          await deleteExportProfileRemote(supabase, profileId);
+          await unwrap(deleteExportProfileAction(profileId));
           await reload();
         }),
       importFramework: (frameworkId, planned) =>
         guard(async () => {
-          if (!db) throw new Error("The catalog is still loading.");
+          if (!db || !tenantId) throw new Error("The catalog is still loading.");
           const framework = db.frameworks.find((item) => item.id === frameworkId);
-          const next = importFrameworkRows(db, frameworkId, planned);
-          if (mode === "demo") {
-            commit(next);
-            return;
-          }
-          const supabase = supabaseRef.current;
-          if (!supabase || !tenantId || !framework) throw new Error("Supabase is not connected.");
-          await importFrameworkRowsRemote(supabase, tenantId, frameworkId, framework.version, planned);
+          if (!framework) throw new Error("That framework is not available.");
+          await unwrap(importFrameworkAction(tenantId, frameworkId, framework.version, planned));
           await reload();
         }),
       recordExport: (meta) =>
         guard(async () => {
-          if (!db || !tenantId) throw new Error("The catalog is still loading.");
-          if (mode === "demo") {
-            commit(recordExportRow(db, meta));
-            return;
-          }
-          const supabase = supabaseRef.current;
-          if (!supabase) throw new Error("Supabase is not connected.");
-          await logCatalogExport(supabase, tenantId, meta);
+          if (!tenantId) throw new Error("The catalog is still loading.");
+          await unwrap(recordExportAction(tenantId, meta));
           await reload();
         }),
       saveCatalogColumns: (keys) =>
         guard(async () => {
-          if (!db || !tenantId) throw new Error("Choose a workspace.");
-          if (mode === "demo") {
-            commit(setCatalogColumnsRow(db, keys));
-            return;
-          }
-          const supabase = supabaseRef.current;
-          if (!supabase) throw new Error("Supabase is not connected.");
-          await persistCatalogColumns(supabase, tenantId, keys);
+          if (!tenantId) throw new Error("Choose a workspace.");
+          await unwrap(saveCatalogColumnsAction(tenantId, keys));
           await reload();
         }),
       saveArtifact: (artifact) =>
         guard(async () => {
           if (!db) throw new Error("The catalog is still loading.");
           const next = saveArtifactRow(db, artifact);
-          if (mode === "demo") {
-            commit(next);
-            return artifact.id;
-          }
           const saved = next.artifacts.find((row) => row.id === artifact.id);
           if (!saved) throw new Error("Could not save that artifact.");
-          const supabase = supabaseRef.current;
-          if (!supabase) throw new Error("Supabase is not connected.");
-          await persistArtifact(supabase, saved);
+          await unwrap(saveArtifactAction(saved));
           await reload();
           return artifact.id;
         }),
       deleteArtifact: (artifactId) =>
         guard(async () => {
-          if (!db) return;
-          const next = deleteArtifactRowModel(db, artifactId);
-          if (mode === "demo") {
-            commit(next);
-            return;
-          }
-          const supabase = supabaseRef.current;
-          if (!supabase) throw new Error("Supabase is not connected.");
-          await deleteArtifactRow(supabase, artifactId);
+          await unwrap(deleteArtifactAction(artifactId));
           await reload();
         }),
       saveArtifactLink: (input) =>
         guard(async () => {
           if (!db) return;
           const next = saveArtifactLinkRow(db, input);
-          if (mode === "demo") {
-            commit(next);
-            return;
-          }
           const saved = next.artifactLinks.find(
             (link) => link.artifact_id === input.artifactId && link.service_id === input.serviceId,
           );
           if (!saved) throw new Error("Could not save that link.");
-          const supabase = supabaseRef.current;
-          if (!supabase) throw new Error("Supabase is not connected.");
-          await persistArtifactLink(supabase, saved);
+          await unwrap(saveArtifactLinkAction(saved));
           await reload();
         }),
       deleteArtifactLink: (linkId) =>
         guard(async () => {
-          if (!db) return;
-          const next = deleteArtifactLinkModel(db, linkId);
-          if (mode === "demo") {
-            commit(next);
-            return;
-          }
-          const supabase = supabaseRef.current;
-          if (!supabase) throw new Error("Supabase is not connected.");
-          await deleteArtifactLinkRow(supabase, linkId);
+          await unwrap(deleteArtifactLinkAction(linkId));
           await reload();
         }),
       importArtifacts: (rows) =>
         guard(async () => {
-          if (!db) throw new Error("The catalog is still loading.");
+          if (!db || !tenantId) throw new Error("The catalog is still loading.");
           const result = importArtifactRows(db, rows);
-          if (mode === "demo") {
-            commit(result.db);
-            return { created: result.created, updated: result.updated };
-          }
-          const supabase = supabaseRef.current;
-          if (!supabase || !tenantId) throw new Error("Supabase is not connected.");
-          for (const row of rows) {
-            const saved = result.db.artifacts.find(
-              (artifact) => artifact.tenant_id === tenantId && artifact.name.toLowerCase() === row.name.toLowerCase(),
+          const saved = rows.flatMap((row) => {
+            const artifact = result.db.artifacts.find(
+              (item) => item.tenant_id === tenantId && item.name.toLowerCase() === row.name.toLowerCase(),
             );
-            if (saved) await persistArtifact(supabase, saved);
-          }
+            return artifact ? [artifact] : [];
+          });
+          await unwrap(importArtifactsAction(tenantId, saved));
           await reload();
           return { created: result.created, updated: result.updated };
         }),
-      resetDemoData: () => {
-        if (!db || mode !== "demo") return;
-        const next = resetDemo(db);
-        commit(next);
-      },
     };
-  }, [db, ready, mode, error, warning, commit, guard, reload]);
+  }, [db, invitations, ready, error, warning, commit, guard, reload]);
 
   return <CatalogContext.Provider value={api}>{children}</CatalogContext.Provider>;
 }
@@ -791,4 +589,16 @@ export function useCatalog(): CatalogApi {
 function messageOf(err: unknown): string {
   if (err instanceof Error && err.message) return err.message;
   return "Something went wrong.";
+}
+
+function browserSupabase(ref: { current: SupabaseClient | null }): SupabaseClient {
+  const supabase = ref.current ?? createBrowserSupabase();
+  ref.current = supabase;
+  return supabase;
+}
+
+async function unwrap<T>(result: Promise<ActionResult<T>>): Promise<T> {
+  const resolved = await result;
+  if (!resolved.ok) throw new Error(resolved.error);
+  return resolved.data;
 }

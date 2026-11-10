@@ -424,7 +424,7 @@ export function ExportDialog({
             </p>
           </div>
         ) : (
-          <p className="hint">Workspace admins save profiles. You can use a saved profile or a one-time custom field list.</p>
+          <p className="hint">Admins save profiles. You can use a saved profile or a one-time custom field list.</p>
         )}
         {notice ? <p className="hint">{notice}</p> : null}
 

@@ -1,14 +1,16 @@
 {
   "name": "security-service-catalog-builder",
-  "version": "4.0.0",
+  "version": "5.0.0",
   "private": true,
-  "description": "Multi-tenant security service catalog with supporting artifacts, audience exports, and NIST CSF 2.0 coverage.",
+  "description": "Multi-tenant security service catalog with Supabase Auth, supporting artifacts, audience exports, and NIST CSF 2.0 coverage.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:e2e": "playwright test",
+    "e2e:local": "bash scripts/e2e-local-supabase.sh",
     "seed:sql": "tsx scripts/emit-sql.ts"
   },
   "dependencies": {
@@ -22,6 +24,7 @@
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.0",
     "@types/node": "^22.19.0",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",

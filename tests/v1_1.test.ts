@@ -151,11 +151,11 @@ describe("archive, restore, and permanent delete", () => {
 
     db = setServiceArchived(db, service.id, false, "2026-11-06T13:00:00.000Z");
     expect(db.services.find((item) => item.id === service.id)?.archived_at).toBeNull();
-    expect(() => deleteService(db, service.id)).toThrow(/workspace admin/i);
+    expect(() => deleteService(db, service.id)).toThrow(/admin/i);
 
     db = withRole(db, "viewer");
     expect(() => setServiceArchived(db, service.id, true)).toThrow(/permission/i);
-    expect(() => deleteService(db, service.id)).toThrow(/workspace admin/i);
+    expect(() => deleteService(db, service.id)).toThrow(/admin/i);
     expect(db.services.some((item) => item.id === service.id)).toBe(true);
 
     db = withRole(db, "tenant_admin");

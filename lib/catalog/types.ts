@@ -43,6 +43,14 @@ export type Member = {
   created_at: string;
 };
 
+export type Invitation = {
+  id: string;
+  tenant_id: string;
+  email: string;
+  role: Role;
+  created_at: string;
+};
+
 export type FieldDefinition = {
   id: string;
   tenant_id: string | null;

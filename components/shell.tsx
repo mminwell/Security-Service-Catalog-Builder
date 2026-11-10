@@ -37,7 +37,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <h1>No workspace yet</h1>
         <p className="lede">
           {api.warning ??
-            "This account is signed in, but it is not a member of a workspace. A platform owner can add the account, or the first account on a new Supabase project becomes the platform owner automatically."}
+            "This account is signed in, but it is not a member of a workspace. An Admin can invite the account. The first account on a new project becomes Admin of Starter Workspace."}
         </p>
         <div className="row-actions" style={{ marginTop: 16 }}>
           <button type="button" className="btn btn-secondary" onClick={() => void api.signOut()}>
@@ -89,21 +89,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             Sign out
           </button>
         </div>
-        {api.mode === "demo" ? (
-          <div className="topbar-demo">
-            <span className="demo-pill">Interactive Demo</span>
-            <button type="button" className="btn btn-ghost" onClick={api.resetDemoData}>
-              Reset demo
-            </button>
-          </div>
-        ) : null}
       </header>
-      {api.mode === "demo" ? (
-        <div className="banner">
-          <strong>Interactive Demo Mode.</strong> Acme Corp and Meridian Health live in this browser. Connect Supabase
-          when you want a real multi-user workspace. Nothing is sent to a server.
-        </div>
-      ) : null}
       {api.error ? (
         <div className="banner" role="alert">
           {api.error}{" "}
@@ -125,6 +111,7 @@ function WorkspaceSwitcher() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("editor");
+  const [inviteNotice, setInviteNotice] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState("");
   const [logoError, setLogoError] = useState<string | null>(null);
   const ref = useDismiss(open, () => setOpen(false));
@@ -270,12 +257,25 @@ function WorkspaceSwitcher() {
               <span className="muted">{roleLabel(member.role)}</span>
             </div>
           ))}
+          {api.invitations.map((invite) => (
+            <div className="member" key={invite.id}>
+              <span>{invite.email}</span>
+              <span className="muted">{roleLabel(invite.role)} · Pending</span>
+            </div>
+          ))}
           {api.canAdmin ? (
             <form
               className="stack"
               onSubmit={(event) => {
                 event.preventDefault();
-                void api.addMember(email, role).then(() => setEmail(""));
+                setInviteNotice(null);
+                void api.addMember(email, role).then(
+                  (message) => {
+                    setEmail("");
+                    setInviteNotice(message);
+                  },
+                  () => setInviteNotice(null),
+                );
               }}
             >
               <input
@@ -285,22 +285,21 @@ function WorkspaceSwitcher() {
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 aria-label="Member email"
+                required
               />
               <div className="row-actions">
                 <select className="select" value={role} onChange={(event) => setRole(event.target.value as Role)} aria-label="Role">
-                  <option value="tenant_admin">Workspace admin</option>
+                  <option value="tenant_admin">Admin</option>
                   <option value="editor">Editor</option>
                   <option value="viewer">Viewer</option>
-                  {api.canCreateWorkspace ? <option value="platform_owner">Platform owner</option> : null}
+                  {api.canGrantOwner ? <option value="platform_owner">Platform owner</option> : null}
                 </select>
                 <button type="submit" className="btn btn-secondary">
-                  Add member
+                  Invite
                 </button>
               </div>
+              {inviteNotice ? <p className="hint">{inviteNotice}</p> : null}
             </form>
-          ) : null}
-          {api.mode === "demo" ? (
-            <p className="hint">Demo invites stay in this browser. They cannot sign in on their own.</p>
           ) : null}
           {api.canCreateWorkspace ? (
             <form

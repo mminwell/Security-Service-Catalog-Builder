@@ -1,45 +1,52 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
+import { safeNextPath } from "@/lib/auth/redirect";
 import { useCatalog } from "@/components/catalog-provider";
 import { Loading } from "@/components/widgets";
+
+type AuthMode = "sign-in" | "create" | "reset";
 
 export function LoginPanel() {
   const api = useCatalog();
   const router = useRouter();
-  const [mode, setMode] = useState<"sign-in" | "create">("sign-in");
+  const search = useSearchParams();
+  const nextPath = safeNextPath(search.get("next"));
+  const linkError = search.get("error") === "auth";
+  const [mode, setMode] = useState<AuthMode>("sign-in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (api.ready && api.session) router.replace("/catalog");
-  }, [api.ready, api.session, router]);
+    if (api.ready && api.session) router.replace(nextPath);
+  }, [api.ready, api.session, nextPath, router]);
 
   if (!api.ready) return <Loading label="Loading…" />;
   if (api.session) return <Loading label="Opening the catalog…" />;
+
+  const title = mode === "create" ? "Create account" : mode === "reset" ? "Reset password" : "Sign in";
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setLocalError(null);
     setNotice(null);
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      setLocalError("Enter a valid email address.");
-      return;
-    }
-    if (password.length < 8) {
-      setLocalError("Use a password of at least 8 characters.");
-      return;
-    }
     try {
-      if (mode === "create") {
-        const message = await api.signUp(email.trim(), password);
-        if (message) setNotice(message);
-      } else {
-        await api.signIn(email.trim(), password);
+      if (mode === "reset") {
+        await api.requestPasswordReset(email);
+        setNotice("If an account exists for that email, a reset link is on its way.");
+        return;
       }
+      if (mode === "create") {
+        const message = await api.signUp(email, password);
+        if (message) setNotice(message);
+        else router.replace(nextPath);
+        return;
+      }
+      await api.signIn(email, password);
+      router.replace(nextPath);
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : "Could not sign in.");
     }
@@ -49,64 +56,74 @@ export function LoginPanel() {
     <main className="auth">
       <section className="auth-card">
         <p className="micro">Security Service Catalog</p>
-        <h1>{mode === "create" ? "Create account" : "Sign in"}</h1>
+        <h1>{title}</h1>
         <p className="lede">
-          One catalog for the security services you deliver. Keep internal notes internal, and export the view each
-          audience should see.
+          One catalog for the security services you deliver. The first account creates a workspace and becomes its
+          Admin.
         </p>
-        {api.mode === "demo" ? (
-          <div className="callout">
-            <strong>Interactive Demo Mode.</strong> Any email and a password of at least 8 characters signs you in
-            inside this browser. You will land in Acme Corp, with Meridian Health available in the workspace switcher.
-            Nothing is sent to a server.
-          </div>
-        ) : (
-          <div className="callout">
-            This deployment uses your Supabase project. The first account becomes the platform owner and receives a
-            seeded workspace.
-          </div>
-        )}
+        {linkError ? (
+          <p className="field-error" role="alert">
+            That link expired or could not be verified. Request a new one.
+          </p>
+        ) : null}
         <form className="stack" onSubmit={(event) => void submit(event)}>
           <label htmlFor="email">Email</label>
           <input
             id="email"
             className="input"
             type="email"
-            autoComplete="username"
-            placeholder="alex.rivera@example.com"
+            autoComplete="email"
+            required
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />
-          <label htmlFor="password">Password</label>
-          <input
-            id="password"
-            className="input"
-            type="password"
-            autoComplete={mode === "create" ? "new-password" : "current-password"}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-          {localError ? <p className="field-error">{localError}</p> : null}
+          {mode === "reset" ? null : (
+            <>
+              <label htmlFor="password">Password</label>
+              <input
+                id="password"
+                className="input"
+                type="password"
+                autoComplete={mode === "create" ? "new-password" : "current-password"}
+                required
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </>
+          )}
+          {localError ? (
+            <p className="field-error" role="alert">
+              {localError}
+            </p>
+          ) : null}
           {notice ? <p className="hint">{notice}</p> : null}
           <button type="submit" className="btn btn-primary">
-            {mode === "create" ? "Create account" : "Sign in"}
+            {mode === "create" ? "Create account" : mode === "reset" ? "Send reset link" : "Sign in"}
           </button>
         </form>
-        {api.mode === "supabase" ? (
-          <button
-            type="button"
-            className="btn btn-ghost"
-            style={{ marginTop: 8 }}
-            onClick={() => {
-              setMode((current) => (current === "create" ? "sign-in" : "create"));
-              setLocalError(null);
-              setNotice(null);
-            }}
-          >
-            {mode === "create" ? "Have an account? Sign in" : "New here? Create an account"}
-          </button>
-        ) : null}
+        <div className="auth-links">
+          {mode === "sign-in" ? (
+            <>
+              <button type="button" className="btn btn-ghost" onClick={() => switchMode("create")}>
+                Create account
+              </button>
+              <button type="button" className="btn btn-ghost" onClick={() => switchMode("reset")}>
+                Forgot password
+              </button>
+            </>
+          ) : (
+            <button type="button" className="btn btn-ghost" onClick={() => switchMode("sign-in")}>
+              Back to sign in
+            </button>
+          )}
+        </div>
       </section>
     </main>
   );
+
+  function switchMode(next: AuthMode) {
+    setMode(next);
+    setLocalError(null);
+    setNotice(null);
+  }
 }

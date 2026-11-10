@@ -132,9 +132,9 @@ export function CatalogScreen() {
                 </Link>
               ) : null}
             </div>
-            {api.canWrite ? (
+            {api.canAdmin ? (
               <button type="button" className="btn btn-ghost" style={{ marginTop: 8 }} onClick={() => void api.loadSampleServices()}>
-                Or load four starter samples
+                Load sample catalog
               </button>
             ) : null}
           </div>

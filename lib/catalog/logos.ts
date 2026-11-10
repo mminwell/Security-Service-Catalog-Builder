@@ -58,7 +58,7 @@ export function normalizeLogoInput(input: string | null | undefined): string | n
       decoded = payload;
     }
   }
-  if (/<script[\s>]/i.test(decoded) || /javascript:/i.test(decoded)) {
+  if (/<script[\s>]/i.test(decoded) || /javascript:/i.test(decoded) || /\bon[a-z]+\s*=/i.test(decoded)) {
     throw new Error("That image can't be used as a logo.");
   }
   return value;

@@ -8,7 +8,7 @@
   --olive: #788c5d;
   --gray-100: #f0eee6;
   --gray-300: #d1cfc5;
-  --gray-500: #87867f;
+  --gray-500: #5c5b56;
   --gray-700: #3d3d3a;
   --warning: #c78e3f;
   --warning-ink: #a06a2a;
@@ -66,9 +66,6 @@ p { margin: 0; }
   position: sticky;
   top: 0;
   z-index: 30;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
   background: var(--white);
   border-bottom: var(--border);
 }
@@ -79,12 +76,7 @@ p { margin: 0; }
   min-height: 64px;
   padding: 8px 22px;
   flex-wrap: nowrap;
-}
-.topbar-demo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 22px 8px;
+  overflow-x: auto;
 }
 
 .brand {
@@ -131,17 +123,6 @@ p { margin: 0; }
 }
 
 .top-spacer { flex: 1; }
-
-.demo-pill {
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  background: rgba(92, 124, 163, 0.15);
-  color: var(--info);
-  border-radius: 999px;
-  padding: 4px 8px;
-}
 
 .who {
   font-size: 13px;
@@ -211,7 +192,11 @@ p { margin: 0; }
   white-space: nowrap;
 }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-primary { background: var(--clay); color: var(--white); }
+.btn-primary { background: var(--clay); color: var(--slate); }
+.btn:focus-visible, .nav a:focus-visible, .brand:focus-visible, .auth-links button:focus-visible {
+  outline: 2px solid var(--clay);
+  outline-offset: 2px;
+}
 .btn-primary:hover:not(:disabled) { background: var(--clay-hover); }
 .btn-secondary { background: var(--white); color: var(--slate); border-color: var(--gray-300); }
 .btn-secondary:hover:not(:disabled) { background: var(--gray-100); }
@@ -396,6 +381,12 @@ table.catalog tr.clickable:hover td { background: rgba(240, 238, 230, 0.55); }
   padding: 32px 28px 28px;
 }
 .auth-card h1 { font-size: 32px; margin-bottom: 8px; }
+.auth-links { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.auth-card code {
+  font-family: var(--mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
 .stack { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
 .stack label, .field-label label {
   font-size: 14px;

@@ -1,15 +1,17 @@
 # Bring your own Supabase and Vercel
 
-About five minutes the first time. You need a Supabase project and a Vercel account. The app does not use the Supabase service-role key. Do not paste that key into Vercel, `.env.local`, or git.
+You need a Supabase project and a Vercel account. The app does not use the Supabase service-role key. Do not paste that key into Vercel, `.env.local`, or git.
+
+The full runbook, including redirect URLs and SMTP, is in the README. This page is the short version.
 
 ## 1. Create the Supabase project
 
 In the Supabase dashboard, create a project and wait until the database is ready. In **Project Settings → API**, copy:
 
 - Project URL
-- `anon` public key
+- The anon public key, or the publishable key
 
-Leave the service-role key where it is.
+Leave the service-role key and the secret key where they are.
 
 ## 2. Apply the schema
 
@@ -23,16 +25,20 @@ Open **SQL Editor → New query**. Paste and run each migration in order:
 6. `supabase/migrations/0006_v3_field_lookup_toggle.sql`
 7. `supabase/migrations/0007_v3_public_defaults.sql`
 8. `supabase/migrations/0008_v4_artifacts.sql`
+9. `supabase/migrations/0009_v5_auth_invites.sql`
 
-`0002` stores a workspace logo and lets services be archived. `0004` loads the NIST CSF 2.0 core and the assessment table. The core wording and provenance are recorded in `docs/nist-csf-2.0-provenance.md`. `0005` adds export profiles, optional geography and privacy fields, and the framework registry. It does not add control text for the licensed frameworks. `0008` adds the artifact registry and copies artifact type and status lookups into each workspace. Sample artifacts are in `supabase/seed.sql`, not in the migration.
+`0008` adds the artifact registry. `0009` adds invitations and makes the first account Admin of Starter Workspace. Do not run `supabase/seed.sql` for a normal project. That file inserts fictional Acme Corp and Meridian Health workspaces with no members, so nobody can open them. Use **Load sample catalog** inside an empty workspace instead.
 
-That creates `tenants`, `tenant_members`, `field_definitions`, `lookup_options`, `services`, `audit_log`, `frameworks`, `framework_elements`, `service_outcome_mappings`, `export_profiles`, `artifacts`, and `artifact_service_links`, turns on row-level security, and loads the starter dropdowns, field definitions, and the CSF 2.0 core. Rows with a null `tenant_id` are the template copied into each new workspace.
+## 3. Auth
 
-Optional: paste `supabase/seed.sql` and run it. That adds two fictional workspaces, **Acme Corp** and **Meridian Health**, with sample services. Skip it if you want to start empty.
+In **Authentication → Providers**, Email is on by default. Set the minimum password length to 8.
 
-## 3. Allow email sign-in
+For a first trial you can turn off **Confirm email**. Turn it back on before real users arrive, and set **Authentication → URL Configuration**:
 
-In **Authentication → Providers**, Email is on by default. For a first trial, turn off **Confirm email** under **Authentication → Sign In / Providers → Email** so the first account can enter immediately. Turn confirmation back on when you are ready for real users.
+- Site URL: the production origin, for example `https://catalog.example.com`
+- Redirect URLs: `http://localhost:3000/auth/callback`, `http://127.0.0.1:3000/auth/callback`, each Vercel preview origin plus `/auth/callback`, and the production origin plus `/auth/callback`
+
+Password reset and signup confirmation use that callback. Custom SMTP is under **Authentication → Emails → SMTP**. Until it is set, Supabase sends a limited number of its own messages.
 
 ## 4. Deploy on Vercel
 
@@ -40,35 +46,22 @@ Import this Git repository. Before the first deploy, set:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_ANON_KEY
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_ANON_OR_PUBLISHABLE_KEY
 ```
 
-Use your own values. Next.js reads `NEXT_PUBLIC_*` at build time, so a preview that was built without them stays in Interactive Demo Mode until you redeploy with the variables set.
+Next.js reads `NEXT_PUBLIC_*` at build time. A preview built without them shows the not-configured screen until you add the variables and redeploy. Do not set the service-role key.
 
-Framework preset: Next.js. Build command: `npm run build`. No other install step.
+Framework preset: Next.js. Build command: `npm run build`.
 
-## 5. Open the site and create the owner
+## 5. Open the site
 
-Open the deployment and choose **Create account**. The first account becomes the platform owner and lands in **Starter Workspace**, which already has the starter dropdowns and an empty catalog.
-
-From the workspace switcher you can:
-
-- Create another client workspace. It is seeded with the same dropdowns and fields.
-- On an empty workspace, choose **Load starter sample services**.
-- Switch service IDs between `SVC-001` and category-prefixed `SEC-SOC-001`.
-- Add a member by email after that person has created an account. Until then the app tells you the account does not exist yet.
-
-If you ran `seed.sql`, Acme Corp and Meridian Health appear in the switcher for the platform owner.
-
-## Local Supabase, if you want it
-
-The same SQL files work in the Supabase SQL editor and in the CLI (`supabase db query --file ...`, or your usual migration command). Point `.env.local` at that project’s URL and anon key, then restart `npm run dev`. An empty `.env.local` keeps Interactive Demo Mode.
+Create an account. That first account becomes Admin of **Starter Workspace**, which has the starter dropdowns and an empty catalog. From the workspace switcher an Admin can invite Viewer, Editor, and Admin members, create another workspace, and load the sample catalog while the workspace is empty.
 
 ## What the policies do
 
-- A platform owner can read and write every workspace and can provision new ones.
-- A workspace admin can edit services, dropdowns, field visibility, and membership for that workspace only.
-- An editor can create and edit services, not dropdowns or fields.
-- A viewer can read and export.
-- Dropdown deletes are not granted. Retire an option with `is_active = false` so older services still resolve.
-- `audit_log` is written by triggers on services, dropdowns, and field definitions. Clients can read their own workspace history and cannot insert rows into it directly.
+- An Admin can edit services, artifacts, dropdowns, fields, export profiles, and membership for that workspace, and can create another workspace they will administer.
+- An Editor can create and edit services, artifacts, and outcome assessments.
+- A Viewer can read and export.
+- A platform owner, if one was granted on an older project, can still reach every workspace. New projects do not create that role automatically.
+- A member of workspace A cannot read or write workspace B.
+- `audit_log` is written by triggers. Clients can read their own workspace history and cannot insert rows into it.
