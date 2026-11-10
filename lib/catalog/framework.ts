@@ -106,6 +106,45 @@ export function ancestorOfType(
   return null;
 }
 
+export type OutcomeChoiceGroup = {
+  id: string;
+  label: string;
+  outcomes: Array<{ id: string; label: string }>;
+};
+
+/**
+ * NIST CSF 2.0 subcategories for a service attach list.
+ * Groups are function then category. Already attached outcomes are omitted.
+ */
+export function outcomeChoiceGroups(args: {
+  elements: readonly FrameworkElement[];
+  frameworkId: string;
+  excludeIds?: ReadonlySet<string>;
+}): OutcomeChoiceGroup[] {
+  const exclude = args.excludeIds ?? new Set<string>();
+  const inFramework = args.elements.filter((element) => element.framework_id === args.frameworkId);
+  const functions = inFramework.filter((element) => element.element_type === "function").sort((a, b) => a.sort_order - b.sort_order);
+  return functions.flatMap((fn) => {
+    const categories = inFramework
+      .filter((element) => element.element_type === "category" && element.parent_id === fn.id)
+      .sort((a, b) => a.sort_order - b.sort_order);
+    return categories.flatMap((category) => {
+      const outcomes = inFramework
+        .filter((element) => element.element_type === "subcategory" && element.parent_id === category.id && !exclude.has(element.id))
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((outcome) => ({ id: outcome.id, label: `${outcome.code} · ${outcome.statement}` }));
+      if (outcomes.length === 0) return [];
+      return [
+        {
+          id: category.id,
+          label: `${fn.code} ${fn.title} · ${category.code} ${category.title}`,
+          outcomes,
+        },
+      ];
+    });
+  });
+}
+
 /** Blueprint subcategory codes stored on a service. These are hints, not assessments. */
 export function blueprintHintCodes(customFields: Record<string, unknown> | null | undefined): string[] {
   const raw = customFields?.nist_csf_subcategories;

@@ -83,7 +83,7 @@ export function BlueprintStore() {
     persist(result.cart);
     setNote(
       result.added.length === 0
-        ? "Those blueprints are already in the cart or in this catalog."
+        ? "Those templates are already in the cart or in this catalog."
         : `Added ${result.added.length} to the cart${result.skipped.length ? `. Skipped ${result.skipped.length} already selected or already in the catalog.` : "."}`,
     );
     setDrawer(true);
@@ -111,11 +111,11 @@ export function BlueprintStore() {
     <>
       <div className="page-head">
         <div>
-          <p className="micro">Blueprint store</p>
-          <h1>Don&apos;t start from scratch.</h1>
+          <p className="micro">Templates</p>
+          <h1>Templates</h1>
           <p className="lede">
-            Shop {BLUEPRINTS.length} practitioner-grade security services. Add a pack or a single blueprint to the cart,
-            then review every item before it lands in the catalog.
+            {BLUEPRINTS.length} practitioner-grade security services. Add a pack or a single template to the cart, then
+            review every item before it lands in the catalog.
           </p>
         </div>
         <div className="store-head-actions">
@@ -136,8 +136,8 @@ export function BlueprintStore() {
         <div className="toolbar catalog-toolbar">
           <input
             className="input search"
-            placeholder="Search blueprints"
-            aria-label="Search blueprints"
+            placeholder="Search templates"
+            aria-label="Search templates"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
@@ -194,7 +194,7 @@ export function BlueprintStore() {
         )}
         {visible.length === 0 ? (
           <section className="empty">
-            <h2>No blueprints match.</h2>
+            <h2>No templates match.</h2>
           </section>
         ) : null}
       </div>
@@ -261,7 +261,7 @@ export function BlueprintStore() {
           <aside className="drawer cart-drawer" role="dialog" aria-modal="true" aria-label="Shopping cart" onMouseDown={(event) => event.stopPropagation()}>
             <p className="micro">Cart</p>
             <h2>Cart · {cart.length}</h2>
-            {cart.length === 0 ? <p className="lede">The cart is empty. Add a pack or a blueprint first.</p> : null}
+            {cart.length === 0 ? <p className="lede">The cart is empty. Add a pack or a template first.</p> : null}
             <ul className="cart-list">
               {cart.map((id) => {
                 const blueprint = blueprintById(id);
@@ -303,7 +303,7 @@ export function BlueprintStore() {
             </select>
             <label className="field-label" htmlFor="cart-delivery">Default delivery team</label>
             <select id="cart-delivery" className="select" value={delivery} onChange={(event) => setDelivery(event.target.value)}>
-              <option value="">Use each blueprint&apos;s suggestion</option>
+              <option value="">Use each template&apos;s suggestion</option>
               {teams.map((item) => (
                 <option key={item.id} value={item.code}>
                   {item.label}
@@ -333,7 +333,7 @@ function BlueprintViewToggle({ view, onChange }: { view: BlueprintView; onChange
   }
 
   return (
-    <div className="segmented" role="radiogroup" aria-label="Blueprint layout" aria-orientation="horizontal" onKeyDown={onKeyDown}>
+    <div className="segmented" role="radiogroup" aria-label="Template layout" aria-orientation="horizontal" onKeyDown={onKeyDown}>
       <button
         type="button"
         role="radio"
@@ -530,7 +530,7 @@ function ArtifactHints({
           </p>
         </div>
       ))}
-      <p className="hint">Hints only. Adding this blueprint does not create these documents.</p>
+      <p className="hint">Hints only. Adding this template does not create these documents.</p>
     </section>
   );
 }

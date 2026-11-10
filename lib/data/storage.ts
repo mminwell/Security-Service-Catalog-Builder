@@ -52,9 +52,11 @@ export function migrateDemoState(raw: unknown): CatalogDb | null {
     }
     const tenants = parsed.tenants.map(normalizeTenant);
     const tenantIds = tenants.map((tenant) => tenant.id);
-    const lookups = ensureArtifactLookups(
-      ensureOptionalLookups(ensureCoverageLookups(parsed.lookups, tenantIds), tenantIds),
-      tenantIds,
+    const lookups = dropRetiredArtifactTypes(
+      ensureArtifactLookups(
+        ensureOptionalLookups(ensureCoverageLookups(parsed.lookups, tenantIds), tenantIds),
+        tenantIds,
+      ),
     );
     const fields = ensureOptionalFields(
       Array.isArray(parsed.fields) ? parsed.fields.map(normalizeStoredField) : [],
@@ -285,6 +287,11 @@ function normalizeProfiles(input: unknown, tenantIds: string[]): ExportProfile[]
 }
 
 const ARTIFACT_LOOKUP_KEYS = new Set([ARTIFACT_TYPE_KEY, ARTIFACT_STATUS_KEY]);
+
+/** Guideline was a starter type. Cached demos drop it so the type list stays Policy, Standard, Procedure / Runbook, and Tool. */
+function dropRetiredArtifactTypes(lookups: LookupOption[]): LookupOption[] {
+  return lookups.filter((option) => !(option.field_key === ARTIFACT_TYPE_KEY && option.code === "guideline"));
+}
 
 function ensureArtifactLookups(lookups: LookupOption[], tenantIds: string[]): LookupOption[] {
   const seeds = STARTER_LOOKUPS.filter((row) => ARTIFACT_LOOKUP_KEYS.has(row.field_key));

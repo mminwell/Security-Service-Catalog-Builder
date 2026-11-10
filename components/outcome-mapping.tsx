@@ -3,58 +3,71 @@
 import { useMemo, useState } from "react";
 import { activeOptions, optionByCode } from "@/lib/catalog/lookups";
 import { isExplicitCoverage } from "@/lib/catalog/coverage";
-import { ancestorOfType, blueprintHintCodes, type FrameworkElement } from "@/lib/catalog/framework";
-import type { LookupOption, OutcomeMapping, ServiceRecord } from "@/lib/catalog/types";
+import { CSF_FRAMEWORK, outcomeChoiceGroups } from "@/lib/catalog/framework";
+import type { LookupOption, OutcomeMapping } from "@/lib/catalog/types";
 import { useCatalog } from "@/components/catalog-provider";
 import { Badge } from "@/components/widgets";
+
+type PanelState = {
+  mode: "create" | "edit";
+  elementId: string;
+  coverage: string;
+  rationale: string;
+  notes: string;
+};
 
 export function ServiceMappingSection({ serviceId }: { serviceId: string }) {
   const api = useCatalog();
   const service = api.services.find((item) => item.id === serviceId) ?? null;
-  const elements = api.elements;
   const mappings = api.mappings.filter((mapping) => mapping.service_id === serviceId);
-  const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(mappings[0]?.element_id ?? null);
-  const selected = elements.find((element) => element.id === selectedId && element.element_type === "subcategory") ?? null;
-  const selectedMapping = mappings.find((mapping) => mapping.element_id === selectedId) ?? null;
-  const [coverage, setCoverage] = useState(selectedMapping?.coverage ?? "");
-  const [rationale, setRationale] = useState(selectedMapping?.rationale ?? "");
-  const [notes, setNotes] = useState(selectedMapping?.notes ?? "");
-  const [message, setMessage] = useState<string | null>(null);
+  const [panel, setPanel] = useState<PanelState | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-
-  function selectOutcome(id: string) {
-    const mapping = mappings.find((item) => item.element_id === id);
-    setSelectedId(id);
-    setCoverage(mapping?.coverage ?? "");
-    setRationale(mapping?.rationale ?? "");
-    setNotes(mapping?.notes ?? "");
-    setMessage(null);
-    setLocalError(null);
-  }
-
-  const hints = useMemo(() => hintRows(service, elements), [service, elements]);
-  const tree = useMemo(() => filterTree(elements, query), [elements, query]);
+  const attachedIds = useMemo(() => new Set(mappings.map((mapping) => mapping.element_id)), [mappings]);
+  const groups = useMemo(
+    () =>
+      outcomeChoiceGroups({
+        elements: api.elements,
+        frameworkId: api.framework?.id ?? CSF_FRAMEWORK.id,
+        excludeIds: panel?.mode === "edit" ? new Set([...attachedIds].filter((id) => id !== panel.elementId)) : attachedIds,
+      }),
+    [api.elements, api.framework?.id, attachedIds, panel],
+  );
 
   if (!service) return null;
   const record = service;
   const readOnly = !api.canWrite;
 
+  function openCreate() {
+    const first = groups[0]?.outcomes[0]?.id ?? "";
+    setPanel({ mode: "create", elementId: first, coverage: "", rationale: "", notes: "" });
+    setLocalError(null);
+  }
+
+  function openEdit(mapping: OutcomeMapping) {
+    setPanel({
+      mode: "edit",
+      elementId: mapping.element_id,
+      coverage: mapping.coverage,
+      rationale: mapping.rationale ?? "",
+      notes: mapping.notes ?? "",
+    });
+    setLocalError(null);
+  }
+
   async function save() {
-    if (!selected) return;
+    if (!panel || !panel.elementId) return;
     setSaving(true);
-    setMessage(null);
     setLocalError(null);
     try {
       await api.saveOutcomeMapping({
         serviceId: record.id,
-        elementId: selected.id,
-        coverage,
-        rationale,
-        notes,
+        elementId: panel.elementId,
+        coverage: panel.coverage,
+        rationale: panel.rationale,
+        notes: panel.notes,
       });
-      setMessage("Assessment saved.");
+      setPanel(null);
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : "The assessment could not be saved.");
     } finally {
@@ -62,14 +75,12 @@ export function ServiceMappingSection({ serviceId }: { serviceId: string }) {
     }
   }
 
-  async function remove() {
-    if (!selectedMapping) return;
+  async function remove(mappingId: string) {
     setSaving(true);
-    setMessage(null);
     setLocalError(null);
     try {
-      await api.removeOutcomeMapping(selectedMapping.id);
-      setMessage("Assessment removed.");
+      await api.removeOutcomeMapping(mappingId);
+      if (panel?.mode === "edit") setPanel(null);
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : "The assessment could not be removed.");
     } finally {
@@ -79,131 +90,104 @@ export function ServiceMappingSection({ serviceId }: { serviceId: string }) {
 
   return (
     <section className="form-section" id="mapping">
-      <h2>Mapping</h2>
+      <h2>CSF mapping</h2>
       <p className="lede">
-        Record how this service addresses a NIST CSF 2.0 subcategory outcome. Saving an assessment is explicit. A
-        blueprint hint or the Primary CSF Function dropdown is not coverage, and this is not a certification.
+        Attach a NIST CSF 2.0 subcategory and record an assessment. A template hint or the Primary CSF Function dropdown
+        is not an assessment, and this is not a certification.
       </p>
       {service.archived_at ? (
         <div className="callout">
-          This service is archived, so these assessments stay on the record and are excluded from coverage until you
+          This service is archived, so these assessments stay on the record and are excluded from CSF Mapping until you
           restore it.
         </div>
       ) : null}
       {readOnly ? <div className="callout">You have view access. Outcome assessments are read only.</div> : null}
 
-      <SavedMappings mappings={mappings} elements={elements} lookups={api.lookups} onOpen={selectOutcome} />
-
-      {hints.length > 0 ? (
-        <div className="hint-block">
-          <p className="micro">Blueprint hints</p>
-          <p className="hint">These codes came in with the blueprint. They are not coverage until you save an assessment.</p>
-          <div className="hint-row">
-            {hints.map((hint) =>
-              hint.element ? (
-                <button key={hint.code} type="button" className="btn btn-secondary" onClick={() => hint.element && selectOutcome(hint.element.id)}>
-                  {hint.code}
-                </button>
-              ) : (
-                <span key={hint.code} className="hint">
-                  {hint.code} is not a current CSF 2.0 outcome.
+      {mappings.length === 0 ? <p>No controls are attached yet.</p> : null}
+      <div className="stack">
+        {mappings.map((mapping) => {
+          const element = api.elements.find((item) => item.id === mapping.element_id);
+          const label = optionByCode(api.lookups, "outcome_coverage", mapping.coverage)?.label ?? mapping.coverage;
+          return (
+            <div className="panel" key={mapping.id} style={{ padding: 12 }}>
+              <div className="row-actions">
+                <span>
+                  <span className="code">{element?.code ?? "Outcome"}</span> {element?.statement ?? ""}
                 </span>
-              ),
-            )}
-          </div>
-        </div>
-      ) : null}
-
-      <label className="field-label" htmlFor="outcome-search">
-        Search outcomes
-      </label>
-      <input
-        id="outcome-search"
-        className="input"
-        value={query}
-        placeholder="Function, category, or outcome"
-        onChange={(event) => setQuery(event.target.value)}
-      />
-
-      <div className="picker" aria-label="CSF outcomes">
-        {tree.length === 0 ? <p className="hint">No outcomes match that search.</p> : null}
-        {tree.map((fn) => (
-          <div key={fn.element.id}>
-            <h3>
-              <span className="code">{fn.element.code}</span> {fn.element.title}
-            </h3>
-            {fn.categories.map((category) => (
-              <div key={category.element.id}>
-                <h4>
-                  <span className="code">{category.element.code}</span> {category.element.title}
-                </h4>
-                <p className="picker-statement">{category.element.statement}</p>
-                {category.outcomes.map((outcome) => {
-                  const pressed = outcome.id === selectedId;
-                  return (
-                    <button
-                      key={outcome.id}
-                      type="button"
-                      className={pressed ? "picker-outcome is-selected" : "picker-outcome"}
-                      aria-pressed={pressed}
-                      onClick={() => selectOutcome(outcome.id)}
-                    >
-                      <span className="code">{outcome.code}</span>
-                      <span>{outcome.statement}</span>
+                <Badge tone={mapping.coverage === "full" ? "success" : mapping.coverage === "partial" ? "warning" : "accent"}>{label}</Badge>
+                {readOnly ? null : (
+                  <>
+                    <button type="button" className="btn btn-secondary" onClick={() => openEdit(mapping)} disabled={saving}>
+                      Edit
                     </button>
-                  );
-                })}
+                    <button type="button" className="btn btn-ghost" onClick={() => void remove(mapping.id)} disabled={saving}>
+                      Remove
+                    </button>
+                  </>
+                )}
               </div>
-            ))}
-          </div>
-        ))}
+              {mapping.rationale ? <p>{mapping.rationale}</p> : null}
+            </div>
+          );
+        })}
       </div>
 
-      {selected ? (
-        <div className="assessment-card">
-          <p className="micro">
-            {ancestorOfType(selected, "function", elements)?.title} · {ancestorOfType(selected, "category", elements)?.title}
-          </p>
-          <h3>
-            <span className="code">{selected.code}</span> {selected.title === selected.code ? "Outcome" : selected.title}
-          </h3>
-          <p>{selected.statement}</p>
+      {readOnly || panel ? null : (
+        <div className="row-actions" style={{ marginTop: 12 }}>
+          <button type="button" className="btn btn-secondary" onClick={openCreate} disabled={groups.length === 0}>
+            Attach Control
+          </button>
+        </div>
+      )}
+
+      {panel ? (
+        <div className="assessment-card" id="attach-control">
+          <label htmlFor="attach-control-outcome">
+            <span className="field-label">NIST CSF 2.0 outcome</span>
+            <select
+              id="attach-control-outcome"
+              className="select"
+              aria-label="NIST CSF 2.0 outcome"
+              value={panel.elementId}
+              disabled={saving || panel.mode === "edit"}
+              onChange={(event) => setPanel({ ...panel, elementId: event.target.value })}
+            >
+              {groups.map((group) => (
+                <optgroup key={group.id} label={group.label}>
+                  {group.outcomes.map((outcome) => (
+                    <option key={outcome.id} value={outcome.id}>
+                      {outcome.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </label>
           <OutcomeAssessmentFields
             lookups={api.lookups}
-            coverage={coverage}
-            rationale={rationale}
-            notes={notes}
-            disabled={readOnly || saving}
-            onCoverage={setCoverage}
-            onRationale={setRationale}
-            onNotes={setNotes}
+            coverage={panel.coverage}
+            rationale={panel.rationale}
+            notes={panel.notes}
+            disabled={saving}
+            onCoverage={(coverage) => setPanel({ ...panel, coverage })}
+            onRationale={(rationale) => setPanel({ ...panel, rationale })}
+            onNotes={(notes) => setPanel({ ...panel, notes })}
           />
           {localError ? (
             <p className="field-error" role="alert">
               {localError}
             </p>
           ) : null}
-          {message ? (
-            <p className="saved-banner" role="status">
-              {message}
-            </p>
-          ) : null}
-          {readOnly ? null : (
-            <div className="row-actions">
-              <button type="button" className="btn btn-primary" onClick={() => void save()} disabled={saving || !coverage}>
-                {saving ? "Saving…" : "Save assessment"}
-              </button>
-              {selectedMapping ? (
-                <button type="button" className="btn btn-secondary" onClick={() => void remove()} disabled={saving}>
-                  Remove assessment
-                </button>
-              ) : null}
-            </div>
-          )}
+          <div className="row-actions">
+            <button type="button" className="btn btn-primary" onClick={() => void save()} disabled={saving || !panel.elementId || !panel.coverage}>
+              {saving ? "Saving…" : "Save Assessment"}
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => { setPanel(null); setLocalError(null); }} disabled={saving}>
+              Cancel
+            </button>
+          </div>
         </div>
-      ) : (
-        <p className="hint">Choose an outcome to read its official statement and record an assessment.</p>
-      )}
+      ) : null}
     </section>
   );
 }
@@ -281,69 +265,3 @@ export function OutcomeAssessmentFields({
   );
 }
 
-function SavedMappings({
-  mappings,
-  elements,
-  lookups,
-  onOpen,
-}: {
-  mappings: OutcomeMapping[];
-  elements: FrameworkElement[];
-  lookups: LookupOption[];
-  onOpen: (elementId: string) => void;
-}) {
-  if (mappings.length === 0) {
-    return <p className="hint">No saved assessments on this service yet.</p>;
-  }
-  return (
-    <ul className="saved-mappings">
-      {mappings.map((mapping) => {
-        const element = elements.find((item) => item.id === mapping.element_id);
-        const label = optionByCode(lookups, "outcome_coverage", mapping.coverage)?.label ?? mapping.coverage;
-        return (
-          <li key={mapping.id}>
-            <button type="button" className="btn btn-ghost" onClick={() => onOpen(mapping.element_id)}>
-              <span className="code">{element?.code ?? "Outcome"}</span>
-              <Badge tone={mapping.coverage === "full" ? "success" : mapping.coverage === "partial" ? "warning" : "accent"}>{label}</Badge>
-            </button>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-function hintRows(service: ServiceRecord | null, elements: FrameworkElement[]) {
-  return blueprintHintCodes(service?.custom_fields).map((code) => ({
-    code,
-    element: elements.find((element) => element.code === code && element.element_type === "subcategory") ?? null,
-  }));
-}
-
-type TreeCategory = { element: FrameworkElement; outcomes: FrameworkElement[] };
-type TreeFunction = { element: FrameworkElement; categories: TreeCategory[] };
-
-function filterTree(elements: FrameworkElement[], query: string): TreeFunction[] {
-  const needle = query.trim().toLowerCase();
-  const functions = elements.filter((element) => element.element_type === "function").sort((a, b) => a.sort_order - b.sort_order);
-  return functions.flatMap((fn) => {
-    const categories = elements
-      .filter((element) => element.element_type === "category" && element.parent_id === fn.id)
-      .sort((a, b) => a.sort_order - b.sort_order)
-      .flatMap((category) => {
-        const outcomes = elements
-          .filter((element) => element.element_type === "subcategory" && element.parent_id === category.id)
-          .filter((outcome) => !needle || matches(needle, fn, category, outcome))
-          .sort((a, b) => a.sort_order - b.sort_order);
-        return outcomes.length > 0 ? [{ element: category, outcomes }] : [];
-      });
-    return categories.length > 0 ? [{ element: fn, categories }] : [];
-  });
-}
-
-function matches(needle: string, fn: FrameworkElement, category: FrameworkElement, outcome: FrameworkElement): boolean {
-  return [fn.code, fn.title, fn.statement, category.code, category.title, category.statement, outcome.code, outcome.statement]
-    .join(" ")
-    .toLowerCase()
-    .includes(needle);
-}

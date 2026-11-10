@@ -6,8 +6,8 @@ import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react
 import { roleLabel } from "@/lib/catalog/access";
 import { cartIdsFor, subscribeCart } from "@/lib/catalog/cart-store";
 import { MAX_LOGO_FILE_BYTES } from "@/lib/catalog/logos";
-import { primaryNavFor } from "@/lib/catalog/primary-nav";
-import { SHOP_FREE_BLUEPRINTS_LABEL } from "@/lib/catalog/shop-label";
+import { primaryNavCurrent, primaryNavFor } from "@/lib/catalog/primary-nav";
+import { TEMPLATES_LABEL } from "@/lib/catalog/shop-label";
 import type { Role, ServiceCodeMode } from "@/lib/catalog/types";
 import { useCatalog } from "@/components/catalog-provider";
 import { CartIcon } from "@/components/icons";
@@ -54,45 +54,49 @@ export function AppShell({ children }: { children: ReactNode }) {
         Skip to content
       </a>
       <header className="topbar">
-        <Link href="/catalog" className="brand">
-          <strong>Security Service Catalog</strong>
-          <span>Catalog builder</span>
-        </Link>
-        <nav className="nav" aria-label="Primary">
-          {primaryNavFor(api.canAdmin).map((item) =>
-            item.cart ? (
-              <Link
-                key={item.href}
-                href="/blueprints"
-                aria-label={SHOP_FREE_BLUEPRINTS_LABEL}
-                aria-current={pathname.startsWith(item.href) ? "page" : undefined}
-              >
-                <CartIcon />
-                {SHOP_FREE_BLUEPRINTS_LABEL}
-                {cartCount > 0 ? <span className="cart-badge">{cartCount}</span> : null}
-              </Link>
-            ) : (
-              <Link key={item.href} href={item.href} aria-current={pathname.startsWith(item.href) ? "page" : undefined}>
-                {item.label}
-              </Link>
-            ),
-          )}
-        </nav>
-        <div className="top-spacer" />
-        {api.mode === "demo" ? <span className="demo-pill">Interactive Demo</span> : null}
-        <WorkspaceSwitcher />
-        <span className="who" title={api.session.email}>
-          {api.session.email}
-          {api.role ? ` · ${roleLabel(api.role)}` : ""}
-        </span>
-        {api.mode === "demo" ? (
-          <button type="button" className="btn btn-ghost" onClick={api.resetDemoData}>
-            Reset demo
+        <div className="topbar-main">
+          <Link href="/catalog" className="brand">
+            <strong>Security Service Catalog</strong>
+            <span>Catalog builder</span>
+          </Link>
+          <nav className="nav" aria-label="Primary">
+            {primaryNavFor(api.canAdmin).map((item) =>
+              item.cart ? (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-label={TEMPLATES_LABEL}
+                  aria-current={primaryNavCurrent(pathname, item.href) ? "page" : undefined}
+                >
+                  <CartIcon />
+                  {TEMPLATES_LABEL}
+                  {cartCount > 0 ? <span className="cart-badge">{cartCount}</span> : null}
+                </Link>
+              ) : (
+                <Link key={item.href} href={item.href} aria-current={primaryNavCurrent(pathname, item.href) ? "page" : undefined}>
+                  {item.label}
+                </Link>
+              ),
+            )}
+          </nav>
+          <div className="top-spacer" />
+          <WorkspaceSwitcher />
+          <span className="who" title={api.session.email}>
+            {api.session.email}
+            {api.role ? ` · ${roleLabel(api.role)}` : ""}
+          </span>
+          <button type="button" className="btn btn-secondary" onClick={() => void api.signOut()}>
+            Sign out
           </button>
+        </div>
+        {api.mode === "demo" ? (
+          <div className="topbar-demo">
+            <span className="demo-pill">Interactive Demo</span>
+            <button type="button" className="btn btn-ghost" onClick={api.resetDemoData}>
+              Reset demo
+            </button>
+          </div>
         ) : null}
-        <button type="button" className="btn btn-secondary" onClick={() => void api.signOut()}>
-          Sign out
-        </button>
       </header>
       {api.mode === "demo" ? (
         <div className="banner">

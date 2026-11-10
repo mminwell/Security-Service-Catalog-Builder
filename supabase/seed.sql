@@ -11,7 +11,8 @@
 -- supabase/migrations/0008_v4_artifacts.sql
 -- No real client names, credentials, or project URLs.
 -- The CSF 2.0 core is loaded by 0004. The block below repeats it so a later seed stays idempotent.
--- Optional field groups and the unloaded framework registry are repeated from 0005.
+-- Optional field groups are repeated from 0005.
+-- NIST CSF 2.0 is the only framework the app shows. 0005 may still insert unused framework rows. This seed does not repeat them.
 
 insert into public.field_definitions (
   tenant_id, field_key, label, help_text, input_type, lookup_field_key,
@@ -193,7 +194,6 @@ insert into public.lookup_options (
   (null, $sscb$artifact_type$sscb$, $sscb$standard$sscb$, $sscb$Standard$sscb$, $sscb$Mandatory rules that make a policy specific enough to follow.$sscb$, null, 20, true),
   (null, $sscb$artifact_type$sscb$, $sscb$procedure$sscb$, $sscb$Procedure / Runbook$sscb$, $sscb$Steps a person or team follows. Includes runbooks and playbooks.$sscb$, null, 30, true),
   (null, $sscb$artifact_type$sscb$, $sscb$tool$sscb$, $sscb$Tool$sscb$, $sscb$A product or system the service uses. The link opens the tool or its record.$sscb$, null, 40, true),
-  (null, $sscb$artifact_type$sscb$, $sscb$guideline$sscb$, $sscb$Guideline$sscb$, $sscb$Recommended practice. Not mandatory the way a standard is. Retire this option if the workspace does not use guidelines.$sscb$, null, 50, true),
   (null, $sscb$artifact_status$sscb$, $sscb$draft$sscb$, $sscb$Draft$sscb$, $sscb$Started, and not yet in force.$sscb$, null, 10, true),
   (null, $sscb$artifact_status$sscb$, $sscb$active$sscb$, $sscb$Active$sscb$, $sscb$In force and expected to be current.$sscb$, null, 20, true),
   (null, $sscb$artifact_status$sscb$, $sscb$under_review$sscb$, $sscb$Under Review$sscb$, $sscb$Being revised. Still the version people should use until it is replaced.$sscb$, null, 30, true),
@@ -529,29 +529,6 @@ update public.field_definitions
 set field_group = $sscb$privacy$sscb$
 where field_key in ($sscb$personal_data_recorded$sscb$, $sscb$recorded_jurisdictions$sscb$, $sscb$privacy_operations_notes$sscb$)
   and field_group is distinct from $sscb$privacy$sscb$;
-
--- Selectable frameworks with no control text. NIST CSF 2.0 is not updated here.
-
-insert into public.frameworks (
-  id, code, version, name, published_on, publication, publication_url,
-  source_title, source_tool, source_url, reference_tool_url, retrieved_on,
-  export_change_log, export_generated_at, export_sha256, content_sha256,
-  id_namespace, excluded_withdrawn_rows, provenance, is_active, content_state, license_note
-) values
-  ($sscb$ddbb042c-94ed-534b-b984-cf73b4d118bd$sscb$::uuid, $sscb$ISO-27001$sscb$, $sscb$2022$sscb$, $sscb$ISO/IEC 27001$sscb$, $sscb$2022-10-25$sscb$::date, $sscb$ISO/IEC 27001:2022$sscb$, $sscb$$sscb$, $sscb$ISO/IEC 27001:2022$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, null, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, 0, $sscb$ISO/IEC 27001:2022 control text is not included. The standard is licensed. Import an authorized CSV if your organization has the rights to use that text.$sscb$, true, $sscb$not_loaded$sscb$, $sscb$ISO/IEC 27001:2022 is copyrighted by ISO. This catalog does not ship its control set.$sscb$),
-  ($sscb$5e572c39-1e18-50b2-a156-70fb3a8f99ff$sscb$::uuid, $sscb$SOC2-TSC$sscb$, $sscb$2017$sscb$, $sscb$AICPA Trust Services Criteria$sscb$, $sscb$2017-04-01$sscb$::date, $sscb$TSP section 100 (2017)$sscb$, $sscb$$sscb$, $sscb$TSP section 100 (2017)$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, null, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, 0, $sscb$Trust Services Criteria text is not included. The criteria are copyrighted by the AICPA. Import an authorized CSV if your organization has the rights to use that text.$sscb$, true, $sscb$not_loaded$sscb$, $sscb$The AICPA Trust Services Criteria are copyrighted. This catalog does not ship them.$sscb$),
-  ($sscb$fbc75172-4771-5432-90f8-65554708166b$sscb$::uuid, $sscb$CIS-V8$sscb$, $sscb$8$sscb$, $sscb$CIS Controls$sscb$, $sscb$2021-05-01$sscb$::date, $sscb$CIS Controls v8$sscb$, $sscb$$sscb$, $sscb$CIS Controls v8$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, null, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, 0, $sscb$CIS Controls v8 safeguards are not included. They are licensed by CIS. Import an authorized CSV if your organization has the rights to use that text.$sscb$, true, $sscb$not_loaded$sscb$, $sscb$CIS Controls are copyrighted by the Center for Internet Security. This catalog does not ship them.$sscb$),
-  ($sscb$e1d4e213-aef9-50d8-9879-9de7cf0cea55$sscb$::uuid, $sscb$HIPAA-SR$sscb$, $sscb$45-CFR-164$sscb$, $sscb$HIPAA Security Rule$sscb$, $sscb$2013-01-25$sscb$::date, $sscb$45 CFR Part 164 Subpart C$sscb$, $sscb$$sscb$, $sscb$45 CFR Part 164 Subpart C$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, null, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, 0, $sscb$The HIPAA Security Rule is public regulation. This release does not ship a reconstructed control list. Import a CSV your team prepared from 45 CFR Part 164 Subpart C if you want those citations in the catalog.$sscb$, true, $sscb$not_loaded$sscb$, $sscb$45 CFR Part 164 Subpart C is public regulation. No control text is seeded, so the catalog cannot imply a complete HIPAA catalog.$sscb$),
-  ($sscb$b8773c64-04ed-53f5-aae5-fb79f19c8dcb$sscb$::uuid, $sscb$NIST-AI-RMF$sscb$, $sscb$1.0$sscb$, $sscb$NIST AI Risk Management Framework$sscb$, $sscb$2023-01-26$sscb$::date, $sscb$NIST AI 100-1$sscb$, $sscb$$sscb$, $sscb$NIST AI 100-1$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, null, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, 0, $sscb$NIST AI RMF 1.0 is a public NIST publication. This release does not include an unverified copy of its functions and categories. Import a CSV taken from the publication you use.$sscb$, true, $sscb$not_loaded$sscb$, $sscb$No AI RMF core is seeded in this release. Coverage stays empty until an authorized import.$sscb$),
-  ($sscb$9252398c-caaa-573a-aac6-07d125cc568b$sscb$::uuid, $sscb$NIST-PF$sscb$, $sscb$1.0$sscb$, $sscb$NIST Privacy Framework$sscb$, $sscb$2020-01-16$sscb$::date, $sscb$NIST Privacy Framework 1.0$sscb$, $sscb$$sscb$, $sscb$NIST Privacy Framework 1.0$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, null, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, 0, $sscb$The NIST Privacy Framework 1.0 is a public NIST publication. This release does not include an unverified copy of its core. Import a CSV taken from the publication you use.$sscb$, true, $sscb$not_loaded$sscb$, $sscb$No Privacy Framework core is seeded in this release. Coverage stays empty until an authorized import.$sscb$)
-on conflict (code, version) do update set
-  name = excluded.name,
-  publication = excluded.publication,
-  provenance = excluded.provenance,
-  license_note = excluded.license_note,
-  content_state = excluded.content_state,
-  is_active = excluded.is_active
-where public.frameworks.code <> 'NIST-CSF';
 
 do $$
 declare

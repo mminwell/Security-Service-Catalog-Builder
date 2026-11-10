@@ -190,7 +190,7 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
     <>
       {isNew ? (
         <p className="scratch-banner">
-          Don&apos;t start from scratch — <Link href="/blueprints">browse pre-built security service blueprints →</Link>
+          Don&apos;t start from scratch — <Link href="/templates">browse templates →</Link>
         </p>
       ) : null}
       <div className="page-head">

@@ -489,7 +489,8 @@ const seed = `-- Optional sample data for Security Service Catalog Builder.
 -- supabase/migrations/0008_v4_artifacts.sql
 -- No real client names, credentials, or project URLs.
 -- The CSF 2.0 core is loaded by 0004. The block below repeats it so a later seed stays idempotent.
--- Optional field groups and the unloaded framework registry are repeated from 0005.
+-- Optional field groups are repeated from 0005.
+-- NIST CSF 2.0 is the only framework the app shows. 0005 may still insert unused framework rows. This seed does not repeat them.
 
 ${fieldInsert("on conflict (field_key) where tenant_id is null do nothing")}
 
@@ -498,8 +499,6 @@ ${lookupInsert("on conflict (field_key, code) where tenant_id is null do nothing
 ${frameworkSeed("on conflict (framework_id, code) where tenant_id is null")}
 
 ${optionalCatalogSql()}
-
-${frameworkRegistrySql()}
 
 ${SAMPLE_TENANTS.map((tenant) =>
   sampleBlock(

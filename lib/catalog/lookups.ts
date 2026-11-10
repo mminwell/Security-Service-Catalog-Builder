@@ -134,7 +134,7 @@ export const LOOKUP_GROUPS: LookupGroup[] = [
     field_key: "artifact_type",
     title: "Artifact Types",
     blurb:
-      "Policy, standard, procedure, tool, and guideline. These options are editable. The app does not hard-code the list.",
+      "Policy, standard, procedure, and tool. These options are editable. The app does not hard-code the list.",
   },
   {
     field_key: "artifact_status",
@@ -593,11 +593,6 @@ export const STARTER_LOOKUPS: LookupSeed[] = [
       code: "tool",
       label: "Tool",
       description: "A product or system the service uses. The link opens the tool or its record.",
-    },
-    {
-      code: "guideline",
-      label: "Guideline",
-      description: "Recommended practice. Not mandatory the way a standard is. Retire this option if the workspace does not use guidelines.",
     },
   ]),
   ...rows("artifact_status", [

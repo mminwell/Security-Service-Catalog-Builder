@@ -67,13 +67,24 @@ p { margin: 0; }
   top: 0;
   z-index: 30;
   display: flex;
-  align-items: center;
-  gap: 18px;
-  min-height: 64px;
-  padding: 10px 22px;
+  flex-direction: column;
+  align-items: stretch;
   background: var(--white);
   border-bottom: var(--border);
-  flex-wrap: wrap;
+}
+.topbar-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 64px;
+  padding: 8px 22px;
+  flex-wrap: nowrap;
+}
+.topbar-demo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 22px 8px;
 }
 
 .brand {
@@ -99,8 +110,9 @@ p { margin: 0; }
 .nav {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+  gap: 2px;
 }
 .nav a {
   display: inline-flex;
@@ -109,8 +121,9 @@ p { margin: 0; }
   text-decoration: none;
   font-size: 14px;
   color: var(--gray-700);
-  padding: 8px 10px;
+  padding: 8px 8px;
   border-bottom: 2px solid transparent;
+  white-space: nowrap;
 }
 .nav a[aria-current="page"] {
   color: var(--slate);
@@ -134,6 +147,8 @@ p { margin: 0; }
   font-size: 13px;
   color: var(--gray-700);
   max-width: 220px;
+  min-width: 0;
+  flex-shrink: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

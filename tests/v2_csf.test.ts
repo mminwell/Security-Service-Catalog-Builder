@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { planBlueprintCheckout } from "@/lib/catalog/checkout";
 import { AGGREGATION_SUMMARY, aggregateCoverage, outcomeMatches } from "@/lib/catalog/coverage";
-import { CSF_CATEGORIES, CSF_ELEMENTS, CSF_FRAMEWORK, CSF_FUNCTIONS, CSF_OUTCOMES, elementByCode } from "@/lib/catalog/framework";
+import { CSF_CATEGORIES, CSF_ELEMENTS, CSF_FRAMEWORK, CSF_FUNCTIONS, CSF_OUTCOMES, elementByCode, outcomeChoiceGroups } from "@/lib/catalog/framework";
 import { STARTER_FIELDS } from "@/lib/catalog/fields";
 import { STARTER_LOOKUPS } from "@/lib/catalog/lookups";
 import core from "@/lib/catalog/nist-csf-2.0.json";
@@ -428,6 +428,30 @@ function withRole(db: CatalogDb, role: Role): CatalogDb {
     members: db.members.map((member) => (member.user_id === DEMO_USER_ID ? { ...member, role } : member)),
   };
 }
+
+describe("service attach list", () => {
+  it("offers only unattached CSF subcategories, grouped by function and category", () => {
+    const attached = elementByCode("DE.CM-01");
+    if (!attached) throw new Error("DE.CM-01");
+    const open = outcomeChoiceGroups({ elements: CSF_ELEMENTS, frameworkId: CSF_FRAMEWORK.id });
+    const choices = open.flatMap((group) => group.outcomes);
+    expect(choices).toHaveLength(106);
+    expect(choices.some((choice) => choice.label.startsWith("DE.CM-01 · Networks and network services are monitored"))).toBe(true);
+    const monitor = open.find((group) => group.label.includes("DE.CM"));
+    expect(monitor?.label.toLowerCase()).toContain("detect");
+    expect(monitor?.outcomes.some((outcome) => outcome.id === attached.id)).toBe(true);
+
+    const remaining = outcomeChoiceGroups({
+      elements: CSF_ELEMENTS,
+      frameworkId: CSF_FRAMEWORK.id,
+      excludeIds: new Set([attached.id]),
+    });
+    const left = remaining.flatMap((group) => group.outcomes);
+    expect(left).toHaveLength(105);
+    expect(left.some((choice) => choice.id === attached.id)).toBe(false);
+    expect(remaining.every((group) => group.outcomes.length > 0)).toBe(true);
+  });
+});
 
 function activeService(db: CatalogDb): ServiceRecord {
   const service = db.services.find((item) => item.tenant_id === db.activeTenantId && !item.archived_at);

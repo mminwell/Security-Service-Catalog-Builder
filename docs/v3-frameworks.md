@@ -1,5 +1,7 @@
 # V3 frameworks and exports
 
+The app shows NIST CSF 2.0 only. CSF Mapping has no framework picker and no importer for other catalogs. Tables from `0005` can still hold unused framework rows. The app does not list them. Demo mode keeps only the NIST core.
+
 V3 keeps the NIST CSF 2.0 core from V2. No other control text is seeded.
 
 ## Why the other frameworks are empty

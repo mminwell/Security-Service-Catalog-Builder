@@ -77,7 +77,8 @@ export const ADDITIONAL_FRAMEWORKS: FrameworkRelease[] = [
   }),
 ];
 
-export const FRAMEWORK_CATALOG: FrameworkRelease[] = [CSF_FRAMEWORK, ...ADDITIONAL_FRAMEWORKS];
+/** The app shows NIST CSF 2.0 only. Other framework rows may still exist in the database from 0005. */
+export const FRAMEWORK_CATALOG: FrameworkRelease[] = [CSF_FRAMEWORK];
 
 export function elementsInScope(
   elements: readonly FrameworkElement[],

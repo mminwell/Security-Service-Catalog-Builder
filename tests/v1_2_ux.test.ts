@@ -13,7 +13,7 @@ import {
 } from "@/lib/catalog/blueprint-view";
 import { CATALOG_SEARCH_DESKTOP, CATALOG_SEARCH_PLACEHOLDER, CATALOG_TOOLBAR_CONTROLS, catalogSearchWidth } from "@/lib/catalog/catalog-toolbar";
 import { placeAnchoredPanel, placementRelativeToTrigger } from "@/lib/catalog/popup-placement";
-import { SHOP_FREE_BLUEPRINTS_LABEL } from "@/lib/catalog/shop-label";
+import { ADD_TEMPLATES_LABEL, TEMPLATES_LABEL } from "@/lib/catalog/shop-label";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -142,22 +142,27 @@ describe("blueprint store view", () => {
     expect(listRow).not.toContain("blueprint.description");
     expect(listRow).not.toContain("blueprint.in_scope");
     expect(listRow).not.toContain("blueprint.deliverables");
-    expect(source).toContain('aria-label="Blueprint layout"');
+    expect(source).toContain('aria-label="Template layout"');
     expect(source).toContain("{SKIP_EXISTING_LABEL}");
     expect(source.indexOf("data-section=\"starter-packs\"")).toBeLessThan(source.indexOf("{SKIP_EXISTING_LABEL}"));
   });
 });
 
-describe("shop free blueprints label", () => {
-  it("uses the exact label and cart icon on the nav and catalog header", () => {
-    expect(SHOP_FREE_BLUEPRINTS_LABEL).toBe("Shop Free Blueprints");
-    for (const file of ["components/shell.tsx", "components/catalog-screen.tsx"]) {
-      const source = readFileSync(file, "utf8");
-      expect(source).toContain("SHOP_FREE_BLUEPRINTS_LABEL");
-      expect(source).toContain("<CartIcon />");
-      expect(source).toContain('href="/blueprints"');
-      expect(source).toContain("aria-label={SHOP_FREE_BLUEPRINTS_LABEL}");
-      expect(source).not.toContain("Shop Blueprints");
-    }
+describe("templates label", () => {
+  it("uses Templates in the nav and Add Template(s) above the catalog", () => {
+    expect(TEMPLATES_LABEL).toBe("Templates");
+    expect(ADD_TEMPLATES_LABEL).toBe("Add Template(s)");
+    const shell = readFileSync("components/shell.tsx", "utf8");
+    expect(shell).toContain("TEMPLATES_LABEL");
+    expect(shell).toContain("<CartIcon />");
+    expect(shell).toContain('href={item.href}');
+    expect(shell).toContain("aria-label={TEMPLATES_LABEL}");
+    const catalog = readFileSync("components/catalog-screen.tsx", "utf8");
+    expect(catalog).toContain("ADD_TEMPLATES_LABEL");
+    expect(catalog).toContain("<CartIcon />");
+    expect(catalog).toContain('href="/templates"');
+    expect(catalog).toContain("aria-label={ADD_TEMPLATES_LABEL}");
+    expect(catalog).not.toContain("Shop Free Blueprints");
+    expect(shell).not.toContain("Shop Free Blueprints");
   });
 });

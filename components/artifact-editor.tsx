@@ -83,6 +83,11 @@ export function ArtifactEditor({ artifactId }: { artifactId: string }) {
           </p>
         </div>
         <div className="row-actions">
+          {isNew ? (
+            <Link className="btn btn-secondary" href="/artifacts">
+              Cancel
+            </Link>
+          ) : null}
           {api.canAdmin && !isNew ? (
             <button type="button" className="btn btn-secondary" onClick={() => setConfirmDelete(true)}>
               Delete

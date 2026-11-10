@@ -288,7 +288,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       artifacts,
       artifactLinks,
       framework: db?.frameworks.find((item) => item.is_active && item.code === "NIST-CSF") ?? null,
-      frameworks: db?.frameworks.filter((item) => item.is_active) ?? [],
+      frameworks: db?.frameworks.filter((item) => item.is_active && item.code === "NIST-CSF") ?? [],
       elements: db?.elements ?? [],
       mappings,
       exportProfiles,

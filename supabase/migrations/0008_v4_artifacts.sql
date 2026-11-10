@@ -165,7 +165,6 @@ insert into public.lookup_options (
   (null, $sscb$artifact_type$sscb$, $sscb$standard$sscb$, $sscb$Standard$sscb$, $sscb$Mandatory rules that make a policy specific enough to follow.$sscb$, null, 20, true),
   (null, $sscb$artifact_type$sscb$, $sscb$procedure$sscb$, $sscb$Procedure / Runbook$sscb$, $sscb$Steps a person or team follows. Includes runbooks and playbooks.$sscb$, null, 30, true),
   (null, $sscb$artifact_type$sscb$, $sscb$tool$sscb$, $sscb$Tool$sscb$, $sscb$A product or system the service uses. The link opens the tool or its record.$sscb$, null, 40, true),
-  (null, $sscb$artifact_type$sscb$, $sscb$guideline$sscb$, $sscb$Guideline$sscb$, $sscb$Recommended practice. Not mandatory the way a standard is. Retire this option if the workspace does not use guidelines.$sscb$, null, 50, true),
   (null, $sscb$artifact_status$sscb$, $sscb$draft$sscb$, $sscb$Draft$sscb$, $sscb$Started, and not yet in force.$sscb$, null, 10, true),
   (null, $sscb$artifact_status$sscb$, $sscb$active$sscb$, $sscb$Active$sscb$, $sscb$In force and expected to be current.$sscb$, null, 20, true),
   (null, $sscb$artifact_status$sscb$, $sscb$under_review$sscb$, $sscb$Under Review$sscb$, $sscb$Being revised. Still the version people should use until it is replaced.$sscb$, null, 30, true),

@@ -78,8 +78,8 @@ describe("artifact registry", () => {
     const created = normalizeArtifact({
       id: "33333333-3333-4333-8333-333333333333",
       tenant_id: tenantId,
-      name: "AI Use Guideline",
-      artifact_type: "guideline",
+      name: "AI Use Standard",
+      artifact_type: "standard",
       owner_team: "privacy_ai_gov",
       status: "draft",
       version: "0.1",
@@ -324,7 +324,9 @@ describe("artifact CSV import and demo migration", () => {
     if (!migrated) throw new Error("migrate");
     expect(migrated.services.find((service) => service.service_code === "SVC-001" && service.tenant_id === tenantId)?.name).toBe("Edited watch");
     expect(migrated.artifacts.some((artifact) => artifact.name === INTERNAL_NAME)).toBe(true);
-    expect(migrated.lookups.some((row) => row.tenant_id === tenantId && row.field_key === "artifact_type" && row.code === "guideline")).toBe(true);
+    expect(migrated.lookups.some((row) => row.tenant_id === tenantId && row.field_key === "artifact_type" && row.code === "tool")).toBe(true);
+    expect(migrated.lookups.some((row) => row.field_key === "artifact_type" && row.code === "guideline")).toBe(false);
+    expect(migrated.frameworks.every((framework) => framework.code === "NIST-CSF")).toBe(true);
     const custom = migrateDemoState({
       ...migrated,
       artifacts: migrated.artifacts.map((artifact) => (artifact.name === INTERNAL_NAME ? { ...artifact, version: "kept" } : artifact)),

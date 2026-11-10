@@ -20,8 +20,8 @@ V1 includes the service form, the catalog list, dropdown and field administratio
 - Choose and reorder the columns on the catalog table. Admins can save a workspace default. Everyone else can keep a browser override.
 - Import a lookup group from CSV, including a large roster, with a template download and a column-mapping preview.
 - Map an active service to NIST CSF 2.0 subcategory outcomes as full, partial, or none, with a rationale and notes. Viewers can read the assessments. Editors and admins can change them.
-- Open Coverage to see the six Functions and drill into categories and outcomes. Counts are explicit assessments on active services. Archived services, blueprint hints, and the primary function dropdown are not coverage. A saved mapping is a workspace assessment, not a certification.
-- Register supporting artifacts — policies, standards, procedures and runbooks, tools, and guidelines — and link them to services from either side. Types and statuses are workspace lookups. The app links out to the document or tool. It does not host the file. Overdue reviews and retired artifacts that are still linked are flagged. Public exports include only public artifacts.
+- Open CSF Mapping to see the six NIST CSF 2.0 Functions and drill into categories and outcomes. Counts are explicit assessments on active services. Archived services, template hints, and the primary function dropdown are not assessments. A saved mapping is a workspace assessment, not a certification.
+- Register supporting artifacts — policies, standards, procedures and runbooks, and tools — and link them to services from either side. Types and statuses are workspace lookups. The app links out to the document or tool. It does not host the file. Overdue reviews and retired artifacts that are still linked are flagged. Public exports include only public artifacts.
 
 ## Architecture
 

@@ -6,7 +6,7 @@ V4 adds a workspace registry of the documents and tools a service depends on. Th
 
 Name, type, owner team, status, version, review cadence, last reviewed, next review, link, short description, and visibility. Visibility defaults to Internal.
 
-Type and status are `lookup_options` (`artifact_type`, `artifact_status`). Edit them in Lookups. The app does not hard-code the list. The starter types are Policy, Standard, Procedure / Runbook, Tool, and Guideline. Guideline is included because a security program often keeps recommended practice separate from a mandatory standard. Retire it if you do not use that class.
+Type and status are `lookup_options` (`artifact_type`, `artifact_status`). Edit them in Lookups. The app does not hard-code the list. The starter types are Policy, Standard, Procedure / Runbook, and Tool.
 
 Owner team reuses the shared Teams lookup. Review cadence reuses the service cadence lookup. That is the one extra field: without it, next review could not follow the same monthly, quarterly, semi-annual, and annual rule, and On Change still produces no date. The overdue flag uses that computed date and ignores artifacts whose status code is `retired`. The retired-but-linked flag follows the code `retired`. Renaming the label is safe. Changing that code turns the flag off.
 
@@ -14,7 +14,7 @@ Links are many-to-many, with an optional relationship note. Add or remove them o
 
 ## Navigation
 
-Artifacts is the third item: Catalog, Coverage, Artifacts, Fields, Lookups, Shop Free Blueprints. It sits with the other workspace views. Fields and Lookups stay admin tools, and Shop Free Blueprints stays last.
+Artifacts is the third item: Catalog, CSF Mapping, Artifacts, Fields, Lookups, Templates. It sits with the other workspace views. Fields and Lookups stay admin tools, and Templates stays last. `/blueprints` still opens Templates.
 
 ## Exports
 
@@ -28,4 +28,4 @@ CSV import matches the lookup importer: a template, a column map, and a preview 
 
 ## Blueprints
 
-A few blueprint previews suggest typical artifact types, such as an incident response plan and a runbook. Checkout does not create those documents.
+A few template previews suggest typical artifact types, such as an incident response plan and a runbook. Checkout does not create those documents.
