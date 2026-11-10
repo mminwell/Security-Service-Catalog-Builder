@@ -1,8 +1,8 @@
 # Security Service Catalog Builder
 
-**Status: V3.** A multi-tenant catalog for the security services an organization delivers. Enter each service once, shop a blueprint instead of starting from a blank form, map services to NIST CSF 2.0 outcomes, and export the audience you choose.
+**Status: V4.** A multi-tenant catalog for the security services an organization delivers. Enter each service once, shop a blueprint instead of starting from a blank form, map services to NIST CSF 2.0 outcomes, link the policies and tools that support each service, and export the audience you choose.
 
-V1 includes the service form, the catalog list, dropdown and field administration, CSV export, workspace isolation, and an audit trail. V2 adds the CSF 2.0 core and workspace assessments. V3 adds saved audience profiles and Excel, Word, and PDF exports. Linked artifacts and assisted drafting come later.
+V1 includes the service form, the catalog list, dropdown and field administration, CSV export, workspace isolation, and an audit trail. V2 adds the CSF 2.0 core and workspace assessments. V3 adds saved audience profiles and Excel, Word, and PDF exports. V4 adds a workspace registry of supporting artifacts. Assisted drafting comes later.
 
 ## What you can do
 
@@ -20,7 +20,8 @@ V1 includes the service form, the catalog list, dropdown and field administratio
 - Choose and reorder the columns on the catalog table. Admins can save a workspace default. Everyone else can keep a browser override.
 - Import a lookup group from CSV, including a large roster, with a template download and a column-mapping preview.
 - Map an active service to NIST CSF 2.0 subcategory outcomes as full, partial, or none, with a rationale and notes. Viewers can read the assessments. Editors and admins can change them.
-- Open Coverage to see the six Functions and drill into categories and outcomes. Counts are explicit assessments on active services. Archived services, blueprint hints, and the primary function dropdown are not coverage. A saved mapping is a workspace assessment, not a certification.
+- Open CSF Mapping to see the six NIST CSF 2.0 Functions and drill into categories and outcomes. Counts are explicit assessments on active services. Archived services, template hints, and the primary function dropdown are not assessments. A saved mapping is a workspace assessment, not a certification.
+- Register supporting artifacts — policies, standards, procedures and runbooks, and tools — and link them to services from either side. Types and statuses are workspace lookups. The app links out to the document or tool. It does not host the file. Overdue reviews and retired artifacts that are still linked are flagged. Public exports include only public artifacts.
 
 ## Architecture
 
@@ -69,7 +70,7 @@ Copy `.env.example` to `.env.local` only on your machine. `.env.local` is gitign
 
 ## Repository layout
 
-- `app/` — screens: sign-in, catalog, service form, lookup admin, field admin
+- `app/` — screens: sign-in, catalog, artifacts, service form, lookup admin, field admin
 - `components/` — Birchline interface
 - `lib/catalog/` — fields, starter lookups, computed values, service IDs, CSV, sample catalogs
 - `lib/data/` — Demo Mode store and the Supabase adapter
@@ -78,6 +79,7 @@ Copy `.env.example` to `.env.local` only on your machine. `.env.local` is gitign
 - `supabase/migrations/0003_v1_2_blueprints_columns_import.sql` — catalog column defaults, bulk lookup import, and blueprint checkout
 - `supabase/migrations/0004_v2_csf_mappings.sql` — NIST CSF 2.0 core, outcome assessments, RLS, and audit
 - `supabase/migrations/0005_v3_exports_frameworks.sql` — export profiles, optional geography and privacy fields, and the unloaded framework registry
+- `supabase/migrations/0008_v4_artifacts.sql` — artifact registry, service links, review-date trigger, and artifact lookups
 - `supabase/seed.sql` — the same starter lookups, the CSF 2.0 core, plus Acme Corp and Meridian Health
 - `docs/nist-csf-2.0-provenance.md` — source, version, and content hash for the CSF core
 - `tests/` — computed fields, service IDs, CSV visibility and distribution markings, filters, archive, field retirement, depth behavior
@@ -94,8 +96,12 @@ Geography and privacy field groups are off until an admin turns them on. Turning
 
 NIST CSF 2.0 remains the only seeded framework. ISO/IEC 27001, the AICPA Trust Services Criteria, CIS Controls, the HIPAA Security Rule, NIST AI RMF, and the NIST Privacy Framework can be selected and show “not loaded—authorized content needed” until an admin imports an authorized CSV. That import does not crosswalk frameworks and does not change the NIST denominator. See [docs/v3-frameworks.md](docs/v3-frameworks.md).
 
+## Supporting artifacts
+
+Artifact types and statuses are lookup options, edited in Lookups. Owner team reuses the shared Teams lookup. Review cadence reuses the service cadence list so the next review date is computed the same way. Visibility defaults to Internal. A public export includes a public artifact’s name, type, status, version, description, and http(s) link, and leaves internal artifacts out entirely, including their names and URLs. Owner, review dates, relationship notes, and the overdue or retired flags stay in the full export. See [docs/v4-artifacts.md](docs/v4-artifacts.md).
+
 ## Later versions
 
-V4 links tools, runbooks, and policies. V5 may suggest text, and a person approves every save.
+V5 may suggest text, and a person approves every save.
 
 A license has not been selected yet.

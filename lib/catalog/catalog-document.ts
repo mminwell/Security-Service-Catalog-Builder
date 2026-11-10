@@ -1,6 +1,8 @@
+import { artifactExportRows } from "@/lib/catalog/artifacts";
 import { displayExportValue, formatExportValue } from "@/lib/catalog/export-value";
 import { monogram } from "@/lib/catalog/logos";
-import type { FieldDefinition, LookupOption, ServiceRecord, Visibility } from "@/lib/catalog/types";
+import { localToday } from "@/lib/catalog/present";
+import type { Artifact, ArtifactLink, FieldDefinition, LookupOption, ServiceRecord, Visibility } from "@/lib/catalog/types";
 
 export type CatalogDocument = {
   workspaceName: string;
@@ -12,6 +14,7 @@ export type CatalogDocument = {
   serviceCount: number;
   fieldLabels: string[];
   services: Array<{ code: string; name: string; heading: string; rows: Array<{ label: string; value: string }> }>;
+  artifacts: Array<{ heading: string; rows: Array<{ label: string; value: string }> }>;
   notes: string[];
 };
 
@@ -24,6 +27,9 @@ export function buildCatalogDocument(args: {
   services: ServiceRecord[];
   fields: FieldDefinition[];
   lookups: LookupOption[];
+  artifacts?: Artifact[];
+  artifactLinks?: ArtifactLink[];
+  today?: string;
 }): CatalogDocument {
   const geo = args.fields.some((field) => field.field_group === "geography" || field.field_group === "privacy");
   const notes = [
@@ -31,6 +37,7 @@ export function buildCatalogDocument(args: {
     `Audience: ${args.audience === "internal" ? "Internal" : "Public"}.`,
     "Fields follow the selected order. Empty values are shown as an em dash.",
     "This is a service catalog. It is not a certification, an audit report, or a compliance determination.",
+    "Supporting artifacts are links. This file does not contain the documents themselves.",
   ];
   if (geo) {
     notes.push("Geography and privacy fields are workspace records. They are not legal conclusions.");
@@ -55,8 +62,41 @@ export function buildCatalogDocument(args: {
         value: displayExportValue(formatExportValue(service, field, args.lookups)),
       })),
     })),
+    artifacts: artifactDocumentRows(args),
     notes,
   };
+}
+
+function artifactDocumentRows(args: {
+  audience: Visibility;
+  services: ServiceRecord[];
+  fields: FieldDefinition[];
+  lookups: LookupOption[];
+  artifacts?: Artifact[];
+  artifactLinks?: ArtifactLink[];
+  today?: string;
+}): CatalogDocument["artifacts"] {
+  const table = artifactExportRows({
+    audience: args.audience,
+    includeServiceCode: args.fields.some((field) => field.field_key === "service_code"),
+    services: args.services,
+    artifacts: args.artifacts ?? [],
+    links: args.artifactLinks ?? [],
+    lookups: args.lookups,
+    today: args.today ?? localToday(),
+  });
+  if (table.rows.length === 0) {
+    return [{ heading: "Supporting artifacts", rows: [{ label: "Artifacts", value: "No artifacts in this export." }] }];
+  }
+  return table.rows.map((row) => ({
+    heading: row.heading,
+    rows: table.columns
+      .filter((column) => column.key !== "service_code" && column.key !== "service_name")
+      .map((column) => ({
+        label: column.label,
+        value: displayExportValue(row.cells[column.key] ?? ""),
+      })),
+  }));
 }
 
 /** Inline PNG or JPEG only. Remote URLs are ignored so an export does not fetch them. */

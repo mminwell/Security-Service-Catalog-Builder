@@ -6,9 +6,13 @@
 -- supabase/migrations/0003_v1_2_blueprints_columns_import.sql
 -- supabase/migrations/0004_v2_csf_mappings.sql
 -- supabase/migrations/0005_v3_exports_frameworks.sql
+-- supabase/migrations/0006_v3_field_lookup_toggle.sql
+-- supabase/migrations/0007_v3_public_defaults.sql
+-- supabase/migrations/0008_v4_artifacts.sql
 -- No real client names, credentials, or project URLs.
 -- The CSF 2.0 core is loaded by 0004. The block below repeats it so a later seed stays idempotent.
--- Optional field groups and the unloaded framework registry are repeated from 0005.
+-- Optional field groups are repeated from 0005.
+-- NIST CSF 2.0 is the only framework the app shows. 0005 may still insert unused framework rows. This seed does not repeat them.
 
 insert into public.field_definitions (
   tenant_id, field_key, label, help_text, input_type, lookup_field_key,
@@ -43,7 +47,7 @@ insert into public.field_definitions (
   (null, $sscb$sla_resolution_target$sscb$, $sscb$SLA Resolution$sscb$, $sscb$Resolution or containment target by severity.$sscb$, $sscb$text$sscb$, null, false, $sscb$internal$sscb$, 2, 270, true, true),
   (null, $sscb$primary_csf_function$sscb$, $sscb$Primary CSF Function$sscb$, $sscb$Primary NIST CSF 2.0 function for this service. This dropdown is not an outcome assessment and does not count as coverage.$sscb$, $sscb$dropdown$sscb$, $sscb$primary_csf_function$sscb$, false, $sscb$internal$sscb$, 2, 280, true, true),
   (null, $sscb$capability_rating$sscb$, $sscb$Capability Rating$sscb$, $sscb$Whether the service fully delivers, partially delivers, or does not yet deliver its declared scope.$sscb$, $sscb$dropdown$sscb$, $sscb$capability_rating$sscb$, false, $sscb$internal$sscb$, 2, 290, true, true),
-  (null, $sscb$current_tooling_notes$sscb$, $sscb$Current Tooling$sscb$, $sscb$Tools used to run the service today. Internal until linked artifacts exist.$sscb$, $sscb$textarea$sscb$, null, false, $sscb$internal$sscb$, 2, 300, true, true),
+  (null, $sscb$current_tooling_notes$sscb$, $sscb$Current Tooling$sscb$, $sscb$Tools used to run the service today. Linked artifacts are the inventory. This note stays internal.$sscb$, $sscb$textarea$sscb$, null, false, $sscb$internal$sscb$, 2, 300, true, true),
   (null, $sscb$internal_notes$sscb$, $sscb$Internal Notes$sscb$, $sscb$Caveats, runbook pointers, and other notes that must not appear in a public export.$sscb$, $sscb$textarea$sscb$, null, false, $sscb$internal$sscb$, 2, 310, true, true),
   (null, $sscb$threats_addressed$sscb$, $sscb$Threats Addressed$sscb$, $sscb$Threat classes this service is meant to mitigate.$sscb$, $sscb$textarea$sscb$, null, false, $sscb$internal$sscb$, 3, 320, true, true),
   (null, $sscb$data_classification_handled$sscb$, $sscb$Data Classification$sscb$, $sscb$Highest classification of data this service routinely handles.$sscb$, $sscb$dropdown$sscb$, $sscb$data_classification$sscb$, false, $sscb$internal$sscb$, 3, 330, true, true),
@@ -186,6 +190,14 @@ insert into public.lookup_options (
   (null, $sscb$personal_data_recorded$sscb$, $sscb$not_recorded$sscb$, $sscb$Not recorded$sscb$, $sscb$The workspace has not recorded whether personal data is handled.$sscb$, null, 10, true),
   (null, $sscb$personal_data_recorded$sscb$, $sscb$no$sscb$, $sscb$No$sscb$, $sscb$The workspace recorded that this service does not handle personal data.$sscb$, null, 20, true),
   (null, $sscb$personal_data_recorded$sscb$, $sscb$yes$sscb$, $sscb$Yes$sscb$, $sscb$The workspace recorded that this service handles personal data. This is not a legal classification.$sscb$, null, 30, true),
+  (null, $sscb$artifact_type$sscb$, $sscb$policy$sscb$, $sscb$Policy$sscb$, $sscb$A management statement of what the organization requires.$sscb$, null, 10, true),
+  (null, $sscb$artifact_type$sscb$, $sscb$standard$sscb$, $sscb$Standard$sscb$, $sscb$Mandatory rules that make a policy specific enough to follow.$sscb$, null, 20, true),
+  (null, $sscb$artifact_type$sscb$, $sscb$procedure$sscb$, $sscb$Procedure / Runbook$sscb$, $sscb$Steps a person or team follows. Includes runbooks and playbooks.$sscb$, null, 30, true),
+  (null, $sscb$artifact_type$sscb$, $sscb$tool$sscb$, $sscb$Tool$sscb$, $sscb$A product or system the service uses. The link opens the tool or its record.$sscb$, null, 40, true),
+  (null, $sscb$artifact_status$sscb$, $sscb$draft$sscb$, $sscb$Draft$sscb$, $sscb$Started, and not yet in force.$sscb$, null, 10, true),
+  (null, $sscb$artifact_status$sscb$, $sscb$active$sscb$, $sscb$Active$sscb$, $sscb$In force and expected to be current.$sscb$, null, 20, true),
+  (null, $sscb$artifact_status$sscb$, $sscb$under_review$sscb$, $sscb$Under Review$sscb$, $sscb$Being revised. Still the version people should use until it is replaced.$sscb$, null, 30, true),
+  (null, $sscb$artifact_status$sscb$, $sscb$retired$sscb$, $sscb$Retired$sscb$, $sscb$No longer in force. A link that remains is a stale-documentation flag, not a recommendation.$sscb$, null, 40, true),
   (null, $sscb$recorded_jurisdiction$sscb$, $sscb$not_recorded$sscb$, $sscb$Not recorded$sscb$, $sscb$The workspace has not recorded a jurisdiction.$sscb$, null, 10, true),
   (null, $sscb$recorded_jurisdiction$sscb$, $sscb$us$sscb$, $sscb$United States$sscb$, $sscb$Noted by the workspace. Not a finding that a US privacy law applies.$sscb$, null, 20, true),
   (null, $sscb$recorded_jurisdiction$sscb$, $sscb$ca$sscb$, $sscb$Canada$sscb$, $sscb$Noted by the workspace. Not a finding that a Canadian privacy law applies.$sscb$, null, 30, true),
@@ -518,29 +530,6 @@ set field_group = $sscb$privacy$sscb$
 where field_key in ($sscb$personal_data_recorded$sscb$, $sscb$recorded_jurisdictions$sscb$, $sscb$privacy_operations_notes$sscb$)
   and field_group is distinct from $sscb$privacy$sscb$;
 
--- Selectable frameworks with no control text. NIST CSF 2.0 is not updated here.
-
-insert into public.frameworks (
-  id, code, version, name, published_on, publication, publication_url,
-  source_title, source_tool, source_url, reference_tool_url, retrieved_on,
-  export_change_log, export_generated_at, export_sha256, content_sha256,
-  id_namespace, excluded_withdrawn_rows, provenance, is_active, content_state, license_note
-) values
-  ($sscb$ddbb042c-94ed-534b-b984-cf73b4d118bd$sscb$::uuid, $sscb$ISO-27001$sscb$, $sscb$2022$sscb$, $sscb$ISO/IEC 27001$sscb$, $sscb$2022-10-25$sscb$::date, $sscb$ISO/IEC 27001:2022$sscb$, $sscb$$sscb$, $sscb$ISO/IEC 27001:2022$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, null, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, 0, $sscb$ISO/IEC 27001:2022 control text is not included. The standard is licensed. Import an authorized CSV if your organization has the rights to use that text.$sscb$, true, $sscb$not_loaded$sscb$, $sscb$ISO/IEC 27001:2022 is copyrighted by ISO. This catalog does not ship its control set.$sscb$),
-  ($sscb$5e572c39-1e18-50b2-a156-70fb3a8f99ff$sscb$::uuid, $sscb$SOC2-TSC$sscb$, $sscb$2017$sscb$, $sscb$AICPA Trust Services Criteria$sscb$, $sscb$2017-04-01$sscb$::date, $sscb$TSP section 100 (2017)$sscb$, $sscb$$sscb$, $sscb$TSP section 100 (2017)$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, null, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, 0, $sscb$Trust Services Criteria text is not included. The criteria are copyrighted by the AICPA. Import an authorized CSV if your organization has the rights to use that text.$sscb$, true, $sscb$not_loaded$sscb$, $sscb$The AICPA Trust Services Criteria are copyrighted. This catalog does not ship them.$sscb$),
-  ($sscb$fbc75172-4771-5432-90f8-65554708166b$sscb$::uuid, $sscb$CIS-V8$sscb$, $sscb$8$sscb$, $sscb$CIS Controls$sscb$, $sscb$2021-05-01$sscb$::date, $sscb$CIS Controls v8$sscb$, $sscb$$sscb$, $sscb$CIS Controls v8$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, null, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, 0, $sscb$CIS Controls v8 safeguards are not included. They are licensed by CIS. Import an authorized CSV if your organization has the rights to use that text.$sscb$, true, $sscb$not_loaded$sscb$, $sscb$CIS Controls are copyrighted by the Center for Internet Security. This catalog does not ship them.$sscb$),
-  ($sscb$e1d4e213-aef9-50d8-9879-9de7cf0cea55$sscb$::uuid, $sscb$HIPAA-SR$sscb$, $sscb$45-CFR-164$sscb$, $sscb$HIPAA Security Rule$sscb$, $sscb$2013-01-25$sscb$::date, $sscb$45 CFR Part 164 Subpart C$sscb$, $sscb$$sscb$, $sscb$45 CFR Part 164 Subpart C$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, null, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, 0, $sscb$The HIPAA Security Rule is public regulation. This release does not ship a reconstructed control list. Import a CSV your team prepared from 45 CFR Part 164 Subpart C if you want those citations in the catalog.$sscb$, true, $sscb$not_loaded$sscb$, $sscb$45 CFR Part 164 Subpart C is public regulation. No control text is seeded, so the catalog cannot imply a complete HIPAA catalog.$sscb$),
-  ($sscb$b8773c64-04ed-53f5-aae5-fb79f19c8dcb$sscb$::uuid, $sscb$NIST-AI-RMF$sscb$, $sscb$1.0$sscb$, $sscb$NIST AI Risk Management Framework$sscb$, $sscb$2023-01-26$sscb$::date, $sscb$NIST AI 100-1$sscb$, $sscb$$sscb$, $sscb$NIST AI 100-1$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, null, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, 0, $sscb$NIST AI RMF 1.0 is a public NIST publication. This release does not include an unverified copy of its functions and categories. Import a CSV taken from the publication you use.$sscb$, true, $sscb$not_loaded$sscb$, $sscb$No AI RMF core is seeded in this release. Coverage stays empty until an authorized import.$sscb$),
-  ($sscb$9252398c-caaa-573a-aac6-07d125cc568b$sscb$::uuid, $sscb$NIST-PF$sscb$, $sscb$1.0$sscb$, $sscb$NIST Privacy Framework$sscb$, $sscb$2020-01-16$sscb$::date, $sscb$NIST Privacy Framework 1.0$sscb$, $sscb$$sscb$, $sscb$NIST Privacy Framework 1.0$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, null, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, $sscb$$sscb$, 0, $sscb$The NIST Privacy Framework 1.0 is a public NIST publication. This release does not include an unverified copy of its core. Import a CSV taken from the publication you use.$sscb$, true, $sscb$not_loaded$sscb$, $sscb$No Privacy Framework core is seeded in this release. Coverage stays empty until an authorized import.$sscb$)
-on conflict (code, version) do update set
-  name = excluded.name,
-  publication = excluded.publication,
-  provenance = excluded.provenance,
-  license_note = excluded.license_note,
-  content_state = excluded.content_state,
-  is_active = excluded.is_active
-where public.frameworks.code <> 'NIST-CSF';
-
 do $$
 declare
   v_tenant uuid := $sscb$11111111-1111-4111-8111-111111111111$sscb$::uuid;
@@ -618,3 +607,47 @@ begin
     ($sscb$22222222-2222-4222-8222-222222222004$sscb$::uuid, v_tenant, $sscb$SEC-PRV-001$sscb$, $sscb$Privacy Impact Consults$sscb$, $sscb$PIA desk$sscb$, $sscb$data_privacy$sscb$, $sscb$active$sscb$, $sscb$tier_2$sscb$, $sscb$Advise Meridian Health teams before a project collects, uses, or shares patient or workforce data in a new way.$sscb$, $sscb$A consult that records the purpose, the data, who receives it, and the conditions the project must meet. It is advice plus a recorded decision, not a legal opinion for outside parties.$sscb$, $sscb$New or changed uses of patient, member, or workforce personal data.$sscb$, $sscb$Individual patient privacy requests, which follow the health-information desk.$sscb$, $sscb$A short privacy memo with conditions, or a note that no further review is needed.$sscb$, $sscb$A project owner and a description of the data and the recipients.$sscb$, $sscb$privacy_ai_gov$sscb$, $sscb$privacy_ai_gov$sscb$, $sscb$enterprise$sscb$, $sscb$Privacy Officer$sscb$, $sscb$advisory_consulting$sscb$, array[$sscb$business_owners$sscb$, $sscb$it_engineering$sscb$]::text[], $sscb$email$sscb$, null, false, null, $sscb$10 business days$sscb$, $sscb$privacy-office@example.com$sscb$, $sscb$business_8x5$sscb$, null, null, $sscb$govern$sscb$, $sscb$full$sscb$, $sscb$Unreviewed collection or disclosure of patient and workforce information.$sscb$, $sscb$restricted$sscb$, $sscb$Memos issued inside the lead time. Projects started without a required consult.$sscb$, 3, 3, $sscb$Shadow projects still surface late. The consult itself is staffed.$sscb$, $sscb$Outside counsel is engaged by the privacy officer when a question needs it. Not the default path.$sscb$, $sscb$no_charge_core$sscb$, $sscb$Core privacy office time.$sscb$, $sscb$Intake mailbox and a decision register.$sscb$, $sscb$Do not call the memo a legal determination when sharing it outside the privacy office.$sscb$, $sscb$annual$sscb$, $sscb$2026-03-11$sscb$::date, '{}'::jsonb),
     ($sscb$22222222-2222-4222-8222-222222222005$sscb$::uuid, v_tenant, $sscb$SEC-ARC-001$sscb$, $sscb$Security Architecture Reviews$sscb$, $sscb$Design review$sscb$, $sscb$sec_architecture$sscb$, $sscb$planned$sscb$, $sscb$tier_2$sscb$, $sscb$Review the security design of Meridian Health projects before build, once the architecture practice is staffed.$sscb$, $sscb$Planned service. The intent is a design review with written findings before build starts. It is not offered yet.$sscb$, $sscb$Projects that introduce a new system integration or a new place patient data is stored.$sscb$, $sscb$Emergency changes, which will keep using the incident and change paths.$sscb$, $sscb$A design note with required changes, when the service is live.$sscb$, $sscb$An architecture diagram and a data-flow description.$sscb$, $sscb$sec_engineering$sscb$, $sscb$sec_engineering$sscb$, $sscb$technology$sscb$, $sscb$Security Architecture (to be named)$sscb$, $sscb$advisory_consulting$sscb$, array[$sscb$it_engineering$sscb$, $sscb$security_team$sscb$]::text[], $sscb$account_team$sscb$, null, false, null, $sscb$Not offered yet$sscb$, null, $sscb$on_request$sscb$, null, null, $sscb$identify$sscb$, $sscb$none$sscb$, $sscb$Insecure integrations and unreviewed places patient data would be stored.$sscb$, $sscb$restricted$sscb$, $sscb$Not measured until the service is piloted.$sscb$, 0, 2, $sscb$No named architect yet. Capability is None on purpose.$sscb$, $sscb$None.$sscb$, $sscb$no_charge_core$sscb$, $sscb$Unstaffed. Hiring is on the technology plan.$sscb$, $sscb$No review tracker yet.$sscb$, $sscb$Status is Planned. Do not list this as an active control in any external packet.$sscb$, $sscb$on_change$sscb$, $sscb$2026-10-20$sscb$::date, '{}'::jsonb);
 end $$;
+
+-- Fictional artifact inventory. Inserts only when the sample workspace and service already exist.
+insert into public.artifacts (
+  id, tenant_id, name, artifact_type, owner_team, status, version, review_cadence,
+  last_reviewed_date, link_url, description, visibility
+)
+select v.id, v.tenant_id, v.name, v.artifact_type, v.owner_team, v.status, v.version, v.review_cadence,
+  v.last_reviewed_date, v.link_url, v.description, v.visibility
+from (values
+  ($sscb$11111111-1111-4111-8111-11111111a001$sscb$::uuid, $sscb$11111111-1111-4111-8111-111111111111$sscb$::uuid, $sscb$Customer Security Overview$sscb$, $sscb$policy$sscb$, $sscb$corp_security_grc$sscb$, $sscb$active$sscb$, $sscb$2.1$sscb$, $sscb$annual$sscb$, $sscb$2026-03-01$sscb$::date, $sscb$https://example.com/acme/security-overview$sscb$, $sscb$A short public description of how Acme Corp protects customer environments.$sscb$, $sscb$public$sscb$),
+  ($sscb$11111111-1111-4111-8111-11111111a002$sscb$::uuid, $sscb$11111111-1111-4111-8111-111111111111$sscb$::uuid, $sscb$SOC Pager Runbook$sscb$, $sscb$procedure$sscb$, $sscb$soc$sscb$, $sscb$active$sscb$, $sscb$4.0$sscb$, $sscb$quarterly$sscb$, $sscb$2026-09-02$sscb$::date, $sscb$https://example.com/acme/internal/soc-pager$sscb$, $sscb$How the Acme watch escalates a paging event. Internal operating procedure.$sscb$, $sscb$internal$sscb$),
+  ($sscb$11111111-1111-4111-8111-11111111a003$sscb$::uuid, $sscb$11111111-1111-4111-8111-111111111111$sscb$::uuid, $sscb$Detection Content Standard$sscb$, $sscb$standard$sscb$, $sscb$soc$sscb$, $sscb$under_review$sscb$, $sscb$1.4$sscb$, $sscb$annual$sscb$, $sscb$2025-06-01$sscb$::date, $sscb$https://example.com/acme/internal/detection-standard$sscb$, $sscb$Required log sources and detection content for production monitoring. Past its review date.$sscb$, $sscb$internal$sscb$),
+  ($sscb$11111111-1111-4111-8111-11111111a004$sscb$::uuid, $sscb$11111111-1111-4111-8111-111111111111$sscb$::uuid, $sscb$Legacy VPN Standard$sscb$, $sscb$standard$sscb$, $sscb$iam$sscb$, $sscb$retired$sscb$, $sscb$0.9$sscb$, $sscb$annual$sscb$, $sscb$2024-11-01$sscb$::date, $sscb$https://example.com/acme/internal/legacy-vpn$sscb$, $sscb$Retired remote-access standard that is still linked to identity lifecycle.$sscb$, $sscb$internal$sscb$),
+  ($sscb$11111111-1111-4111-8111-11111111a005$sscb$::uuid, $sscb$11111111-1111-4111-8111-111111111111$sscb$::uuid, $sscb$Vulnerability Scanner$sscb$, $sscb$tool$sscb$, $sscb$sec_engineering$sscb$, $sscb$active$sscb$, null, $sscb$semi_annual$sscb$, $sscb$2026-08-15$sscb$::date, $sscb$https://example.com/acme/tools/scanner$sscb$, $sscb$The scanner Acme uses for the vulnerability desk. The catalog links out and does not store findings.$sscb$, $sscb$internal$sscb$),
+  ($sscb$22222222-2222-4222-8222-22222222a001$sscb$::uuid, $sscb$22222222-2222-4222-8222-222222222222$sscb$::uuid, $sscb$Patient Privacy Notice Summary$sscb$, $sscb$policy$sscb$, $sscb$privacy_ai_gov$sscb$, $sscb$active$sscb$, $sscb$3.0$sscb$, $sscb$annual$sscb$, $sscb$2026-04-12$sscb$::date, $sscb$https://example.com/meridian/privacy-notice$sscb$, $sscb$Public summary of how Meridian Health describes privacy to patients.$sscb$, $sscb$public$sscb$),
+  ($sscb$22222222-2222-4222-8222-22222222a002$sscb$::uuid, $sscb$22222222-2222-4222-8222-222222222222$sscb$::uuid, $sscb$Incident Response Plan$sscb$, $sscb$policy$sscb$, $sscb$soc$sscb$, $sscb$active$sscb$, $sscb$5.2$sscb$, $sscb$annual$sscb$, $sscb$2026-02-20$sscb$::date, $sscb$https://example.com/meridian/internal/ir-plan$sscb$, $sscb$Meridian's incident response plan. The security incident service executes this plan.$sscb$, $sscb$internal$sscb$),
+  ($sscb$22222222-2222-4222-8222-22222222a003$sscb$::uuid, $sscb$22222222-2222-4222-8222-222222222222$sscb$::uuid, $sscb$Clinical Access Standard$sscb$, $sscb$standard$sscb$, $sscb$iam$sscb$, $sscb$active$sscb$, $sscb$2.0$sscb$, $sscb$annual$sscb$, $sscb$2026-01-09$sscb$::date, $sscb$https://example.com/meridian/internal/clinical-access$sscb$, $sscb$Who may receive clinical application access, and which approvals are required.$sscb$, $sscb$internal$sscb$),
+  ($sscb$22222222-2222-4222-8222-22222222a004$sscb$::uuid, $sscb$22222222-2222-4222-8222-222222222222$sscb$::uuid, $sscb$After-Hours IR Runbook$sscb$, $sscb$procedure$sscb$, $sscb$soc$sscb$, $sscb$under_review$sscb$, $sscb$1.1$sscb$, $sscb$quarterly$sscb$, $sscb$2026-05-01$sscb$::date, $sscb$https://example.com/meridian/internal/ir-runbook$sscb$, $sscb$Steps for the on-call analyst. Review was due in August.$sscb$, $sscb$internal$sscb$)
+) as v(id, tenant_id, name, artifact_type, owner_team, status, version, review_cadence, last_reviewed_date, link_url, description, visibility)
+where exists (select 1 from public.tenants t where t.id = v.tenant_id)
+on conflict (id) do nothing;
+
+insert into public.artifact_service_links (
+  id, tenant_id, artifact_id, service_id, relationship_note
+)
+select v.id, v.tenant_id, v.artifact_id, v.service_id, v.relationship_note
+from (values
+  ($sscb$11111111-1111-4111-8111-11111111b001$sscb$::uuid, $sscb$11111111-1111-4111-8111-111111111111$sscb$::uuid, $sscb$11111111-1111-4111-8111-11111111a001$sscb$::uuid, $sscb$11111111-1111-4111-8111-111111111004$sscb$::uuid, null),
+  ($sscb$11111111-1111-4111-8111-11111111b002$sscb$::uuid, $sscb$11111111-1111-4111-8111-111111111111$sscb$::uuid, $sscb$11111111-1111-4111-8111-11111111a002$sscb$::uuid, $sscb$11111111-1111-4111-8111-111111111001$sscb$::uuid, $sscb$Paging path for the monitoring service.$sscb$),
+  ($sscb$11111111-1111-4111-8111-11111111b003$sscb$::uuid, $sscb$11111111-1111-4111-8111-111111111111$sscb$::uuid, $sscb$11111111-1111-4111-8111-11111111a003$sscb$::uuid, $sscb$11111111-1111-4111-8111-111111111001$sscb$::uuid, $sscb$Detection content this service is supposed to keep current.$sscb$),
+  ($sscb$11111111-1111-4111-8111-11111111b004$sscb$::uuid, $sscb$11111111-1111-4111-8111-111111111111$sscb$::uuid, $sscb$11111111-1111-4111-8111-11111111a004$sscb$::uuid, $sscb$11111111-1111-4111-8111-111111111002$sscb$::uuid, $sscb$Still referenced by identity lifecycle. Replace or unlink it.$sscb$),
+  ($sscb$11111111-1111-4111-8111-11111111b005$sscb$::uuid, $sscb$11111111-1111-4111-8111-111111111111$sscb$::uuid, $sscb$11111111-1111-4111-8111-11111111a005$sscb$::uuid, $sscb$11111111-1111-4111-8111-111111111003$sscb$::uuid, null),
+  ($sscb$22222222-2222-4222-8222-22222222b001$sscb$::uuid, $sscb$22222222-2222-4222-8222-222222222222$sscb$::uuid, $sscb$22222222-2222-4222-8222-22222222a001$sscb$::uuid, $sscb$22222222-2222-4222-8222-222222222004$sscb$::uuid, null),
+  ($sscb$22222222-2222-4222-8222-22222222b002$sscb$::uuid, $sscb$22222222-2222-4222-8222-222222222222$sscb$::uuid, $sscb$22222222-2222-4222-8222-22222222a002$sscb$::uuid, $sscb$22222222-2222-4222-8222-222222222002$sscb$::uuid, $sscb$The plan this response service executes.$sscb$),
+  ($sscb$22222222-2222-4222-8222-22222222b003$sscb$::uuid, $sscb$22222222-2222-4222-8222-222222222222$sscb$::uuid, $sscb$22222222-2222-4222-8222-22222222a003$sscb$::uuid, $sscb$22222222-2222-4222-8222-222222222001$sscb$::uuid, null),
+  ($sscb$22222222-2222-4222-8222-22222222b004$sscb$::uuid, $sscb$22222222-2222-4222-8222-222222222222$sscb$::uuid, $sscb$22222222-2222-4222-8222-22222222a004$sscb$::uuid, $sscb$22222222-2222-4222-8222-222222222002$sscb$::uuid, $sscb$After-hours steps. Overdue for review.$sscb$)
+) as v(id, tenant_id, artifact_id, service_id, relationship_note)
+where exists (select 1 from public.artifacts a where a.id = v.artifact_id and a.tenant_id = v.tenant_id)
+  and exists (select 1 from public.services s where s.id = v.service_id and s.tenant_id = v.tenant_id)
+  and not exists (
+    select 1 from public.artifact_service_links existing
+    where existing.artifact_id = v.artifact_id and existing.service_id = v.service_id
+  )
+on conflict (id) do nothing;

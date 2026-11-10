@@ -1,8 +1,8 @@
 {
   "name": "security-service-catalog-builder",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "private": true,
-  "description": "Multi-tenant security service catalog with audience exports, optional geography and privacy fields, and NIST CSF 2.0 coverage.",
+  "description": "Multi-tenant security service catalog with supporting artifacts, audience exports, and NIST CSF 2.0 coverage.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

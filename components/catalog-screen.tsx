@@ -8,7 +8,7 @@ import { columnLabel, formatCatalogCell } from "@/lib/catalog/columns";
 import { CATALOG_SEARCH_DESKTOP, CATALOG_SEARCH_PLACEHOLDER } from "@/lib/catalog/catalog-toolbar";
 import { CLOSED_COMPOSER, requestAdditionalFilter, type FilterComposer } from "@/lib/catalog/filter";
 import { filterServices } from "@/lib/catalog/filter";
-import { SHOP_FREE_BLUEPRINTS_LABEL } from "@/lib/catalog/shop-label";
+import { ADD_TEMPLATES_LABEL } from "@/lib/catalog/shop-label";
 import { EMPTY_FILTERS, type CatalogFilters } from "@/lib/catalog/types";
 import { BlueprintCartArt } from "@/components/blueprint-art";
 import { ExportDialog } from "@/components/export-dialog";
@@ -54,9 +54,9 @@ export function CatalogScreen() {
           <button type="button" className="btn btn-secondary" onClick={() => setHistory(true)}>
             Change history
           </button>
-          <Link className="btn btn-secondary" href="/blueprints" aria-label={SHOP_FREE_BLUEPRINTS_LABEL}>
+          <Link className="btn btn-secondary" href="/templates" aria-label={ADD_TEMPLATES_LABEL}>
             <CartIcon />
-            {SHOP_FREE_BLUEPRINTS_LABEL}
+            {ADD_TEMPLATES_LABEL}
             {cartCount > 0 ? <span className="cart-badge">{cartCount}</span> : null}
           </Link>
           {api.canWrite ? (
@@ -115,14 +115,14 @@ export function CatalogScreen() {
         <section className="hero-card">
           <BlueprintCartArt />
           <div>
-            <p className="micro">Blueprint store</p>
+            <p className="micro">Templates</p>
             <h2>Don&apos;t start from scratch.</h2>
             <p className="lede">
               Shop pre-built security service blueprints, bundle them by company size or industry, and tailor every field
               to your organization.
             </p>
             <div className="row-actions" style={{ marginTop: 16 }}>
-              <Link className="btn btn-primary" href="/blueprints">
+              <Link className="btn btn-primary" href="/templates">
                 <CartIcon />
                 Shop Pre-Built Security Services
               </Link>
@@ -193,6 +193,8 @@ export function CatalogScreen() {
           frameworks={api.frameworks}
           mappings={api.mappings}
           tenantId={tenant.id}
+          artifacts={api.artifacts}
+          artifactLinks={api.artifactLinks}
           onClose={() => setExportOpen(false)}
           onSaveProfile={(input) => api.saveExportProfile(input)}
           onDeleteProfile={(profileId) => api.deleteExportProfile(profileId)}

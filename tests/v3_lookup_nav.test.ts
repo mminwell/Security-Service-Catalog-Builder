@@ -6,7 +6,7 @@ import { lookupChoices, lookupToggleFor } from "@/lib/catalog/lookup-toggle";
 import { visibleLookupGroups } from "@/lib/catalog/lookups";
 import { primaryNavFor } from "@/lib/catalog/primary-nav";
 import { readField, writeField } from "@/lib/catalog/service";
-import { SHOP_FREE_BLUEPRINTS_LABEL } from "@/lib/catalog/shop-label";
+import { TEMPLATES_LABEL } from "@/lib/catalog/shop-label";
 import type { Role } from "@/lib/catalog/types";
 import { migrateDemoState } from "@/lib/data/storage";
 
@@ -18,26 +18,29 @@ const byKey = (key: string) => {
 };
 
 describe("primary navigation", () => {
-  it("places Fields after Coverage and Lookups before Shop Free Blueprints", () => {
+  it("places Fields after CSF Mapping and Lookups before Templates", () => {
     expect(primaryNavFor(true).map((item) => item.label)).toEqual([
       "Catalog",
-      "Coverage",
+      "CSF Mapping",
+      "Artifacts",
       "Fields",
       "Lookups",
-      SHOP_FREE_BLUEPRINTS_LABEL,
+      TEMPLATES_LABEL,
     ]);
     expect(primaryNavFor(false).map((item) => item.label)).toEqual([
       "Catalog",
-      "Coverage",
-      SHOP_FREE_BLUEPRINTS_LABEL,
+      "CSF Mapping",
+      "Artifacts",
+      TEMPLATES_LABEL,
     ]);
-    expect(primaryNavFor(true).find((item) => item.cart)?.href).toBe("/blueprints");
+    expect(primaryNavFor(true).find((item) => item.cart)?.href).toBe("/templates");
     expect(primaryNavFor(true).map((item) => item.href)).toEqual([
       "/catalog",
       "/coverage",
+      "/artifacts",
       "/admin/fields",
       "/admin/lookups",
-      "/blueprints",
+      "/templates",
     ]);
   });
 });

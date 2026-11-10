@@ -157,7 +157,7 @@ describe("workbook, Word, and PDF", () => {
       audience: "public",
       marking: distributionMarking("Acme Corp", "public"),
     });
-    expect(sheets.map((sheet) => sheet.name)).toEqual(["Services", "Fields", "Lookups", "Mappings", "Coverage"]);
+    expect(sheets.map((sheet) => sheet.name)).toEqual(["Services", "Fields", "Lookups", "Mappings", "Coverage", "Artifacts"]);
     const bytes = buildXlsx(sheets);
     expect(String.fromCharCode(...bytes.slice(0, 2))).toBe("PK");
     const sheet = zipText(bytes, "xl/worksheets/sheet1.xml");
@@ -395,10 +395,11 @@ describe("permissions, profiles, and demo migration", () => {
     expect(migrated?.lookups[0]?.label).toBe("Harbor Team");
     expect(migrated?.mappings).toHaveLength(1);
     expect(migrated?.exportProfiles[0]?.name).toBe("Client pack");
-    expect(migrated?.elements.some((element) => element.code === "LOCAL-01" && element.tenant_id === "t1")).toBe(true);
+    expect(migrated?.elements.some((element) => element.code === "LOCAL-01")).toBe(false);
+    expect(migrated?.frameworks.every((framework) => framework.code === "NIST-CSF")).toBe(true);
     expect(migrated?.elements.filter((element) => element.framework_id === CSF_FRAMEWORK.id)).toHaveLength(134);
     const again = migrateDemoState(migrated);
-    expect(again?.elements.filter((element) => element.code === "LOCAL-01")).toHaveLength(1);
+    expect(again?.elements.filter((element) => element.code === "LOCAL-01")).toHaveLength(0);
     expect(again?.services[0]?.name).toBe("Edited");
   });
 });
@@ -426,6 +427,7 @@ describe("framework selection", () => {
     ).toBeGreaterThan(0);
 
     let db = signInDemo(freshDemo(), "owner@example.com");
+    db = { ...db, frameworks: [...db.frameworks, framework] };
     const tenantId = db.activeTenantId ?? "";
     const nistBefore = aggregateCoverage({
       elements: elementsInScope(db.elements, CSF_FRAMEWORK, tenantId),

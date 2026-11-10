@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { artifactCsvSection, artifactExportRows } from "@/lib/catalog/artifacts";
 import { buildCatalogDocument } from "@/lib/catalog/catalog-document";
 import { buildCatalogWorkbook } from "@/lib/catalog/catalog-workbook";
 import { distributionMarking, servicesToCsv, type CsvVisibility } from "@/lib/catalog/csv";
@@ -29,6 +30,8 @@ import { buildCatalogPdf, loadPdfFonts } from "@/lib/catalog/pdf-catalog";
 import { localToday } from "@/lib/catalog/present";
 import type { FrameworkElement, FrameworkRelease } from "@/lib/catalog/framework";
 import type {
+  Artifact,
+  ArtifactLink,
   ExportProfile,
   FieldDefinition,
   LookupOption,
@@ -42,12 +45,12 @@ function pinnedPublicName(field: FieldDefinition): boolean {
 }
 
 const FORMATS: Array<{ id: ExportFormat; label: string; hint: string }> = [
-  { id: "csv", label: "CSV", hint: "One sheet of the selected fields." },
-  { id: "xlsx", label: "Excel workbook", hint: "Services, fields, lookups, mappings, and coverage." },
+  { id: "csv", label: "CSV", hint: "Selected service fields, then supporting artifact links." },
+  { id: "xlsx", label: "Excel workbook", hint: "Services, fields, lookups, mappings, coverage, and an Artifacts sheet." },
   { id: "docx", label: "Word", hint: "Editable catalog with a header and footer." },
   { id: "pdf", label: "PDF", hint: "Paginated catalog for reading and sharing." },
-  { id: "jira", label: "Jira CSV preset", hint: "Local file only. Not a Jira connection." },
-  { id: "servicenow", label: "ServiceNow CSV preset", hint: "Local file only. Not an instance update." },
+  { id: "jira", label: "Jira CSV preset", hint: "Local file only. Not a Jira connection. Artifact links stay in the catalog files." },
+  { id: "servicenow", label: "ServiceNow CSV preset", hint: "Local file only. Not an instance update. Artifact links stay in the catalog files." },
 ];
 
 export function ExportDialog({
@@ -63,6 +66,8 @@ export function ExportDialog({
   frameworks,
   mappings,
   tenantId,
+  artifacts = [],
+  artifactLinks = [],
   onClose,
   onSaveProfile,
   onDeleteProfile,
@@ -80,6 +85,8 @@ export function ExportDialog({
   frameworks: FrameworkRelease[];
   mappings: OutcomeMapping[];
   tenantId: string;
+  artifacts?: Artifact[];
+  artifactLinks?: ArtifactLink[];
   onClose: () => void;
   onSaveProfile: (input: {
     id?: string;
@@ -117,6 +124,19 @@ export function ExportDialog({
   const marking = distributionMarking(companyName, audience === "public" ? "public" : "all");
   const previewRows =
     mapped != null ? previewMappedRows(services, lookups, mapped.columns) : [];
+  const artifactPreview = useMemo(
+    () =>
+      artifactExportRows({
+        audience,
+        includeServiceCode: resolved.fields.some((field) => field.field_key === "service_code"),
+        services,
+        artifacts,
+        links: artifactLinks,
+        lookups,
+        today: localToday(),
+      }),
+    [audience, resolved.fields, services, artifacts, artifactLinks, lookups],
+  );
 
   function requestDownload() {
     if (services.length === 0) return;
@@ -147,11 +167,18 @@ export function ExportDialog({
       const fileMarking = includeMarking ? marking : null;
       if (format === "csv") {
         const csvVisibility: CsvVisibility = audience === "public" ? "public" : "all";
-        saveText(
-          servicesToCsv(services, fields, lookups, csvVisibility, { marking: fileMarking, columns: resolved.fields }),
-          exportFileName(slug, audience, "csv"),
-          "text/csv;charset=utf-8",
-        );
+        const servicesCsv = servicesToCsv(services, fields, lookups, csvVisibility, { marking: fileMarking, columns: resolved.fields });
+        const artifactsCsv = artifactCsvSection({
+          audience,
+          includeServiceCode: resolved.fields.some((field) => field.field_key === "service_code"),
+          services,
+          artifacts,
+          links: artifactLinks,
+          lookups,
+          today: localToday(),
+          marking: fileMarking,
+        });
+        saveText(`${servicesCsv}\r\n\r\n${artifactsCsv}`, exportFileName(slug, audience, "csv"), "text/csv;charset=utf-8");
       } else if (format === "jira" || format === "servicenow") {
         const columns = mapped?.columns ?? [];
         saveText(
@@ -170,6 +197,9 @@ export function ExportDialog({
           tenantId,
           audience,
           marking: fileMarking,
+          artifacts,
+          artifactLinks,
+          today: localToday(),
         });
         saveBytes(bytes, exportFileName(slug, audience, "xlsx"), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       } else if (format === "docx") {
@@ -182,6 +212,9 @@ export function ExportDialog({
           services,
           fields: resolved.fields,
           lookups,
+          artifacts,
+          artifactLinks,
+          today: localToday(),
         });
         saveBytes(buildDocx(doc), exportFileName(slug, audience, "docx"), "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
       } else {
@@ -194,6 +227,9 @@ export function ExportDialog({
           services,
           fields: resolved.fields,
           lookups,
+          artifacts,
+          artifactLinks,
+          today: localToday(),
         });
         const bytes = await buildCatalogPdf(doc, await loadPdfFonts());
         saveBytes(bytes, exportFileName(slug, audience, "pdf"), "application/pdf");
@@ -302,6 +338,15 @@ export function ExportDialog({
             {" · "}
             {(mapped ? mapped.columns.map((column) => column.field.label) : resolved.fields.map((field) => field.label)).join(", ")}
           </p>
+          {format === "jira" || format === "servicenow" ? (
+            <p className="hint">Artifact links stay out of the Jira and ServiceNow presets. They are in the catalog CSV, Excel, Word, and PDF files.</p>
+          ) : (
+            <p className="hint">
+              Supporting artifacts: {artifactPreview.rows.length}{" "}
+              {artifactPreview.rows.length === 1 ? "row" : "rows"}
+              {audience === "public" ? ". Internal artifact names and links are omitted." : "."}
+            </p>
+          )}
           {resolved.excludedInternal.length > 0 && format !== "jira" && format !== "servicenow" ? (
             <p className="hint">
               Left out of this public file: {resolved.excludedInternal.map((field) => field.label).join(", ")}.

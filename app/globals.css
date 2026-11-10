@@ -67,13 +67,24 @@ p { margin: 0; }
   top: 0;
   z-index: 30;
   display: flex;
-  align-items: center;
-  gap: 18px;
-  min-height: 64px;
-  padding: 10px 22px;
+  flex-direction: column;
+  align-items: stretch;
   background: var(--white);
   border-bottom: var(--border);
-  flex-wrap: wrap;
+}
+.topbar-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 64px;
+  padding: 8px 22px;
+  flex-wrap: nowrap;
+}
+.topbar-demo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 22px 8px;
 }
 
 .brand {
@@ -99,8 +110,9 @@ p { margin: 0; }
 .nav {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+  gap: 2px;
 }
 .nav a {
   display: inline-flex;
@@ -109,8 +121,9 @@ p { margin: 0; }
   text-decoration: none;
   font-size: 14px;
   color: var(--gray-700);
-  padding: 8px 10px;
+  padding: 8px 8px;
   border-bottom: 2px solid transparent;
+  white-space: nowrap;
 }
 .nav a[aria-current="page"] {
   color: var(--slate);
@@ -134,6 +147,8 @@ p { margin: 0; }
   font-size: 13px;
   color: var(--gray-700);
   max-width: 220px;
+  min-width: 0;
+  flex-shrink: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1050,11 +1065,25 @@ table.catalog tr.clickable:hover td { background: rgba(240, 238, 230, 0.55); }
   display: block;
   color: var(--gray-700);
 }
-.coverage-function[aria-pressed="true"] { border-color: var(--clay); }
+.coverage-count {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.coverage-count:focus-visible,
+.coverage-function:focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; }
+.coverage-count[aria-pressed="true"],
+.coverage-function[aria-pressed="true"] { border-color: var(--clay); box-shadow: inset 0 0 0 1px var(--clay); }
 .coverage-function strong { display: block; font-family: var(--serif); font-weight: 500; font-size: 18px; }
 .coverage-count strong { display: block; font-family: var(--serif); font-size: 28px; font-weight: 500; line-height: 1.1; }
 .coverage-mini { display: block; margin-top: 4px; color: var(--gray-700); font-size: 12px; }
 .outcome-groups { display: flex; flex-direction: column; gap: 10px; }
+.dashboard-panel-title { font-size: 22px; margin: 8px 0 0; }
 .outcome-group h2 { font-size: 20px; }
 .outcome-group ul { list-style: none; margin: 8px 0 0; padding: 0; }
 .outcome-row { padding: 10px 0; border-top: 1px solid var(--gray-100); }

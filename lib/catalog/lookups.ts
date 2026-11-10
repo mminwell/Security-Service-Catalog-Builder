@@ -128,7 +128,19 @@ export const LOOKUP_GROUPS: LookupGroup[] = [
   {
     field_key: "review_cadence",
     title: "Review Cadences",
-    blurb: "Drives the computed next review date. On Change does not calculate one.",
+    blurb: "Drives the computed next review date. On Change does not calculate one. Shared by services and artifacts.",
+  },
+  {
+    field_key: "artifact_type",
+    title: "Artifact Types",
+    blurb:
+      "Policy, standard, procedure, and tool. These options are editable. The app does not hard-code the list.",
+  },
+  {
+    field_key: "artifact_status",
+    title: "Artifact Statuses",
+    blurb:
+      "Draft, active, under review, and retired. The retired-but-linked flag follows the code retired. Renaming that label is safe. Changing the code turns the flag off.",
   },
   {
     field_key: "intake_method",
@@ -560,6 +572,38 @@ export const STARTER_LOOKUPS: LookupSeed[] = [
     { code: "not_recorded", label: "Not recorded", description: "The workspace has not recorded whether personal data is handled." },
     { code: "no", label: "No", description: "The workspace recorded that this service does not handle personal data." },
     { code: "yes", label: "Yes", description: "The workspace recorded that this service handles personal data. This is not a legal classification." },
+  ]),
+  ...rows("artifact_type", [
+    {
+      code: "policy",
+      label: "Policy",
+      description: "A management statement of what the organization requires.",
+    },
+    {
+      code: "standard",
+      label: "Standard",
+      description: "Mandatory rules that make a policy specific enough to follow.",
+    },
+    {
+      code: "procedure",
+      label: "Procedure / Runbook",
+      description: "Steps a person or team follows. Includes runbooks and playbooks.",
+    },
+    {
+      code: "tool",
+      label: "Tool",
+      description: "A product or system the service uses. The link opens the tool or its record.",
+    },
+  ]),
+  ...rows("artifact_status", [
+    { code: "draft", label: "Draft", description: "Started, and not yet in force." },
+    { code: "active", label: "Active", description: "In force and expected to be current." },
+    { code: "under_review", label: "Under Review", description: "Being revised. Still the version people should use until it is replaced." },
+    {
+      code: "retired",
+      label: "Retired",
+      description: "No longer in force. A link that remains is a stale-documentation flag, not a recommendation.",
+    },
   ]),
   ...rows("recorded_jurisdiction", [
     { code: "not_recorded", label: "Not recorded", description: "The workspace has not recorded a jurisdiction." },

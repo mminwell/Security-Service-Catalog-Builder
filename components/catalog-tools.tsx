@@ -26,6 +26,7 @@ export function FilterControl({
   composer,
   onChange,
   onComposer,
+  showArchive = true,
 }: {
   filters: CatalogFilters;
   fields: FieldDefinition[];
@@ -33,6 +34,8 @@ export function FilterControl({
   composer: FilterComposer;
   onChange: (filters: CatalogFilters) => void;
   onComposer: (composer: FilterComposer) => void;
+  /** Services use Active / Archived. Other lists leave this off. */
+  showArchive?: boolean;
 }) {
   const anchorRef = useRef<HTMLDivElement | null>(null);
   const dismissRef = useDismiss(composer.popupOpen, () => onComposer(closeFilterPopup(composer)));
@@ -80,27 +83,31 @@ export function FilterControl({
         Filter{count > 0 ? ` · ${count}` : ""}
       </button>
       {composer.popupOpen ? (
-        <div className="filter-panel" role="dialog" aria-label="Filter services" style={panelStyle}>
-          <p className="micro">Catalog</p>
-          <div className="segmented" role="radiogroup" aria-label="Service archive state">
-            <button
-              type="button"
-              role="radio"
-              aria-checked={filters.scope === "active"}
-              onClick={() => onChange({ ...filters, scope: "active" })}
-            >
-              Active
-            </button>
-            <button
-              type="button"
-              role="radio"
-              aria-checked={filters.scope === "archived"}
-              onClick={() => onChange({ ...filters, scope: "archived" })}
-            >
-              Archived
-            </button>
-          </div>
-          <p className="hint">Archived services stay in the workspace and can be restored.</p>
+        <div className="filter-panel" role="dialog" aria-label={showArchive ? "Filter services" : "Filter artifacts"} style={panelStyle}>
+          <p className="micro">{showArchive ? "Catalog" : "Artifacts"}</p>
+          {showArchive ? (
+            <>
+              <div className="segmented" role="radiogroup" aria-label="Service archive state">
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={filters.scope === "active"}
+                  onClick={() => onChange({ ...filters, scope: "active" })}
+                >
+                  Active
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={filters.scope === "archived"}
+                  onClick={() => onChange({ ...filters, scope: "archived" })}
+                >
+                  Archived
+                </button>
+              </div>
+              <p className="hint">Archived services stay in the workspace and can be restored.</p>
+            </>
+          ) : null}
           {filters.rules.length > 0 ? (
             <div className="filter-rules">
               {filters.rules.map((rule) => {

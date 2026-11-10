@@ -6,14 +6,15 @@ import {
   AGGREGATION_SUMMARY,
   aggregateCoverage,
   countsFor,
+  dashboardOutcomes,
   outcomeMatches,
+  type DashboardFocus,
   type CoverageFilter,
   type OutcomeAssessment,
   type OutcomeStatus,
 } from "@/lib/catalog/coverage";
 import { ancestorOfType, CSF_FRAMEWORK } from "@/lib/catalog/framework";
-import { elementsInScope, frameworkHasContent, NOT_LOADED_LABEL } from "@/lib/catalog/framework-catalog";
-import { FrameworkImportPanel } from "@/components/framework-import-panel";
+import { elementsInScope } from "@/lib/catalog/framework-catalog";
 import { optionByCode } from "@/lib/catalog/lookups";
 import { useCatalog } from "@/components/catalog-provider";
 import { CsfFunctionIcon } from "@/components/icons";
@@ -29,13 +30,11 @@ const STATUS_TONE = {
 
 export function CoverageScreen() {
   const api = useCatalog();
-  const [frameworkId, setFrameworkId] = useState(api.framework?.id ?? "");
-  const selected = api.frameworks.find((item) => item.id === frameworkId) ?? api.framework ?? api.frameworks[0] ?? null;
+  const selected = api.framework;
   const elements = useMemo(
     () => (selected ? elementsInScope(api.elements, selected, api.activeTenant?.id ?? "") : []),
     [selected, api.elements, api.activeTenant?.id],
   );
-  const loaded = selected ? frameworkHasContent(api.elements, selected, api.activeTenant?.id ?? "") : false;
   const services = api.services;
   const [filter, setFilter] = useState<CoverageFilter>({
     query: "",
@@ -44,6 +43,7 @@ export function CoverageScreen() {
     status: null,
   });
   const [attachId, setAttachId] = useState<string | null>(null);
+  const [focus, setFocus] = useState<DashboardFocus | null>(null);
   const report = useMemo(
     () =>
       aggregateCoverage({
@@ -74,11 +74,29 @@ export function CoverageScreen() {
     return outcomeMatches(outcome, elements, filter, linked);
   });
   const grouped = groupVisible(visible, elements);
+  const panelOutcomes = focus ? dashboardOutcomes(report.outcomes, elements, focus) : [];
+  const panelGroups = focus ? groupVisible(panelOutcomes, elements) : [];
+  const panelTitle =
+    focus?.kind === "status"
+      ? `${statusLabel(api.lookups, focus.status)} · ${panelOutcomes.length}`
+      : focus?.kind === "function"
+        ? `${focus.code} · ${panelOutcomes.length}`
+        : "";
+
+  function toggleStatus(status: OutcomeStatus) {
+    setFocus((current) => (current?.kind === "status" && current.status === status ? null : { kind: "status", status }));
+    setAttachId(null);
+  }
+
+  function toggleFunction(code: string) {
+    setFocus((current) => (current?.kind === "function" && current.code === code ? null : { kind: "function", code }));
+    setAttachId(null);
+  }
 
   if (!api.framework) {
     return (
       <section className="empty">
-        <h1>Coverage</h1>
+        <h1>CSF Mapping</h1>
         <p className="lede">
           NIST CSF 2.0 is not loaded in this workspace yet. Apply <span className="code">0004_v2_csf_mappings.sql</span>{" "}
           and reload. Demo Mode includes the core automatically.
@@ -87,7 +105,7 @@ export function CoverageScreen() {
     );
   }
 
-  const frameworkName = selected?.code === "NIST-CSF" ? CSF_FRAMEWORK.name : (selected?.name ?? CSF_FRAMEWORK.name);
+  const frameworkName = CSF_FRAMEWORK.name;
   const noServices = services.length === 0;
   const noAssessments = report.counts.full + report.counts.partial + report.counts.none === 0;
 
@@ -95,61 +113,24 @@ export function CoverageScreen() {
     <>
       <div className="page-head">
         <div>
-          <p className="micro">{selected?.code === "NIST-CSF" ? "NIST CSF 2.0" : selected?.code}</p>
-          <h1>Coverage</h1>
+          <p className="micro">NIST CSF 2.0</p>
+          <h1>CSF Mapping</h1>
           <p className="lede">
-            {frameworkName}.{" "}
-            {loaded
-              ? `${report.denominator} subcategory outcomes. ${activeServices.length} active ${activeServices.length === 1 ? "service" : "services"}${
-                  services.length - activeServices.length > 0
-                    ? `, ${services.length - activeServices.length} archived excluded`
-                    : ""
-                }.`
-              : NOT_LOADED_LABEL}
+            {frameworkName}. {report.denominator} subcategory outcomes. {activeServices.length} active{" "}
+            {activeServices.length === 1 ? "service" : "services"}
+            {services.length - activeServices.length > 0
+              ? `, ${services.length - activeServices.length} archived excluded`
+              : ""}
+            .
           </p>
         </div>
-        <label>
-          <span className="micro">Framework</span>
-          <select
-            className="select"
-            aria-label="Framework"
-            value={selected?.id ?? ""}
-            onChange={(event) => {
-              setFrameworkId(event.target.value);
-              setFilter({ query: "", functionCode: null, categoryCode: null, status: null });
-            }}
-          >
-            {api.frameworks.map((framework) => (
-              <option key={framework.id} value={framework.id}>
-                {framework.name} {framework.version}
-                {frameworkHasContent(api.elements, framework, api.activeTenant?.id ?? "") ? "" : " — not loaded"}
-              </option>
-            ))}
-          </select>
-        </label>
       </div>
 
-      {!loaded && selected ? (
-        <section className="panel pad">
-          <h2>{NOT_LOADED_LABEL}</h2>
-          <p className="lede">{selected.license_note}</p>
-          <p className="hint">{selected.provenance}</p>
-          <p className="hint">
-            This framework does not change the NIST CSF 2.0 denominator. No control text is invented, and nothing is
-            marked covered from another framework.
-          </p>
-          {api.canAdmin ? <FrameworkImportPanel framework={selected} /> : null}
-        </section>
-      ) : null}
-
-      {loaded ? (
-      <>
       <div className="callout">
         <p>{AGGREGATION_SUMMARY}</p>
         <p className="hint">
           Denominator: all {report.denominator} subcategory outcomes in {frameworkName}. The four counts add up to that
-          denominator. Other frameworks are not included. Dropdown labels can be edited; the assessment codes stay full,
-          partial, and none.
+          denominator. Dropdown labels can be edited; the assessment codes stay full, partial, and none.
         </p>
       </div>
 
@@ -173,30 +154,26 @@ export function CoverageScreen() {
       ) : null}
 
       <div className="coverage-counts" aria-label="Workspace outcome counts">
-        <Count label="Full" value={report.counts.full} tone="success" />
-        <Count label="Partial" value={report.counts.partial} tone="warning" />
-        <Count label="None" value={report.counts.none} tone="accent" />
-        <Count label="Unmapped" value={report.counts.unmapped} tone="neutral" />
+        <Count label="Full" value={report.counts.full} tone="success" status="full" pressed={focus?.kind === "status" && focus.status === "full"} onToggle={toggleStatus} />
+        <Count label="Partial" value={report.counts.partial} tone="warning" status="partial" pressed={focus?.kind === "status" && focus.status === "partial"} onToggle={toggleStatus} />
+        <Count label="None" value={report.counts.none} tone="accent" status="none" pressed={focus?.kind === "status" && focus.status === "none"} onToggle={toggleStatus} />
+        <Count label="Unmapped" value={report.counts.unmapped} tone="neutral" status="unmapped" pressed={focus?.kind === "status" && focus.status === "unmapped"} onToggle={toggleStatus} />
       </div>
 
       <div className="coverage-functions">
         {functions.map((fn) => {
           const inFunction = report.outcomes.filter((outcome) => ancestorOfType(outcome.element, "function", elements)?.id === fn.id);
           const counts = countsFor(inFunction);
-          const pressed = filter.functionCode === fn.code;
+          const pressed = focus?.kind === "function" && focus.code === fn.code;
           return (
             <button
               key={fn.id}
               type="button"
               className="coverage-function"
               aria-pressed={pressed}
-              onClick={() =>
-                setFilter((current) => ({
-                  ...current,
-                  functionCode: pressed ? null : fn.code,
-                  categoryCode: pressed ? current.categoryCode : null,
-                }))
-              }
+              aria-expanded={pressed}
+              aria-controls="coverage-dashboard-panel"
+              onClick={() => toggleFunction(fn.code)}
             >
               <span className="coverage-function-copy">
                 <span className="code">{fn.code}</span>
@@ -210,6 +187,32 @@ export function CoverageScreen() {
           );
         })}
       </div>
+
+      {focus ? (
+        <section id="coverage-dashboard-panel" className="outcome-groups" aria-label={panelTitle}>
+          <h2 className="dashboard-panel-title">{panelTitle}</h2>
+          {panelGroups.length === 0 ? <p className="hint">No outcomes are in this state.</p> : null}
+          {panelGroups.map((group) => (
+            <section key={group.category.id} className="outcome-group">
+              <h3>
+                <span className="code">{group.fn?.code}</span> {group.fn?.title}
+                <span className="muted"> · </span>
+                <span className="code">{group.category.code}</span> {group.category.title}
+              </h3>
+              <ul>
+                {group.outcomes.map((outcome) => (
+                  <OutcomeRow
+                    key={outcome.element.id}
+                    outcome={outcome}
+                    open={attachId === outcome.element.id}
+                    onToggle={() => setAttachId((current) => (current === outcome.element.id ? null : outcome.element.id))}
+                  />
+                ))}
+              </ul>
+            </section>
+          ))}
+        </section>
+      ) : null}
 
       <div className="coverage-filters">
         <label>
@@ -313,8 +316,6 @@ export function CoverageScreen() {
           ))}
         </div>
       )}
-      </>
-      ) : null}
     </>
   );
 }
@@ -369,7 +370,9 @@ function OutcomeRow({
             <span className="code">{outcome.element.code}</span> {outcome.element.statement}
           </p>
           <div className="outcome-links">
-            {outcome.contributions.length === 0 ? <span className="hint">No active service assessment.</span> : null}
+            {outcome.contributions.length === 0 ? (
+              <span className="hint">{outcome.status === "unmapped" ? "None" : "No active service assessment."}</span>
+            ) : null}
             {outcome.contributions.map((item) => {
               const service = api.services.find((candidate) => candidate.id === item.serviceId);
               if (!service) return null;
@@ -436,13 +439,34 @@ function OutcomeRow({
   );
 }
 
-function Count({ label, value, tone }: { label: string; value: number; tone: "success" | "warning" | "accent" | "neutral" }) {
+function Count({
+  label,
+  value,
+  tone,
+  status,
+  pressed,
+  onToggle,
+}: {
+  label: string;
+  value: number;
+  tone: "success" | "warning" | "accent" | "neutral";
+  status: OutcomeStatus;
+  pressed: boolean;
+  onToggle: (status: OutcomeStatus) => void;
+}) {
   return (
-    <div className="coverage-count">
+    <button
+      type="button"
+      className="coverage-count"
+      aria-pressed={pressed}
+      aria-expanded={pressed}
+      aria-controls="coverage-dashboard-panel"
+      onClick={() => onToggle(status)}
+    >
       <span className="micro">{label}</span>
       <strong>{value}</strong>
       <Badge tone={tone}>{label}</Badge>
-    </div>
+    </button>
   );
 }
 
