@@ -135,17 +135,18 @@ export function ServiceMappingSection({ serviceId }: { serviceId: string }) {
       {readOnly || panel ? null : (
         <div className="row-actions" style={{ marginTop: 12 }}>
           <button type="button" className="btn btn-secondary" onClick={openCreate} disabled={groups.length === 0}>
-            Attach Control
+            Map Control
           </button>
         </div>
       )}
 
       {panel ? (
-        <div className="assessment-card" id="attach-control">
-          <label htmlFor="attach-control-outcome">
+        <div className="assessment-card" id="map-control">
+          <h3>Map control</h3>
+          <label htmlFor="map-control-outcome">
             <span className="field-label">NIST CSF 2.0 outcome</span>
             <select
-              id="attach-control-outcome"
+              id="map-control-outcome"
               className="select"
               aria-label="NIST CSF 2.0 outcome"
               value={panel.elementId}

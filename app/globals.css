@@ -1065,11 +1065,25 @@ table.catalog tr.clickable:hover td { background: rgba(240, 238, 230, 0.55); }
   display: block;
   color: var(--gray-700);
 }
-.coverage-function[aria-pressed="true"] { border-color: var(--clay); }
+.coverage-count {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.coverage-count:focus-visible,
+.coverage-function:focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; }
+.coverage-count[aria-pressed="true"],
+.coverage-function[aria-pressed="true"] { border-color: var(--clay); box-shadow: inset 0 0 0 1px var(--clay); }
 .coverage-function strong { display: block; font-family: var(--serif); font-weight: 500; font-size: 18px; }
 .coverage-count strong { display: block; font-family: var(--serif); font-size: 28px; font-weight: 500; line-height: 1.1; }
 .coverage-mini { display: block; margin-top: 4px; color: var(--gray-700); font-size: 12px; }
 .outcome-groups { display: flex; flex-direction: column; gap: 10px; }
+.dashboard-panel-title { font-size: 22px; margin: 8px 0 0; }
 .outcome-group h2 { font-size: 20px; }
 .outcome-group ul { list-style: none; margin: 8px 0 0; padding: 0; }
 .outcome-row { padding: 10px 0; border-top: 1px solid var(--gray-100); }

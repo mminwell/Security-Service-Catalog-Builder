@@ -6,7 +6,9 @@ import {
   AGGREGATION_SUMMARY,
   aggregateCoverage,
   countsFor,
+  dashboardOutcomes,
   outcomeMatches,
+  type DashboardFocus,
   type CoverageFilter,
   type OutcomeAssessment,
   type OutcomeStatus,
@@ -41,6 +43,7 @@ export function CoverageScreen() {
     status: null,
   });
   const [attachId, setAttachId] = useState<string | null>(null);
+  const [focus, setFocus] = useState<DashboardFocus | null>(null);
   const report = useMemo(
     () =>
       aggregateCoverage({
@@ -71,6 +74,24 @@ export function CoverageScreen() {
     return outcomeMatches(outcome, elements, filter, linked);
   });
   const grouped = groupVisible(visible, elements);
+  const panelOutcomes = focus ? dashboardOutcomes(report.outcomes, elements, focus) : [];
+  const panelGroups = focus ? groupVisible(panelOutcomes, elements) : [];
+  const panelTitle =
+    focus?.kind === "status"
+      ? `${statusLabel(api.lookups, focus.status)} · ${panelOutcomes.length}`
+      : focus?.kind === "function"
+        ? `${focus.code} · ${panelOutcomes.length}`
+        : "";
+
+  function toggleStatus(status: OutcomeStatus) {
+    setFocus((current) => (current?.kind === "status" && current.status === status ? null : { kind: "status", status }));
+    setAttachId(null);
+  }
+
+  function toggleFunction(code: string) {
+    setFocus((current) => (current?.kind === "function" && current.code === code ? null : { kind: "function", code }));
+    setAttachId(null);
+  }
 
   if (!api.framework) {
     return (
@@ -133,30 +154,26 @@ export function CoverageScreen() {
       ) : null}
 
       <div className="coverage-counts" aria-label="Workspace outcome counts">
-        <Count label="Full" value={report.counts.full} tone="success" />
-        <Count label="Partial" value={report.counts.partial} tone="warning" />
-        <Count label="None" value={report.counts.none} tone="accent" />
-        <Count label="Unmapped" value={report.counts.unmapped} tone="neutral" />
+        <Count label="Full" value={report.counts.full} tone="success" status="full" pressed={focus?.kind === "status" && focus.status === "full"} onToggle={toggleStatus} />
+        <Count label="Partial" value={report.counts.partial} tone="warning" status="partial" pressed={focus?.kind === "status" && focus.status === "partial"} onToggle={toggleStatus} />
+        <Count label="None" value={report.counts.none} tone="accent" status="none" pressed={focus?.kind === "status" && focus.status === "none"} onToggle={toggleStatus} />
+        <Count label="Unmapped" value={report.counts.unmapped} tone="neutral" status="unmapped" pressed={focus?.kind === "status" && focus.status === "unmapped"} onToggle={toggleStatus} />
       </div>
 
       <div className="coverage-functions">
         {functions.map((fn) => {
           const inFunction = report.outcomes.filter((outcome) => ancestorOfType(outcome.element, "function", elements)?.id === fn.id);
           const counts = countsFor(inFunction);
-          const pressed = filter.functionCode === fn.code;
+          const pressed = focus?.kind === "function" && focus.code === fn.code;
           return (
             <button
               key={fn.id}
               type="button"
               className="coverage-function"
               aria-pressed={pressed}
-              onClick={() =>
-                setFilter((current) => ({
-                  ...current,
-                  functionCode: pressed ? null : fn.code,
-                  categoryCode: pressed ? current.categoryCode : null,
-                }))
-              }
+              aria-expanded={pressed}
+              aria-controls="coverage-dashboard-panel"
+              onClick={() => toggleFunction(fn.code)}
             >
               <span className="coverage-function-copy">
                 <span className="code">{fn.code}</span>
@@ -170,6 +187,32 @@ export function CoverageScreen() {
           );
         })}
       </div>
+
+      {focus ? (
+        <section id="coverage-dashboard-panel" className="outcome-groups" aria-label={panelTitle}>
+          <h2 className="dashboard-panel-title">{panelTitle}</h2>
+          {panelGroups.length === 0 ? <p className="hint">No outcomes are in this state.</p> : null}
+          {panelGroups.map((group) => (
+            <section key={group.category.id} className="outcome-group">
+              <h3>
+                <span className="code">{group.fn?.code}</span> {group.fn?.title}
+                <span className="muted"> · </span>
+                <span className="code">{group.category.code}</span> {group.category.title}
+              </h3>
+              <ul>
+                {group.outcomes.map((outcome) => (
+                  <OutcomeRow
+                    key={outcome.element.id}
+                    outcome={outcome}
+                    open={attachId === outcome.element.id}
+                    onToggle={() => setAttachId((current) => (current === outcome.element.id ? null : outcome.element.id))}
+                  />
+                ))}
+              </ul>
+            </section>
+          ))}
+        </section>
+      ) : null}
 
       <div className="coverage-filters">
         <label>
@@ -327,7 +370,9 @@ function OutcomeRow({
             <span className="code">{outcome.element.code}</span> {outcome.element.statement}
           </p>
           <div className="outcome-links">
-            {outcome.contributions.length === 0 ? <span className="hint">No active service assessment.</span> : null}
+            {outcome.contributions.length === 0 ? (
+              <span className="hint">{outcome.status === "unmapped" ? "None" : "No active service assessment."}</span>
+            ) : null}
             {outcome.contributions.map((item) => {
               const service = api.services.find((candidate) => candidate.id === item.serviceId);
               if (!service) return null;
@@ -394,13 +439,34 @@ function OutcomeRow({
   );
 }
 
-function Count({ label, value, tone }: { label: string; value: number; tone: "success" | "warning" | "accent" | "neutral" }) {
+function Count({
+  label,
+  value,
+  tone,
+  status,
+  pressed,
+  onToggle,
+}: {
+  label: string;
+  value: number;
+  tone: "success" | "warning" | "accent" | "neutral";
+  status: OutcomeStatus;
+  pressed: boolean;
+  onToggle: (status: OutcomeStatus) => void;
+}) {
   return (
-    <div className="coverage-count">
+    <button
+      type="button"
+      className="coverage-count"
+      aria-pressed={pressed}
+      aria-expanded={pressed}
+      aria-controls="coverage-dashboard-panel"
+      onClick={() => onToggle(status)}
+    >
       <span className="micro">{label}</span>
       <strong>{value}</strong>
       <Badge tone={tone}>{label}</Badge>
-    </div>
+    </button>
   );
 }
 

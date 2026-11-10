@@ -110,6 +110,20 @@ export function aggregateCoverage(input: {
   return { outcomes, counts, denominator: subcategories.length };
 }
 
+export type DashboardFocus =
+  | { kind: "status"; status: OutcomeStatus }
+  | { kind: "function"; code: string };
+
+/** Outcomes for the one open dashboard panel. A status slice is exactly that box's count. */
+export function dashboardOutcomes(
+  outcomes: readonly OutcomeAssessment[],
+  elements: readonly FrameworkElement[],
+  focus: DashboardFocus,
+): OutcomeAssessment[] {
+  if (focus.kind === "status") return outcomes.filter((outcome) => outcome.status === focus.status);
+  return outcomes.filter((outcome) => ancestorOfType(outcome.element, "function", elements)?.code === focus.code);
+}
+
 export type CoverageFilter = {
   query: string;
   functionCode: string | null;

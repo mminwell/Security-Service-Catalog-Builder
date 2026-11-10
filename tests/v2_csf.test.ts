@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { planBlueprintCheckout } from "@/lib/catalog/checkout";
-import { AGGREGATION_SUMMARY, aggregateCoverage, outcomeMatches } from "@/lib/catalog/coverage";
+import { AGGREGATION_SUMMARY, aggregateCoverage, dashboardOutcomes, outcomeMatches } from "@/lib/catalog/coverage";
 import { CSF_CATEGORIES, CSF_ELEMENTS, CSF_FRAMEWORK, CSF_FUNCTIONS, CSF_OUTCOMES, elementByCode, outcomeChoiceGroups } from "@/lib/catalog/framework";
 import { STARTER_FIELDS } from "@/lib/catalog/fields";
 import { STARTER_LOOKUPS } from "@/lib/catalog/lookups";
@@ -428,6 +428,40 @@ function withRole(db: CatalogDb, role: Role): CatalogDb {
     members: db.members.map((member) => (member.user_id === DEMO_USER_ID ? { ...member, role } : member)),
   };
 }
+
+describe("dashboard status panels", () => {
+  it("lists exactly the outcomes counted in each summary box", () => {
+    const db = signInDemo(freshDemo(), "owner@example.com");
+    const tenantId = db.activeTenantId ?? "";
+    const outcome = elementByCode("DE.CM-01");
+    const service = db.services.find((item) => item.tenant_id === tenantId && !item.archived_at);
+    if (!outcome || !service) throw new Error("fixture");
+    const saved = saveOutcomeMapping(db, {
+      serviceId: service.id,
+      elementId: outcome.id,
+      coverage: "partial",
+      rationale: "Watching the agreed sources.",
+    });
+    const report = aggregateCoverage({
+      elements: saved.elements,
+      mappings: saved.mappings,
+      services: saved.services,
+      tenantId,
+      frameworkId: CSF_FRAMEWORK.id,
+    });
+    for (const status of ["full", "partial", "none", "unmapped"] as const) {
+      const rows = dashboardOutcomes(report.outcomes, saved.elements, { kind: "status", status });
+      expect(rows).toHaveLength(report.counts[status]);
+      expect(rows.every((row) => row.status === status)).toBe(true);
+    }
+    const partial = dashboardOutcomes(report.outcomes, saved.elements, { kind: "status", status: "partial" });
+    expect(partial.map((row) => row.element.code)).toEqual(["DE.CM-01"]);
+    expect(partial[0]?.contributions).toHaveLength(1);
+    const unmapped = dashboardOutcomes(report.outcomes, saved.elements, { kind: "status", status: "unmapped" });
+    expect(unmapped.every((row) => row.contributions.length === 0)).toBe(true);
+    expect(report.counts.full + report.counts.partial + report.counts.none + report.counts.unmapped).toBe(report.denominator);
+  });
+});
 
 describe("service attach list", () => {
   it("offers only unattached CSF subcategories, grouped by function and category", () => {
