@@ -24,7 +24,14 @@ test.describe("workspace menu is not clipped by the header", () => {
               <button type="button" class="btn btn-secondary switcher-trigger">Starter Workspace</button>
               <div class="switcher-panel" style="position:absolute; top: calc(100% + 8px); right: 0; left: auto;">
                 <p class="micro">Workspaces</p>
-                <p>Members, logo, and a new workspace live in this menu.</p>
+                <form class="stack">
+                  <label for="workspace-name">Workspace name</label>
+                  <input id="workspace-name" class="input" value="Starter Workspace" aria-label="Workspace name" />
+                  <div class="row-actions">
+                    <button type="button" class="btn btn-primary">Save</button>
+                    <button type="button" class="btn btn-secondary">Cancel</button>
+                  </div>
+                </form>
               </div>
             </div>
           </div>`;
@@ -33,6 +40,9 @@ test.describe("workspace menu is not clipped by the header", () => {
 
       const panel = page.locator(".switcher-panel");
       await expect(panel).toBeVisible();
+      await expect(page.getByLabel("Workspace name")).toHaveValue("Starter Workspace");
+      await expect(page.getByRole("button", { name: "Save" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible();
       const box = await panel.boundingBox();
       expect(box).not.toBeNull();
       expect(box!.height).toBeGreaterThan(48);

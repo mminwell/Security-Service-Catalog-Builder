@@ -9,6 +9,7 @@ import { isIdentityField } from "@/lib/catalog/fields";
 import type { ExportLogMeta } from "@/lib/catalog/export-plan";
 import type { PlannedElement } from "@/lib/catalog/framework-import";
 import { normalizeLogoInput } from "@/lib/catalog/logos";
+import { normalizeWorkspaceName } from "@/lib/catalog/workspace-name";
 import { uniqueSlug } from "@/lib/catalog/service-code";
 import type {
   Artifact,
@@ -286,6 +287,21 @@ export async function saveFieldsAction(fields: FieldDefinition[]): Promise<Actio
   return runMutation(tenantId, "admin", async (supabase) => {
     for (const field of fields) await persistField(supabase, field);
     return null;
+  });
+}
+
+export async function renameWorkspaceAction(tenantId: string, name: string): Promise<ActionResult<{ name: string }>> {
+  let nextName: string;
+  try {
+    nextName = normalizeWorkspaceName(name);
+  } catch (error) {
+    return fail(error);
+  }
+  return runMutation(tenantId, "admin", async (supabase) => {
+    const { data, error } = await supabase.rpc("rename_workspace", { p_tenant: tenantId, p_name: nextName });
+    if (error) throw new Error(error.message);
+    if (typeof data !== "string" || data.trim().length === 0) throw new Error("The workspace name could not be saved.");
+    return { name: data };
   });
 }
 

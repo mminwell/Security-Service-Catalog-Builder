@@ -15,6 +15,7 @@ import {
   archiveServiceAction,
   checkoutBlueprintsAction,
   createWorkspaceAction,
+  renameWorkspaceAction,
   deleteArtifactAction,
   deleteArtifactLinkAction,
   deleteExportProfileAction,
@@ -135,6 +136,7 @@ type CatalogApi = {
   setFieldLookup: (fieldId: string, enabled: boolean) => Promise<void>;
   addMember: (email: string, role: Role) => Promise<string>;
   setTenantLogo: (logoUrl: string | null) => Promise<void>;
+  renameWorkspace: (name: string) => Promise<void>;
   archiveService: (serviceId: string, archived: boolean) => Promise<ServiceRecord>;
   deleteService: (serviceId: string) => Promise<void>;
   importLookups: (
@@ -414,6 +416,12 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         guard(async () => {
           if (!tenantId) throw new Error("Choose a workspace.");
           await unwrap(setTenantLogoAction(tenantId, logoUrl));
+          await reload();
+        }),
+      renameWorkspace: (name: string) =>
+        guard(async () => {
+          if (!tenantId) throw new Error("Choose a workspace.");
+          await unwrap(renameWorkspaceAction(tenantId, name));
           await reload();
         }),
       archiveService: (serviceId: string, archived: boolean) =>

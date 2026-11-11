@@ -107,6 +107,53 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
+function WorkspaceNameForm({ name, onSave }: { name: string; onSave: (value: string) => Promise<void> }) {
+  const [draft, setDraft] = useState(name);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <form
+      className="stack"
+      onSubmit={(event) => {
+        event.preventDefault();
+        setError(null);
+        void onSave(draft).catch((err: unknown) => {
+          setError(err instanceof Error ? err.message : "Could not rename the workspace.");
+        });
+      }}
+    >
+      <label htmlFor="workspace-name">Workspace name</label>
+      <input
+        id="workspace-name"
+        className="input"
+        value={draft}
+        maxLength={80}
+        aria-label="Workspace name"
+        onChange={(event) => setDraft(event.target.value)}
+      />
+      <div className="row-actions">
+        <button type="submit" className="btn btn-primary" disabled={draft.trim().length === 0}>
+          Save
+        </button>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => {
+            setDraft(name);
+            setError(null);
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+      {error ? (
+        <p className="field-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </form>
+  );
+}
+
 function WorkspaceSwitcher() {
   const api = useCatalog();
   const [open, setOpen] = useState(false);
@@ -195,6 +242,13 @@ function WorkspaceSwitcher() {
               </button>
             ))}
           </div>
+          {api.canAdmin ? (
+            <WorkspaceNameForm
+              key={`${tenant.id}:${tenant.name}`}
+              name={tenant.name}
+              onSave={(value) => api.renameWorkspace(value)}
+            />
+          ) : null}
           <div className="logo-setting">
             <p className="micro">Company logo</p>
             <div className="row-actions">

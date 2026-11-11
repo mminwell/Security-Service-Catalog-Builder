@@ -8,6 +8,7 @@ import { applyFrameworkImport, type PlannedElement } from "@/lib/catalog/framewo
 import { FRAMEWORK_CATALOG } from "@/lib/catalog/framework-catalog";
 import { CSF_ELEMENTS, CSF_FRAMEWORK, type FrameworkElement, type FrameworkRelease } from "@/lib/catalog/framework";
 import { builtinLogoForSlug, normalizeLogoInput } from "@/lib/catalog/logos";
+import { normalizeWorkspaceName } from "@/lib/catalog/workspace-name";
 import { sampleArtifactRecords } from "@/lib/catalog/artifact-samples";
 import { normalizeArtifact, type PlannedArtifactImport } from "@/lib/catalog/artifacts";
 import { STARTER_LOOKUPS } from "@/lib/catalog/lookups";
@@ -475,6 +476,34 @@ export function addMember(db: CatalogDb, email: string, role: Role, now = new Da
         action: "insert",
         before: null,
         after: { email: member.email, role: member.role },
+        now,
+      }),
+      ...db.audit,
+    ],
+  };
+}
+
+export function renameWorkspace(db: CatalogDb, name: string, now = new Date().toISOString()): CatalogDb {
+  const actor = requireSession(db);
+  const tenantId = requireActive(db);
+  assertAdmin(db, tenantId, actor.userId, "Only an Admin can rename this workspace.");
+  const nextName = normalizeWorkspaceName(name);
+  const current = db.tenants.find((tenant) => tenant.id === tenantId);
+  if (!current) throw new Error("Choose a workspace.");
+  if (current.name === nextName) return db;
+  const next: Tenant = { ...current, name: nextName, updated_at: now };
+  return {
+    ...db,
+    tenants: db.tenants.map((tenant) => (tenant.id === tenantId ? next : tenant)),
+    audit: [
+      auditEntry({
+        tenantId,
+        actor,
+        table: "tenants",
+        rowId: tenantId,
+        action: "update",
+        before: { name: current.name, slug: current.slug },
+        after: { name: next.name, slug: next.slug },
         now,
       }),
       ...db.audit,

@@ -11,6 +11,7 @@ Production readiness. The app signs people in with Supabase Auth and no longer s
 - Sign-in page, empty and error states, 404 and 500 screens, one-row header, and security headers.
 - Tests cover role gates, tenant isolation, redirects, URL and logo checks, and the RLS migration contract. Playwright covers the not-configured screen. `scripts/e2e-local-supabase.sh` is the local Auth smoke.
 - Empty dollar quotes in the framework seed are real empty strings, and `0010_v5_function_grants.sql` revokes API execute on trigger and helper functions.
+- An Admin can rename the active workspace from the header menu. The slug stays put, and the new name is written to the audit log.
 
 ## 4.0.0
 

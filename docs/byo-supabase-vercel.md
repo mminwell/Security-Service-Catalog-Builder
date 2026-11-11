@@ -27,6 +27,7 @@ Open **SQL Editor → New query**. Paste and run each migration in order:
 8. `supabase/migrations/0008_v4_artifacts.sql`
 9. `supabase/migrations/0009_v5_auth_invites.sql`
 10. `supabase/migrations/0010_v5_function_grants.sql`
+11. `supabase/migrations/0011_v5_rename_workspace.sql`
 
 `0008` adds the artifact registry. `0009` adds invitations and makes the first account Admin of Starter Workspace. `0010` revokes API execute on trigger functions and internal helpers. Do not run `supabase/seed.sql` for a normal project. That file inserts fictional Acme Corp and Meridian Health workspaces with no members, so nobody can open them. Use **Load sample catalog** inside an empty workspace instead.
 

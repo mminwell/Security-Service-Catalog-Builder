@@ -67,6 +67,19 @@ begin
     raise exception 'invite did not stay pending: %', v_invite;
   end if;
 
+  if public.rename_workspace(v_tenant, '  Northwind Security  ') is distinct from 'Northwind Security' then
+    raise exception 'rename_workspace did not return the trimmed name';
+  end if;
+  begin
+    perform public.rename_workspace(v_tenant, '   ');
+    raise exception 'blank workspace name was accepted';
+  exception
+    when others then
+      if sqlerrm not like '%workspace name%' then
+        raise;
+      end if;
+  end;
+
   begin
     perform public.write_audit();
     raise exception 'authenticated was able to call write_audit';
@@ -86,9 +99,21 @@ begin
   execute 'reset role';
 
   if not exists (
-    select 1 from public.tenants where id = v_tenant and name = 'Starter Workspace'
+    select 1 from public.tenants where id = v_tenant and name = 'Northwind Security' and slug = 'starter-workspace'
   ) then
-    raise exception 'Starter Workspace was not created';
+    raise exception 'rename changed the slug or missed the name';
+  end if;
+
+  if not exists (
+    select 1
+    from public.audit_log
+    where tenant_id = v_tenant
+      and table_name = 'tenants'
+      and action = 'update'
+      and after_data->>'name' = 'Northwind Security'
+      and after_data->>'slug' = before_data->>'slug'
+  ) then
+    raise exception 'rename was not written to the audit log';
   end if;
 
   if not exists (
@@ -124,7 +149,8 @@ declare
     'log_catalog_export',
     'can_access_tenant',
     'can_write_services',
-    'can_admin_tenant'
+    'can_admin_tenant',
+    'rename_workspace'
   ];
 begin
   for r in
