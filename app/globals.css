@@ -591,15 +591,17 @@ table.catalog tr.clickable:hover td { background: rgba(240, 238, 230, 0.55); }
   display: inline-grid;
   place-items: center;
   flex: none;
-  border-radius: 8px;
-  border: 1.5px solid var(--gray-300);
-  background: var(--white);
-  object-fit: cover;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  object-fit: contain;
 }
 .workspace-mark.monogram {
   font-family: var(--serif);
   line-height: 1;
   color: var(--slate);
+  border-radius: 8px;
+  border: 1.5px solid var(--gray-300);
   background: var(--gray-100);
 }
 .logo-setting { margin: 4px 0 12px; padding-top: 4px; border-top: 1px solid var(--gray-100); }
