@@ -47,7 +47,7 @@ This repository is not connected to a live Supabase project, and preview deploym
 To make a preview or a production deploy actually sign people in, Mike needs:
 
 1. A Supabase project he controls.
-2. Migrations `0001` through `0009` applied in order, in the SQL editor or with the Supabase CLI.
+2. Migrations `0001` through `0010` applied in order, in the SQL editor or with the Supabase CLI.
 3. These Vercel environment variables set for Preview and Production, then a redeploy so Next.js can inline them:
 
 ```
@@ -109,6 +109,7 @@ In **SQL Editor → New query**, paste and run each file in this order:
 7. `supabase/migrations/0007_v3_public_defaults.sql`
 8. `supabase/migrations/0008_v4_artifacts.sql`
 9. `supabase/migrations/0009_v5_auth_invites.sql`
+10. `supabase/migrations/0010_v5_function_grants.sql`
 
 With the CLI, `supabase link` and `supabase db push` apply the same files. Do that against the project you intend to use. Skip `supabase/seed.sql`. It inserts fictional workspaces that have no members. **Load sample catalog** on an empty workspace is the supported sample.
 
@@ -187,7 +188,7 @@ Deferred, and not done in this release:
 - `lib/catalog/` — fields, starter lookups, computed values, service IDs, exports, blueprints, artifacts
 - `lib/auth/` — the role matrix, email and password checks, and safe redirects
 - `lib/data/` — the in-memory catalog model used by unit tests, and the Supabase adapter
-- `supabase/migrations/` — `0001` through `0009`
+- `supabase/migrations/` — `0001` through `0010`
 - `e2e/` — Playwright
 - `docs/byo-supabase-vercel.md` — the short deploy note
 - `docs/nist-csf-2.0-provenance.md` — source, version, and content hash for the CSF core

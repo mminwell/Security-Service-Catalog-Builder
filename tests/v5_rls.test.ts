@@ -81,6 +81,56 @@ describe("V5 auth migration", () => {
   });
 });
 
+describe("migration SQL quoting", () => {
+  it("rejects the unclosed empty dollar quote that Postgres reads as an open tag", () => {
+    const files = readdirSync(migrationsDir).filter((name) => name.endsWith(".sql"));
+    for (const name of files) {
+      const body = readFileSync(path.join(migrationsDir, name), "utf8");
+      expect(body, name).not.toContain("$sscb$sscb$");
+    }
+  });
+});
+
+describe("function execute grants", () => {
+  const grants = readFileSync(path.join(migrationsDir, "0010_v5_function_grants.sql"), "utf8");
+
+  it("removes the default public and anon execute grant on future functions", () => {
+    expect(grants).toMatch(/alter default privileges in schema public revoke execute on functions from public, anon/i);
+  });
+
+  it("keeps authenticated off trigger and internal helpers", () => {
+    for (const signature of [
+      "public.write_audit()",
+      "public.provision_tenant_internal(text, text, uuid, text)",
+      "public.is_platform_owner()",
+      "public.apply_service_computeds()",
+      "public.enforce_outcome_mapping()",
+    ]) {
+      expect(grants, signature).toMatch(
+        new RegExp(`revoke all on function ${signature.replace(/[()]/g, "\\$&")} from public, anon, authenticated`, "i"),
+      );
+    }
+    expect(grants).not.toMatch(/grant execute on function public\.write_audit\(\) to authenticated/i);
+    expect(grants).not.toMatch(/grant execute on function public\.is_platform_owner\(\) to authenticated/i);
+  });
+
+  it("keeps authenticated execute on app RPCs and the RLS helpers policies call", () => {
+    for (const signature of [
+      "public.provision_tenant(text, text)",
+      "public.ensure_practitioner_access()",
+      "public.add_tenant_member(uuid, text, text)",
+      "public.list_visible_members()",
+      "public.can_access_tenant(uuid)",
+      "public.can_write_services(uuid)",
+      "public.can_admin_tenant(uuid)",
+    ]) {
+      expect(grants, signature).toMatch(
+        new RegExp(`grant execute on function ${signature.replace(/[()]/g, "\\$&")} to authenticated`, "i"),
+      );
+    }
+  });
+});
+
 describe("repository secrets", () => {
   it("documents only the public Supabase variables", () => {
     const example = readFileSync(path.join(process.cwd(), ".env.example"), "utf8");

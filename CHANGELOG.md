@@ -10,6 +10,7 @@ Production readiness. The app signs people in with Supabase Auth and no longer s
 - Interactive Demo Mode is gone. A deployment without `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` shows a not-configured screen. An Admin can still load the four starter sample services into an empty workspace.
 - Sign-in page, empty and error states, 404 and 500 screens, one-row header, and security headers.
 - Tests cover role gates, tenant isolation, redirects, URL and logo checks, and the RLS migration contract. Playwright covers the not-configured screen. `scripts/e2e-local-supabase.sh` is the local Auth smoke.
+- Empty dollar quotes in the framework seed are real empty strings, and `0010_v5_function_grants.sql` revokes API execute on trigger and helper functions.
 
 ## 4.0.0
 
