@@ -131,12 +131,12 @@ export function CatalogScreen() {
                   Add a service from scratch
                 </Link>
               ) : null}
+              {api.canAdmin ? (
+                <button type="button" className="btn btn-secondary" onClick={() => void api.loadSampleServices()}>
+                  Load sample catalog
+                </button>
+              ) : null}
             </div>
-            {api.canAdmin ? (
-              <button type="button" className="btn btn-ghost" style={{ marginTop: 8 }} onClick={() => void api.loadSampleServices()}>
-                Load sample catalog
-              </button>
-            ) : null}
           </div>
         </section>
       ) : filtered.length === 0 ? (
