@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { roleLabel } from "@/lib/catalog/access";
+import { placeAnchoredPanel } from "@/lib/catalog/popup-placement";
 import { cartIdsFor, subscribeCart } from "@/lib/catalog/cart-store";
 import { MAX_LOGO_FILE_BYTES } from "@/lib/catalog/logos";
 import { primaryNavCurrent, primaryNavFor } from "@/lib/catalog/primary-nav";
@@ -114,23 +116,65 @@ function WorkspaceSwitcher() {
   const [inviteNotice, setInviteNotice] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState("");
   const [logoError, setLogoError] = useState<string | null>(null);
-  const ref = useDismiss(open, () => setOpen(false));
+  const [panelStyle, setPanelStyle] = useState<CSSProperties>({});
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const ref = useDismiss(open, () => setOpen(false), panelRef);
   const tenant = api.activeTenant;
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const node = buttonRef.current;
+      if (!node) return;
+      const rect = node.getBoundingClientRect();
+      const placement = placeAnchoredPanel(
+        { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+        { width: window.innerWidth, height: window.innerHeight },
+        380,
+        "end",
+      );
+      setPanelStyle({
+        top: placement.top,
+        left: placement.left,
+        width: placement.width,
+        maxHeight: placement.maxHeight,
+      });
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open]);
+
   if (!tenant) return null;
 
   return (
     <div className="switcher" ref={ref}>
       <button
+        ref={buttonRef}
         type="button"
         className="btn btn-secondary switcher-trigger"
         aria-expanded={open}
+        aria-controls="workspace-menu"
         onClick={() => setOpen((value) => !value)}
       >
         <WorkspaceMark name={tenant.name} logoUrl={tenant.logo_url} size={18} />
         <span className="switcher-name">{tenant.name}</span>
       </button>
-      {open ? (
-        <div className="switcher-panel">
+      {open && typeof document !== "undefined"
+        ? createPortal(
+        <div
+          id="workspace-menu"
+          className="switcher-panel"
+          ref={panelRef}
+          role="dialog"
+          aria-label="Workspace"
+          style={panelStyle}
+        >
           <p className="micro">Workspaces</p>
           <div className="workspace-list">
             {api.tenants.map((item) => (
@@ -325,8 +369,10 @@ function WorkspaceSwitcher() {
               </button>
             </form>
           ) : null}
-        </div>
-      ) : null}
+        </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

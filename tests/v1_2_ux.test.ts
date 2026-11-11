@@ -86,6 +86,18 @@ describe("filter pop-up placement", () => {
     expect(flipped.top).toBeLessThan(760);
     expect(flipped.top + flipped.maxHeight).toBeLessThanOrEqual(800 - 12);
   });
+
+  it("aligns a right-side menu to the trigger and keeps it inside the viewport", () => {
+    for (const width of [1440, 390]) {
+      const trigger = { top: 16, left: width - 220, width: 180, height: 36 };
+      const placement = placeAnchoredPanel(trigger, { width, height: 800 }, 380, "end");
+      expect(placement.top).toBeGreaterThanOrEqual(trigger.top + trigger.height);
+      expect(placement.left).toBeGreaterThanOrEqual(12);
+      expect(placement.left + placement.width).toBeLessThanOrEqual(width - 12);
+      expect(placement.top + placement.maxHeight).toBeLessThanOrEqual(800 - 12);
+      expect(placement.width).toBeGreaterThan(120);
+    }
+  });
 });
 
 describe("blueprint store view", () => {

@@ -306,12 +306,18 @@ export function AuditDrawer({
   );
 }
 
-function useDismiss(open: boolean, onClose: () => void) {
+function useDismiss(
+  open: boolean,
+  onClose: () => void,
+  extra?: { current: HTMLElement | null },
+) {
   const node = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (!open) return;
     function onPointer(event: MouseEvent) {
-      if (!node.current?.contains(event.target as Node)) onClose();
+      const target = event.target as Node;
+      if (node.current?.contains(target) || extra?.current?.contains(target)) return;
+      onClose();
     }
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") onClose();
@@ -322,7 +328,7 @@ function useDismiss(open: boolean, onClose: () => void) {
       document.removeEventListener("mousedown", onPointer);
       document.removeEventListener("keydown", onKey);
     };
-  }, [open, onClose]);
+  }, [open, onClose, extra]);
   return useCallback((element: HTMLElement | null) => {
     node.current = element;
   }, []);
