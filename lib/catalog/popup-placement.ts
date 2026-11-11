@@ -34,12 +34,13 @@ export function placeAnchoredPanel(
   trigger: ViewportBox,
   viewport: ViewportSize,
   preferredWidth = FILTER_PANEL_PREFERRED_WIDTH,
+  align: "start" | "end" = "start",
 ): AnchoredPanelPlacement {
   const margin = VIEWPORT_MARGIN;
   const maxWidth = Math.max(0, viewport.width - margin * 2);
   const width = Math.min(preferredWidth, maxWidth);
 
-  let left = trigger.left;
+  let left = align === "end" ? trigger.left + trigger.width - width : trigger.left;
   if (left + width > viewport.width - margin) {
     left = viewport.width - margin - width;
   }

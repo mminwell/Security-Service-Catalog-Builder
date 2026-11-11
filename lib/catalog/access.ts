@@ -9,6 +9,10 @@ export function canAdminister(role: Role | null): boolean {
 }
 
 export function canProvision(role: Role | null): boolean {
+  return role === "platform_owner" || role === "tenant_admin";
+}
+
+export function canGrantPlatformOwner(role: Role | null): boolean {
   return role === "platform_owner";
 }
 
@@ -17,7 +21,7 @@ export function roleLabel(role: Role): string {
     case "platform_owner":
       return "Platform owner";
     case "tenant_admin":
-      return "Workspace admin";
+      return "Admin";
     case "editor":
       return "Editor";
     case "viewer":

@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { roleLabel } from "@/lib/catalog/access";
+import { placeAnchoredPanel } from "@/lib/catalog/popup-placement";
 import { cartIdsFor, subscribeCart } from "@/lib/catalog/cart-store";
 import { MAX_LOGO_FILE_BYTES } from "@/lib/catalog/logos";
 import { primaryNavCurrent, primaryNavFor } from "@/lib/catalog/primary-nav";
@@ -37,7 +39,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <h1>No workspace yet</h1>
         <p className="lede">
           {api.warning ??
-            "This account is signed in, but it is not a member of a workspace. A platform owner can add the account, or the first account on a new Supabase project becomes the platform owner automatically."}
+            "This account is signed in, but it is not a member of a workspace. An Admin can invite the account. The first account on a new project becomes Admin of Starter Workspace."}
         </p>
         <div className="row-actions" style={{ marginTop: 16 }}>
           <button type="button" className="btn btn-secondary" onClick={() => void api.signOut()}>
@@ -89,21 +91,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             Sign out
           </button>
         </div>
-        {api.mode === "demo" ? (
-          <div className="topbar-demo">
-            <span className="demo-pill">Interactive Demo</span>
-            <button type="button" className="btn btn-ghost" onClick={api.resetDemoData}>
-              Reset demo
-            </button>
-          </div>
-        ) : null}
       </header>
-      {api.mode === "demo" ? (
-        <div className="banner">
-          <strong>Interactive Demo Mode.</strong> Acme Corp and Meridian Health live in this browser. Connect Supabase
-          when you want a real multi-user workspace. Nothing is sent to a server.
-        </div>
-      ) : null}
       {api.error ? (
         <div className="banner" role="alert">
           {api.error}{" "}
@@ -119,31 +107,121 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
+function WorkspaceNameForm({ name, onSave }: { name: string; onSave: (value: string) => Promise<void> }) {
+  const [draft, setDraft] = useState(name);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <form
+      className="stack"
+      onSubmit={(event) => {
+        event.preventDefault();
+        setError(null);
+        void onSave(draft).catch((err: unknown) => {
+          setError(err instanceof Error ? err.message : "Could not rename the workspace.");
+        });
+      }}
+    >
+      <label htmlFor="workspace-name">Workspace name</label>
+      <input
+        id="workspace-name"
+        className="input"
+        value={draft}
+        maxLength={80}
+        aria-label="Workspace name"
+        onChange={(event) => setDraft(event.target.value)}
+      />
+      <div className="row-actions">
+        <button type="submit" className="btn btn-primary" disabled={draft.trim().length === 0}>
+          Save
+        </button>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => {
+            setDraft(name);
+            setError(null);
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+      {error ? (
+        <p className="field-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </form>
+  );
+}
+
 function WorkspaceSwitcher() {
   const api = useCatalog();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("editor");
+  const [inviteNotice, setInviteNotice] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState("");
   const [logoError, setLogoError] = useState<string | null>(null);
-  const ref = useDismiss(open, () => setOpen(false));
+  const [panelStyle, setPanelStyle] = useState<CSSProperties>({});
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const ref = useDismiss(open, () => setOpen(false), panelRef);
   const tenant = api.activeTenant;
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const node = buttonRef.current;
+      if (!node) return;
+      const rect = node.getBoundingClientRect();
+      const placement = placeAnchoredPanel(
+        { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+        { width: window.innerWidth, height: window.innerHeight },
+        380,
+        "end",
+      );
+      setPanelStyle({
+        top: placement.top,
+        left: placement.left,
+        width: placement.width,
+        maxHeight: placement.maxHeight,
+      });
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open]);
+
   if (!tenant) return null;
 
   return (
     <div className="switcher" ref={ref}>
       <button
+        ref={buttonRef}
         type="button"
         className="btn btn-secondary switcher-trigger"
         aria-expanded={open}
+        aria-controls="workspace-menu"
         onClick={() => setOpen((value) => !value)}
       >
         <WorkspaceMark name={tenant.name} logoUrl={tenant.logo_url} size={18} />
         <span className="switcher-name">{tenant.name}</span>
       </button>
-      {open ? (
-        <div className="switcher-panel">
+      {open && typeof document !== "undefined"
+        ? createPortal(
+        <div
+          id="workspace-menu"
+          className="switcher-panel"
+          ref={panelRef}
+          role="dialog"
+          aria-label="Workspace"
+          style={panelStyle}
+        >
           <p className="micro">Workspaces</p>
           <div className="workspace-list">
             {api.tenants.map((item) => (
@@ -164,6 +242,13 @@ function WorkspaceSwitcher() {
               </button>
             ))}
           </div>
+          {api.canAdmin ? (
+            <WorkspaceNameForm
+              key={`${tenant.id}:${tenant.name}`}
+              name={tenant.name}
+              onSave={(value) => api.renameWorkspace(value)}
+            />
+          ) : null}
           <div className="logo-setting">
             <p className="micro">Company logo</p>
             <div className="row-actions">
@@ -270,12 +355,25 @@ function WorkspaceSwitcher() {
               <span className="muted">{roleLabel(member.role)}</span>
             </div>
           ))}
+          {api.invitations.map((invite) => (
+            <div className="member" key={invite.id}>
+              <span>{invite.email}</span>
+              <span className="muted">{roleLabel(invite.role)} · Pending</span>
+            </div>
+          ))}
           {api.canAdmin ? (
             <form
               className="stack"
               onSubmit={(event) => {
                 event.preventDefault();
-                void api.addMember(email, role).then(() => setEmail(""));
+                setInviteNotice(null);
+                void api.addMember(email, role).then(
+                  (message) => {
+                    setEmail("");
+                    setInviteNotice(message);
+                  },
+                  () => setInviteNotice(null),
+                );
               }}
             >
               <input
@@ -285,22 +383,21 @@ function WorkspaceSwitcher() {
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 aria-label="Member email"
+                required
               />
               <div className="row-actions">
                 <select className="select" value={role} onChange={(event) => setRole(event.target.value as Role)} aria-label="Role">
-                  <option value="tenant_admin">Workspace admin</option>
+                  <option value="tenant_admin">Admin</option>
                   <option value="editor">Editor</option>
                   <option value="viewer">Viewer</option>
-                  {api.canCreateWorkspace ? <option value="platform_owner">Platform owner</option> : null}
+                  {api.canGrantOwner ? <option value="platform_owner">Platform owner</option> : null}
                 </select>
                 <button type="submit" className="btn btn-secondary">
-                  Add member
+                  Invite
                 </button>
               </div>
+              {inviteNotice ? <p className="hint">{inviteNotice}</p> : null}
             </form>
-          ) : null}
-          {api.mode === "demo" ? (
-            <p className="hint">Demo invites stay in this browser. They cannot sign in on their own.</p>
           ) : null}
           {api.canCreateWorkspace ? (
             <form
@@ -326,8 +423,10 @@ function WorkspaceSwitcher() {
               </button>
             </form>
           ) : null}
-        </div>
-      ) : null}
+        </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

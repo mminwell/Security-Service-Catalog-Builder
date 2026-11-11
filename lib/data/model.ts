@@ -8,6 +8,7 @@ import { applyFrameworkImport, type PlannedElement } from "@/lib/catalog/framewo
 import { FRAMEWORK_CATALOG } from "@/lib/catalog/framework-catalog";
 import { CSF_ELEMENTS, CSF_FRAMEWORK, type FrameworkElement, type FrameworkRelease } from "@/lib/catalog/framework";
 import { builtinLogoForSlug, normalizeLogoInput } from "@/lib/catalog/logos";
+import { normalizeWorkspaceName } from "@/lib/catalog/workspace-name";
 import { sampleArtifactRecords } from "@/lib/catalog/artifact-samples";
 import { normalizeArtifact, type PlannedArtifactImport } from "@/lib/catalog/artifacts";
 import { STARTER_LOOKUPS } from "@/lib/catalog/lookups";
@@ -362,7 +363,7 @@ export function addLookup(
 export function setFieldLookup(db: CatalogDb, fieldId: string, enabled: boolean, now = new Date().toISOString()): CatalogDb {
   const actor = requireSession(db);
   const tenantId = requireActive(db);
-  assertAdmin(db, tenantId, actor.userId, "Only a workspace admin can change whether a field is a lookup.");
+  assertAdmin(db, tenantId, actor.userId, "Only an Admin can change whether a field is a lookup.");
   const current = db.fields.find((field) => field.id === fieldId && field.tenant_id === tenantId);
   if (!current) throw new Error("That field is not in this workspace.");
   const toggle = lookupToggleFor(current);
@@ -482,10 +483,38 @@ export function addMember(db: CatalogDb, email: string, role: Role, now = new Da
   };
 }
 
+export function renameWorkspace(db: CatalogDb, name: string, now = new Date().toISOString()): CatalogDb {
+  const actor = requireSession(db);
+  const tenantId = requireActive(db);
+  assertAdmin(db, tenantId, actor.userId, "Only an Admin can rename this workspace.");
+  const nextName = normalizeWorkspaceName(name);
+  const current = db.tenants.find((tenant) => tenant.id === tenantId);
+  if (!current) throw new Error("Choose a workspace.");
+  if (current.name === nextName) return db;
+  const next: Tenant = { ...current, name: nextName, updated_at: now };
+  return {
+    ...db,
+    tenants: db.tenants.map((tenant) => (tenant.id === tenantId ? next : tenant)),
+    audit: [
+      auditEntry({
+        tenantId,
+        actor,
+        table: "tenants",
+        rowId: tenantId,
+        action: "update",
+        before: { name: current.name, slug: current.slug },
+        after: { name: next.name, slug: next.slug },
+        now,
+      }),
+      ...db.audit,
+    ],
+  };
+}
+
 export function setTenantLogo(db: CatalogDb, logoUrl: string | null, now = new Date().toISOString()): CatalogDb {
   const actor = requireSession(db);
   const tenantId = requireActive(db);
-  assertAdmin(db, tenantId, actor.userId, "Only a workspace admin can change the company logo.");
+  assertAdmin(db, tenantId, actor.userId, "Only an Admin can change the company logo.");
   const nextLogo = normalizeLogoInput(logoUrl);
   const current = db.tenants.find((tenant) => tenant.id === tenantId);
   if (!current) throw new Error("Choose a workspace.");
@@ -550,7 +579,7 @@ export function setServiceArchived(
 export function deleteService(db: CatalogDb, serviceId: string, now = new Date().toISOString()): CatalogDb {
   const actor = requireSession(db);
   const tenantId = requireActive(db);
-  assertAdmin(db, tenantId, actor.userId, "Only a workspace admin can permanently delete a service.");
+  assertAdmin(db, tenantId, actor.userId, "Only an Admin can permanently delete a service.");
   const current = db.services.find((service) => service.id === serviceId && service.tenant_id === tenantId);
   if (!current) throw new Error("That service is not in this workspace.");
   const removed = db.mappings.filter((mapping) => mapping.service_id === serviceId);
@@ -682,7 +711,7 @@ export function importLookups(
 ): { db: CatalogDb; created: number; updated: number } {
   const actor = requireSession(db);
   const tenantId = requireActive(db);
-  assertAdmin(db, tenantId, actor.userId, "Only a workspace admin can import dropdown options.");
+  assertAdmin(db, tenantId, actor.userId, "Only an Admin can import dropdown options.");
   const group = fieldKey.trim();
   if (!group) throw new Error("Choose a lookup group.");
   const existing = db.lookups.filter((option) => option.tenant_id === tenantId && option.field_key === group);
@@ -807,7 +836,7 @@ export function checkoutServices(
 export function setCatalogColumns(db: CatalogDb, keys: string[], now = new Date().toISOString()): CatalogDb {
   const actor = requireSession(db);
   const tenantId = requireActive(db);
-  assertAdmin(db, tenantId, actor.userId, "Only a workspace admin can save the catalog column default.");
+  assertAdmin(db, tenantId, actor.userId, "Only an Admin can save the catalog column default.");
   const clean = keys.filter((key) => key.trim().length > 0);
   if (clean.length === 0) throw new Error("Choose at least one column.");
   const current = db.tenants.find((tenant) => tenant.id === tenantId);
@@ -835,7 +864,7 @@ export function setCatalogColumns(db: CatalogDb, keys: string[], now = new Date(
 export function setFieldGroup(db: CatalogDb, group: FieldGroupId, active: boolean, now = new Date().toISOString()): CatalogDb {
   const actor = requireSession(db);
   const tenantId = requireActive(db);
-  assertAdmin(db, tenantId, actor.userId, "Only a workspace admin can turn field groups on or off.");
+  assertAdmin(db, tenantId, actor.userId, "Only an Admin can turn field groups on or off.");
   const touched = db.fields.filter((field) => field.tenant_id === tenantId && field.field_group === group);
   if (touched.length === 0) throw new Error("That field group is not in this workspace.");
   return {
@@ -866,7 +895,7 @@ export function saveExportProfile(
 ): CatalogDb {
   const actor = requireSession(db);
   const tenantId = requireActive(db);
-  assertAdmin(db, tenantId, actor.userId, "Only a workspace admin can save an export profile.");
+  assertAdmin(db, tenantId, actor.userId, "Only an Admin can save an export profile.");
   const name = input.name.trim();
   if (name.length < 2 || name.length > 80) throw new Error("Name the profile with 2 to 80 characters.");
   const fields = db.fields.filter((field) => field.tenant_id === tenantId);
@@ -919,7 +948,7 @@ export function saveExportProfile(
 export function deleteExportProfile(db: CatalogDb, profileId: string, now = new Date().toISOString()): CatalogDb {
   const actor = requireSession(db);
   const tenantId = requireActive(db);
-  assertAdmin(db, tenantId, actor.userId, "Only a workspace admin can delete an export profile.");
+  assertAdmin(db, tenantId, actor.userId, "Only an Admin can delete an export profile.");
   const current = db.exportProfiles.find((profile) => profile.id === profileId && profile.tenant_id === tenantId);
   if (!current) throw new Error("That profile is not in this workspace.");
   return {
@@ -949,7 +978,7 @@ export function importFrameworkRows(
 ): CatalogDb {
   const actor = requireSession(db);
   const tenantId = requireActive(db);
-  assertAdmin(db, tenantId, actor.userId, "Only a workspace admin can import framework content.");
+  assertAdmin(db, tenantId, actor.userId, "Only an Admin can import framework content.");
   const framework = db.frameworks.find((item) => item.id === frameworkId && item.is_active);
   if (!framework) throw new Error("That framework is not available.");
   if (framework.code === CSF_FRAMEWORK.code) {
@@ -1047,7 +1076,7 @@ export function saveArtifact(db: CatalogDb, input: Artifact, now = new Date().to
 export function deleteArtifact(db: CatalogDb, artifactId: string, now = new Date().toISOString()): CatalogDb {
   const actor = requireSession(db);
   const tenantId = requireActive(db);
-  assertAdmin(db, tenantId, actor.userId, "Only a workspace admin can permanently delete an artifact.");
+  assertAdmin(db, tenantId, actor.userId, "Only an Admin can permanently delete an artifact.");
   const current = db.artifacts.find((artifact) => artifact.id === artifactId && artifact.tenant_id === tenantId);
   if (!current) throw new Error("That artifact is not in this workspace.");
   return {
@@ -1189,6 +1218,7 @@ export function resetDemo(db: CatalogDb): CatalogDb {
   return signInDemo(fresh, db.session.email);
 }
 
+/** Direct membership wins. A platform-owner row elsewhere does not override a role on this workspace. Postgres does the opposite for a real platform owner; server actions follow Postgres. */
 export function roleFor(db: CatalogDb, tenantId: string | null, userId: string | null): Role | null {
   if (!tenantId || !userId) return null;
   const direct = db.members.find((member) => member.tenant_id === tenantId && member.user_id === userId);

@@ -9,6 +9,7 @@ import type {
   AuditEntry,
   ExportProfile,
   FieldDefinition,
+  Invitation,
   LookupOption,
   Member,
   OutcomeMapping,
@@ -25,6 +26,7 @@ import { readActiveTenantId } from "@/lib/data/storage";
 
 export type Hydration = {
   db: CatalogDb;
+  invitations: Invitation[];
   warning: string | null;
 };
 
@@ -32,12 +34,12 @@ export async function hydrateFromSupabase(supabase: SupabaseClient): Promise<Hyd
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError) throw new Error(userError.message);
   const user = userData.user;
-  if (!user) return { db: emptyDb(), warning: null };
+  if (!user) return { db: emptyDb(), invitations: [], warning: null };
 
   const session = { userId: user.id, email: user.email ?? user.id };
   const ensured = await supabase.rpc("ensure_practitioner_access");
   if (ensured.error) {
-    return { db: { ...emptyDb(), session }, warning: ensured.error.message };
+    return { db: { ...emptyDb(), session }, invitations: [], warning: ensured.error.message };
   }
 
   const tenantQuery = await supabase.from("tenants").select("*").eq("is_active", true).order("name");
@@ -45,10 +47,10 @@ export async function hydrateFromSupabase(supabase: SupabaseClient): Promise<Hyd
   const tenants = (tenantQuery.data ?? []).map(asTenant);
   const ids = tenants.map((tenant) => tenant.id);
   if (ids.length === 0) {
-    return { db: { ...emptyDb(), session }, warning: null };
+    return { db: { ...emptyDb(), session }, invitations: [], warning: null };
   }
 
-  const [fields, lookups, services, members, audit, frameworks, elements, mappings, profiles, artifacts, artifactLinks] = await Promise.all([
+  const [fields, lookups, services, members, audit, frameworks, elements, mappings, profiles, artifacts, artifactLinks, invitationsQuery] = await Promise.all([
     supabase.from("field_definitions").select("*").in("tenant_id", ids),
     supabase.from("lookup_options").select("*").in("tenant_id", ids),
     supabase.from("services").select("*").in("tenant_id", ids),
@@ -60,12 +62,20 @@ export async function hydrateFromSupabase(supabase: SupabaseClient): Promise<Hyd
     supabase.from("export_profiles").select("*").in("tenant_id", ids),
     supabase.from("artifacts").select("*").in("tenant_id", ids).order("name"),
     supabase.from("artifact_service_links").select("*").in("tenant_id", ids),
+    supabase.from("workspace_invitations").select("id, tenant_id, email, role, created_at").is("accepted_at", null).in("tenant_id", ids),
   ]);
   for (const result of [fields, lookups, services, frameworks, elements, mappings, profiles, artifacts, artifactLinks]) {
     if (result.error) throw new Error(result.error.message);
   }
   if (members.error) throw new Error(members.error.message);
   if (audit.error) throw new Error(audit.error.message);
+  const invitations =
+    invitationsQuery.error && /workspace_invitations|schema cache|does not exist/i.test(invitationsQuery.error.message)
+      ? []
+      : ((invitationsQuery.data ?? []) as InvitationRow[]).map(asInvitation);
+  if (invitationsQuery.error && invitations.length === 0 && !/workspace_invitations|schema cache|does not exist/i.test(invitationsQuery.error.message)) {
+    throw new Error(invitationsQuery.error.message);
+  }
 
   const preferred = readActiveTenantId();
   const activeTenantId = ids.includes(preferred ?? "") ? preferred : ids[0];
@@ -87,6 +97,7 @@ export async function hydrateFromSupabase(supabase: SupabaseClient): Promise<Hyd
       exportProfiles: (profiles.data ?? []).map(asExportProfile),
       audit: (audit.data ?? []).map(asAudit),
     },
+    invitations,
     warning: null,
   };
 }
@@ -652,6 +663,28 @@ type MemberRow = {
   role: Role;
   created_at: string;
 };
+
+type InvitationRow = {
+  id: string;
+  tenant_id: string;
+  email: string;
+  role: Role;
+  created_at: string;
+};
+
+function asInvitation(row: InvitationRow): Invitation {
+  const role: Role =
+    row.role === "platform_owner" || row.role === "tenant_admin" || row.role === "editor" || row.role === "viewer"
+      ? row.role
+      : "viewer";
+  return {
+    id: row.id,
+    tenant_id: row.tenant_id,
+    email: row.email,
+    role,
+    created_at: row.created_at,
+  };
+}
 
 function asMember(row: MemberRow): Member {
   return {
