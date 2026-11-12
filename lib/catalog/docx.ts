@@ -278,7 +278,7 @@ function labeledTable(rows: Array<{ label: string; value: string }>): string {
 function headerXml(document: CatalogDocument, hasLogo: boolean): string {
   const title = hasLogo ? `  ${document.workspaceName}` : `${document.monogram}  ${document.workspaceName}`;
   // The drawing is its own run. Nesting it inside the name run makes Word refuse to open the file.
-  const name = `<w:p>${hasLogo ? logoRun(1, 365760) : ""}<w:r><w:rPr><w:rFonts w:ascii="Georgia" w:hAnsi="Georgia"/><w:color w:val="141413"/><w:sz w:val="28"/></w:rPr><w:t xml:space="preserve">${xmlEscape(title)}</w:t></w:r></w:p>`;
+  const name = `<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/></w:pPr>${hasLogo ? logoRun(1, 365760) : ""}<w:r><w:rPr><w:rFonts w:ascii="Georgia" w:hAnsi="Georgia"/><w:color w:val="141413"/><w:sz w:val="28"/></w:rPr><w:t xml:space="preserve">${xmlEscape(title)}</w:t></w:r></w:p>`;
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
   ${name}
@@ -306,13 +306,17 @@ function logoRun(docId: number, emu: number): string {
 }
 
 function footerXml(document: CatalogDocument): string {
-  const lead = document.marking ? `${document.marking} · Page ` : "Page ";
   const pages = String(3 + document.services.length + 1);
+  const center = `<w:pPr><w:spacing w:before="0" w:after="0"/><w:jc w:val="center"/></w:pPr>`;
+  const statement = document.marking
+    ? `<w:p>${center}<w:r><w:rPr><w:color w:val="87867F"/><w:sz w:val="16"/></w:rPr><w:t xml:space="preserve">${xmlEscape(document.marking)}</w:t></w:r></w:p>`
+    : "";
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  ${statement}
   <w:p>
-    <w:pPr><w:jc w:val="center"/></w:pPr>
-    <w:r><w:rPr><w:color w:val="87867F"/><w:sz w:val="16"/></w:rPr><w:t xml:space="preserve">${xmlEscape(lead)}</w:t></w:r>
+    ${center}
+    <w:r><w:rPr><w:color w:val="87867F"/><w:sz w:val="16"/></w:rPr><w:t xml:space="preserve">Page </w:t></w:r>
     ${pageField("PAGE", "2")}
     <w:r><w:rPr><w:color w:val="87867F"/><w:sz w:val="16"/></w:rPr><w:t xml:space="preserve"> of </w:t></w:r>
     ${pageField("NUMPAGES", pages)}

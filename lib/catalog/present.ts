@@ -64,6 +64,16 @@ export function localToday(): string {
   return `${now.getFullYear()}-${month}-${day}`;
 }
 
+/** Local date and time for an export details page, such as "12 Nov 2026, 15:04". */
+export function localTimestamp(now: Date = new Date()): string {
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const iso = `${now.getFullYear()}-${month}-${day}`;
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+  return `${formatDate(iso)}, ${hours}:${minutes}`;
+}
+
 export function reviewTone(iso: string | null | undefined): Tone {
   if (!iso) return "neutral";
   const today = localToday();

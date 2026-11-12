@@ -11,7 +11,22 @@ export type CatalogDocument = {
   logo: { bytes: Uint8Array; kind: "png" | "jpg" } | null;
   monogram: string;
   generatedOn: string;
+  /** Date and time for the PDF details page. Word keeps using `generatedOn`. */
+  generatedAt: string | null;
+  /** Saved profile or preset name, when the export has one. */
+  profileName: string | null;
+  /** Signed-in exporter, when the caller knows it. */
+  exportedBy: string | null;
   serviceCount: number;
+  /** Artifact rows in this file. Zero when the file only has the empty-artifacts note. */
+  artifactCount: number;
+  /**
+   * Outcome mappings printed in this file.
+   * Null means this file does not include them. The PDF does not add mapping rows.
+   */
+  csfMappingCount: number | null;
+  geographySummary: string;
+  privacySummary: string;
   fieldLabels: string[];
   services: Array<{ code: string; name: string; heading: string; rows: Array<{ label: string; value: string }> }>;
   artifacts: Array<{ heading: string; rows: Array<{ label: string; value: string }> }>;
@@ -24,6 +39,10 @@ export function buildCatalogDocument(args: {
   audience: Visibility;
   marking: string | null;
   generatedOn: string;
+  generatedAt?: string | null;
+  profileName?: string | null;
+  exportedBy?: string | null;
+  csfMappingCount?: number | null;
   services: ServiceRecord[];
   fields: FieldDefinition[];
   lookups: LookupOption[];
@@ -31,7 +50,9 @@ export function buildCatalogDocument(args: {
   artifactLinks?: ArtifactLink[];
   today?: string;
 }): CatalogDocument {
-  const geo = args.fields.some((field) => field.field_group === "geography" || field.field_group === "privacy");
+  const geographySummary = groupSummary(args.fields, "geography");
+  const privacySummary = groupSummary(args.fields, "privacy");
+  const geo = geographySummary !== "Not included" || privacySummary !== "Not included";
   const notes = [
     `${args.services.length} ${args.services.length === 1 ? "service" : "services"} in the current search and filters.`,
     `Audience: ${args.audience === "internal" ? "Internal" : "Public"}.`,
@@ -42,6 +63,7 @@ export function buildCatalogDocument(args: {
   if (geo) {
     notes.push("Geography and privacy fields are workspace records. They are not legal conclusions.");
   }
+  const artifacts = artifactDocumentRows(args);
   return {
     workspaceName: args.workspaceName,
     audience: args.audience,
@@ -49,7 +71,14 @@ export function buildCatalogDocument(args: {
     logo: inlineRasterLogo(args.logoUrl),
     monogram: monogram(args.workspaceName),
     generatedOn: args.generatedOn,
+    generatedAt: args.generatedAt ?? null,
+    profileName: args.profileName?.trim() || null,
+    exportedBy: args.exportedBy?.trim() || null,
     serviceCount: args.services.length,
+    artifactCount: countArtifacts(artifacts),
+    csfMappingCount: args.csfMappingCount ?? null,
+    geographySummary,
+    privacySummary,
     fieldLabels: args.fields.map((field) => field.label),
     services: args.services.map((service) => ({
       code: service.service_code,
@@ -62,9 +91,24 @@ export function buildCatalogDocument(args: {
         value: displayExportValue(formatExportValue(service, field, args.lookups)),
       })),
     })),
-    artifacts: artifactDocumentRows(args),
+    artifacts,
     notes,
   };
+}
+
+function groupSummary(fields: FieldDefinition[], group: "geography" | "privacy"): string {
+  const included = fields.filter((field) => field.field_group === group);
+  if (included.length === 0) return "Not included";
+  return `Included: ${included.map((field) => field.label).join(", ")}`;
+}
+
+function countArtifacts(artifacts: CatalogDocument["artifacts"]): number {
+  const onlyPlaceholder =
+    artifacts.length === 1 &&
+    artifacts[0]?.heading === "Supporting artifacts" &&
+    artifacts[0].rows.length === 1 &&
+    artifacts[0].rows[0]?.value === "No artifacts in this export.";
+  return onlyPlaceholder ? 0 : artifacts.length;
 }
 
 function artifactDocumentRows(args: {
