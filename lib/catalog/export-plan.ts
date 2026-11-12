@@ -6,7 +6,7 @@ export const INTERNAL_EXPORT_CONFIRMATION =
 export const PUBLIC_PRESET_NAME = "Public catalog";
 export const FULL_PRESET_NAME = "Full catalog";
 
-export type ExportFormat = "csv" | "xlsx" | "docx" | "pdf" | "jira" | "servicenow";
+export type ExportFormat = "csv" | "xlsx" | "docx" | "pdf" | "json" | "jira" | "servicenow";
 
 export type ResolvedExport = {
   fields: FieldDefinition[];
@@ -142,7 +142,7 @@ export function sanitizeExportLog(input: ExportLogMeta): ExportLogMeta {
 export function exportFileName(slug: string, audience: Visibility, format: ExportFormat): string {
   const who = audience === "public" ? "public" : "full";
   const kind = format === "jira" ? "jira" : format === "servicenow" ? "servicenow" : "catalog";
-  const ext = format === "xlsx" || format === "docx" || format === "pdf" ? format : "csv";
+  const ext = format === "xlsx" || format === "docx" || format === "pdf" || format === "json" ? format : "csv";
   const safe = (slug || "catalog").replace(/[^a-z0-9-]+/gi, "-").replace(/^-|-$/g, "") || "catalog";
   return `${safe}-${kind}-${who}.${ext}`;
 }

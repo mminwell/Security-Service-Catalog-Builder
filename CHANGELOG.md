@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- JSON catalog export. The file is `{slug}-catalog-public.json` or `{slug}-catalog-full.json`, built in the browser with the same audience, field, artifact, and CSF mapping rules as the other formats.
+
 ## 5.0.0
 
 Production readiness. The app signs people in with Supabase Auth and no longer stores a catalog in the browser.

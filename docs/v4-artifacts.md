@@ -18,7 +18,7 @@ Artifacts is the third item: Catalog, CSF Mapping, Artifacts, Fields, Lookups, T
 
 ## Exports
 
-Full catalog CSV, Excel (its own Artifacts sheet), Word, and PDF include artifact links for the services in the export, plus artifacts that are not linked to any service. Public files include only artifacts whose visibility is Public, and only the public columns: service name, artifact name, type, status, version, description, and link. Service code is included only when that service field is public. Owner, cadence, review dates, visibility, relationship notes, and flags stay in the full file. An internal artifact contributes no name and no URL. Jira and ServiceNow presets stay service-field mappings and do not add artifact rows.
+Full catalog CSV, Excel (its own Artifacts sheet), Word, PDF, and JSON include artifact links for the services in the export, plus artifacts that are not linked to any service. JSON nests linked artifacts on each service and lists unlinked artifacts separately. Public files include only artifacts whose visibility is Public, and only the public columns: service name, artifact name, type, status, version, description, and link. Service code is included only when that service field is public. Owner, cadence, review dates, visibility, relationship notes, and flags stay in the full file. An internal artifact contributes no name and no URL. Jira and ServiceNow presets stay service-field mappings and do not add artifact rows.
 
 Links must be http or https. The app will not render a `javascript:` URL.
 
