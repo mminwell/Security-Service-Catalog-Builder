@@ -27,7 +27,7 @@ import {
   type TargetMapping,
 } from "@/lib/catalog/import-presets";
 import { buildCatalogPdf, loadPdfFonts } from "@/lib/catalog/pdf-catalog";
-import { localToday } from "@/lib/catalog/present";
+import { localTimestamp, localToday } from "@/lib/catalog/present";
 import type { FrameworkElement, FrameworkRelease } from "@/lib/catalog/framework";
 import type {
   Artifact,
@@ -48,7 +48,7 @@ const FORMATS: Array<{ id: ExportFormat; label: string; hint: string }> = [
   { id: "csv", label: "CSV", hint: "Selected service fields, then supporting artifact links." },
   { id: "xlsx", label: "Excel workbook", hint: "Services, fields, lookups, mappings, coverage, and an Artifacts sheet." },
   { id: "docx", label: "Word", hint: "Editable catalog with a header and footer." },
-  { id: "pdf", label: "PDF", hint: "Paginated catalog for reading and sharing." },
+  { id: "pdf", label: "PDF", hint: "Title page, file details, and a service index. Each service starts on a new page." },
   { id: "jira", label: "Jira CSV preset", hint: "Local file only. Not a Jira connection. Artifact links stay in the catalog files." },
   { id: "servicenow", label: "ServiceNow CSV preset", hint: "Local file only. Not an instance update. Artifact links stay in the catalog files." },
 ];
@@ -60,6 +60,7 @@ export function ExportDialog({
   companyName,
   slug,
   logoUrl,
+  exportedBy,
   profiles,
   canAdmin,
   elements,
@@ -79,6 +80,7 @@ export function ExportDialog({
   companyName: string;
   slug: string;
   logoUrl: string | null;
+  exportedBy: string | null;
   profiles: ExportProfile[];
   canAdmin: boolean;
   elements: FrameworkElement[];
@@ -224,6 +226,10 @@ export function ExportDialog({
           audience,
           marking: fileMarking,
           generatedOn: localToday(),
+          generatedAt: localTimestamp(),
+          profileName: resolved.profileName,
+          exportedBy,
+          csfMappingCount: null,
           services,
           fields: resolved.fields,
           lookups,

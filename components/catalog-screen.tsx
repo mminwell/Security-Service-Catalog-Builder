@@ -187,6 +187,7 @@ export function CatalogScreen() {
           companyName={tenant.name}
           slug={tenant.slug}
           logoUrl={tenant.logo_url}
+          exportedBy={api.session?.email ?? null}
           profiles={api.exportProfiles}
           canAdmin={api.canAdmin}
           elements={api.elements}

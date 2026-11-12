@@ -30,6 +30,7 @@
     "@types/react-dom": "^19.2.2",
     "eslint": "^9.39.1",
     "eslint-config-next": "^16.4.5",
+    "pdfjs-dist": "^4.10.38",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
