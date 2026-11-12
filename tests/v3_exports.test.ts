@@ -200,8 +200,12 @@ describe("workbook, Word, and PDF", () => {
     expect(documentXml).toContain(unicode);
     expect(documentXml).toContain("APPROVED FOR CLIENT/LIMITED DISTRIBUTION");
     expect(documentXml).not.toContain(secret);
-    expect(zipText(docx, "word/header1.xml")).toContain("APPROVED FOR CLIENT/LIMITED DISTRIBUTION");
-    expect(zipText(docx, "word/footer1.xml")).toContain("PAGE");
+    expect(zipText(docx, "word/header1.xml")).not.toContain("APPROVED FOR CLIENT/LIMITED DISTRIBUTION");
+    expect(zipText(docx, "word/header1.xml")).toContain("Acme Corp");
+    const footer = zipText(docx, "word/footer1.xml");
+    expect(footer).toContain("APPROVED FOR CLIENT/LIMITED DISTRIBUTION");
+    expect(footer).toContain("PAGE");
+    expect(footer).toContain("NUMPAGES");
 
     const pdf = await buildCatalogPdf(doc, fonts);
     expect(Buffer.from(pdf.slice(0, 5)).toString("utf8")).toBe("%PDF-");

@@ -276,14 +276,12 @@ function labeledTable(rows: Array<{ label: string; value: string }>): string {
 }
 
 function headerXml(document: CatalogDocument, hasLogo: boolean): string {
-  const mark = document.marking ? paragraph(document.marking, true) : "";
   const title = hasLogo ? `  ${document.workspaceName}` : `${document.monogram}  ${document.workspaceName}`;
   // The drawing is its own run. Nesting it inside the name run makes Word refuse to open the file.
   const name = `<w:p>${hasLogo ? logoRun(1, 365760) : ""}<w:r><w:rPr><w:rFonts w:ascii="Georgia" w:hAnsi="Georgia"/><w:color w:val="141413"/><w:sz w:val="28"/></w:rPr><w:t xml:space="preserve">${xmlEscape(title)}</w:t></w:r></w:p>`;
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
   ${name}
-  ${mark}
 </w:hdr>`;
 }
 

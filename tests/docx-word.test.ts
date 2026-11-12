@@ -208,8 +208,12 @@ function expectWord(docx: Uint8Array, logo: "png" | "jpg" | null): void {
   expect(text).not.toContain(SECRET);
   const header = parseXml(strFromU8(parts["word/header1.xml"]));
   assertHeader(header, logo);
-  expect(textOf(header)).toContain("APPROVED FOR CLIENT/LIMITED DISTRIBUTION");
-  expect(strFromU8(parts["word/footer1.xml"])).toContain("PAGE");
+  expect(textOf(header)).not.toContain("APPROVED FOR CLIENT/LIMITED DISTRIBUTION");
+  expect(textOf(header)).not.toContain("DO NOT DISTRIBUTE EXTERNALLY");
+  const footer = strFromU8(parts["word/footer1.xml"]);
+  expect(footer).toContain("APPROVED FOR CLIENT/LIMITED DISTRIBUTION");
+  expect(footer).toContain("> PAGE <");
+  expect(footer).toContain("> NUMPAGES <");
   if (logo === "png") {
     const media = parts["word/media/logo.png"];
     expect(Buffer.from(media.subarray(0, 8)).toString("hex")).toBe("89504e470d0a1a0a");
@@ -345,12 +349,17 @@ describe("Word catalog page layout", () => {
     expect(body).toContain("4");
     expect(body).toContain("5");
 
+    const header = parseXml(strFromU8(parts["word/header1.xml"]));
+    expect(textOf(header)).toContain(WORKSPACE);
+    expect(textOf(header)).not.toContain("APPROVED FOR CLIENT/LIMITED DISTRIBUTION");
+    expect(textOf(header)).not.toContain("DO NOT DISTRIBUTE EXTERNALLY");
     const footer = strFromU8(parts["word/footer1.xml"]);
+    expect(footer).toContain("APPROVED FOR CLIENT/LIMITED DISTRIBUTION");
     expect(footer).toContain("> PAGE <");
     expect(footer).toContain("> NUMPAGES <");
     expect(footer).toContain(" of ");
-    expect(footer).not.toContain("Public");
-    expect(footer).not.toContain("Internal");
+    expect(footer).not.toContain(">Public<");
+    expect(footer).not.toContain(">Internal<");
     expect(strFromU8(parts["word/settings.xml"])).toContain("<w:updateFields");
     const documentRels = parseXml(strFromU8(parts["word/_rels/document.xml.rels"]));
     expect(tagged(documentRels, "Relationship").some((rel) => rel.getAttribute("Target") === "media/logo.png")).toBe(true);
@@ -367,12 +376,18 @@ describe("Word catalog page layout", () => {
       fields,
       lookups: [],
     });
-    const document = parseXml(strFromU8(unzipSync(buildDocx(doc))["word/document.xml"]));
+    const bytes = buildDocx(doc);
+    const opened = unzipSync(bytes);
+    const document = parseXml(strFromU8(opened["word/document.xml"]));
     const title = titlePageText(document);
     expect(title).toContain("DO NOT DISTRIBUTE EXTERNALLY");
     expect(title).not.toContain("Internal use only");
     expect(textOf(document)).toContain("Internal use only");
     expect(textOf(document)).not.toContain("Audience: Internal");
     expect(textOf(document)).not.toContain(SECRET);
+    const header = parseXml(strFromU8(opened["word/header1.xml"]));
+    expect(textOf(header)).toContain(WORKSPACE);
+    expect(textOf(header)).not.toContain("DO NOT DISTRIBUTE EXTERNALLY");
+    expect(strFromU8(opened["word/footer1.xml"])).toContain("DO NOT DISTRIBUTE EXTERNALLY");
   });
 });
