@@ -117,8 +117,8 @@ describe("PDF catalog page structure", () => {
       expect(flat[actual - 1]).not.toContain("not a certification");
       if (previousHeading) expect(flat[actual - 1]).not.toContain(previousHeading);
       const headingY = textY(pages[actual - 1], entry.code);
-      expect(headingY).toBeGreaterThan(620);
-      expect(headingY).toBeLessThan(700);
+      expect(headingY).toBeGreaterThan(640);
+      expect(headingY).toBeLessThan(730);
       previous = actual;
       previousHeading = entry.heading;
     }

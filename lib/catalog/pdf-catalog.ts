@@ -12,9 +12,9 @@ const PAGE_H = 792;
 const LEFT = 54;
 const RIGHT = 558;
 const MAX_W = RIGHT - LEFT;
-const HEADER_BOTTOM = 700;
-const CONTENT_TOP = 684;
-const CONTENT_BOTTOM = 56;
+const HEADER_RULE = 732;
+const CONTENT_TOP = 716;
+const CONTENT_BOTTOM = 58;
 const LEADING = 4;
 const INDEX_TRAIL_W = 56;
 const LABEL_W = (MAX_W * 2400) / 9360;
@@ -613,28 +613,46 @@ function drawChrome(
   const name = cleanSans(document.workspaceName).trim();
   const showHeader = Boolean(logo) || name.length > 0;
   if (showHeader) {
+    const logoSize = 22;
+    const logoBottom = HEADER_RULE + 8;
     let x = LEFT;
     if (logo) {
-      const fit = fitBox(logo, 22, 22);
-      const top = PAGE_H - 26;
-      page.drawImage(logo, { x: LEFT, y: top - fit.height, width: fit.width, height: fit.height });
+      const fit = fitBox(logo, logoSize, logoSize);
+      page.drawImage(logo, { x: LEFT, y: logoBottom, width: fit.width, height: fit.height });
       x += fit.width + 6;
     } else {
       const mark = cleanBold(document.monogram);
-      page.drawText(mark, { x, y: PAGE_H - 42, size: 11, font: bold, color: CLAY });
+      page.drawText(mark, { x, y: logoBottom + 4, size: 11, font: bold, color: CLAY });
       x += bold.widthOfTextAtSize(mark, 11) + 8;
     }
-    if (name) page.drawText(name, { x, y: PAGE_H - 42, size: 11, font: sans, color: SLATE });
-    page.drawLine({ start: { x: LEFT, y: HEADER_BOTTOM }, end: { x: RIGHT, y: HEADER_BOTTOM }, thickness: 1, color: CLAY });
+    if (name) page.drawText(name, { x, y: logoBottom + 4, size: 11, font: sans, color: SLATE });
+    page.drawLine({ start: { x: LEFT, y: HEADER_RULE }, end: { x: RIGHT, y: HEADER_RULE }, thickness: 1, color: CLAY });
   }
-  const pageLabel = `Page ${pageNumber} of ${pageCount}`;
-  const footer = cleanSans(document.marking ? `${document.marking} · ${pageLabel}` : pageLabel);
-  const lines = wrapText(footer, (sample) => sans.widthOfTextAtSize(sample, 8), MAX_W);
-  let y = 28 + (lines.length - 1) * 10;
-  for (const line of lines) {
-    if (line) page.drawText(line, { x: LEFT, y, size: 8, font: sans, color: GRAY });
-    y -= 10;
+  drawFooter(page, document, sans, pageNumber, pageCount, cleanSans);
+}
+
+function drawFooter(
+  page: PDFPage,
+  document: CatalogDocument,
+  sans: PDFFont,
+  pageNumber: number,
+  pageCount: number,
+  cleanSans: (value: string) => string,
+): void {
+  const pageLabel = cleanSans(`Page ${pageNumber} of ${pageCount}`);
+  const statement = document.marking ? wrapText(cleanSans(document.marking), (sample) => sans.widthOfTextAtSize(sample, 8), MAX_W) : [];
+  let y = 34 + (statement.length - 1) * 11;
+  for (const line of statement) {
+    drawCentered(page, line, sans, 8, y);
+    y -= 11;
   }
+  drawCentered(page, pageLabel, sans, 8, 20);
+}
+
+function drawCentered(page: PDFPage, text: string, font: PDFFont, size: number, y: number): void {
+  if (!text) return;
+  const width = font.widthOfTextAtSize(text, size);
+  page.drawText(text, { x: Math.max(LEFT, (PAGE_W - width) / 2), y, size, font, color: GRAY });
 }
 
 function fitBox(image: PDFImage, maxW: number, maxH: number): { width: number; height: number } {
