@@ -243,3 +243,136 @@ describe("Word catalog package", () => {
     expectWord(catalog(`data:image/jpeg;base64,${JPEG_BASE64}`), "jpg");
   });
 });
+
+function titlePageText(doc: Document): string {
+  const body = tagged(doc, "w:body")[0];
+  if (!body) throw new Error("document body");
+  let text = "";
+  for (const child of childElements(body)) {
+    if (child.localName === "p" && tagged(child, "w:sectPr").length > 0) break;
+    text += textOf(child);
+  }
+  return text;
+}
+
+function layoutServices() {
+  return [
+    buildService("tenant", {
+      service_code: "SVC-001",
+      name: SERVICE,
+      category: "secops",
+      status: "active",
+      service_tier: "tier_0",
+      summary: `Watches the gate.\n${SUMMARY_TAIL}`,
+      owner_team: "soc",
+      internal_notes: SECRET,
+    }),
+    buildService("tenant", {
+      service_code: "SVC-002",
+      name: "North Gate",
+      category: "secops",
+      status: "active",
+      service_tier: "tier_0",
+      summary: "Covers the north approach.",
+      owner_team: "soc",
+      internal_notes: SECRET,
+    }),
+  ];
+}
+
+describe("Word catalog page layout", () => {
+  it("centers a title page, then details, a TOC, and one page per service", () => {
+    const all = materializeFields("tenant", (key) => `field:${key}`);
+    const geography = all.find((field) => field.field_key === "data_residency_regions");
+    const selected = [...fields, ...(geography ? [{ ...geography, is_active: true }] : [])];
+    const doc = buildCatalogDocument({
+      workspaceName: WORKSPACE,
+      logoUrl: `data:image/png;base64,${PNG_BASE64}`,
+      audience: "public",
+      marking: distributionMarking(WORKSPACE, "public"),
+      generatedOn: "2026-11-12",
+      services: layoutServices(),
+      fields: selected,
+      lookups: [],
+    });
+    const docx = buildDocx(doc);
+    expectWord(docx, "png");
+    const parts = unzipSync(docx);
+    const document = parseXml(strFromU8(parts["word/document.xml"]));
+    const title = titlePageText(document);
+    expect(title).toContain("Service Catalog");
+    expect(title).toContain(WORKSPACE);
+    expect(title).toContain("APPROVED FOR CLIENT/LIMITED DISTRIBUTION");
+    expect(title).toContain("Prepared 2026-11-12.");
+    expect(title).not.toContain("Export details");
+    expect(title).not.toContain(SERVICE);
+    expect(title).not.toContain("Audience:");
+    expect(title).not.toContain(SUMMARY_TAIL);
+
+    const sections = tagged(document, "w:sectPr");
+    expect(sections).toHaveLength(2);
+    expect(tagged(sections[0] ?? document, "w:vAlign")[0]?.getAttribute("w:val")).toBe("center");
+    expect(tagged(sections[0] ?? document, "w:type")[0]?.getAttribute("w:val")).toBe("nextPage");
+    expect(tagged(sections[0] ?? document, "w:headerReference")).toHaveLength(0);
+    expect(tagged(sections[1] ?? document, "w:headerReference")).toHaveLength(1);
+    expect(tagged(sections[1] ?? document, "w:footerReference")).toHaveLength(1);
+
+    const body = textOf(document);
+    expect(body).toContain("Export details");
+    expect(body).toContain("Export date");
+    expect(body).toContain("2026-11-12");
+    expect(body).toContain("Approved for client distribution");
+    expect(body).toContain("Services, Supporting artifacts");
+    expect(body).toContain("Included. Geography and privacy fields are workspace records.");
+    expect(body).toContain("Fields follow the selected order.");
+    for (const label of doc.fieldLabels) expect(body).toContain(label);
+    expect(body).not.toContain("Audience: Public");
+    expect(body).not.toContain("Audience: Internal");
+    expect(body).not.toContain(SECRET);
+    expect(body).toContain('TOC \\o "1-1" \\h \\z \\u');
+
+    const serviceHeadings = tagged(document, "w:p").filter((paragraph) =>
+      tagged(paragraph, "w:pStyle").some((style) => style.getAttribute("w:val") === "Heading1"),
+    );
+    expect(serviceHeadings).toHaveLength(2);
+    for (const heading of serviceHeadings) {
+      expect(tagged(heading, "w:pageBreakBefore")).toHaveLength(1);
+      expect(tagged(heading, "w:bookmarkStart")).toHaveLength(1);
+    }
+    expect(tagged(document, "w:hyperlink").map((link) => link.getAttribute("w:anchor"))).toEqual(["Service1", "Service2"]);
+    expect(tagged(document, "w:bookmarkStart").map((mark) => mark.getAttribute("w:name"))).toEqual(["Service1", "Service2"]);
+    expect(body).toContain("North Gate");
+    expect(body).toContain("4");
+    expect(body).toContain("5");
+
+    const footer = strFromU8(parts["word/footer1.xml"]);
+    expect(footer).toContain("> PAGE <");
+    expect(footer).toContain("> NUMPAGES <");
+    expect(footer).toContain(" of ");
+    expect(footer).not.toContain("Public");
+    expect(footer).not.toContain("Internal");
+    expect(strFromU8(parts["word/settings.xml"])).toContain("<w:updateFields");
+    const documentRels = parseXml(strFromU8(parts["word/_rels/document.xml.rels"]));
+    expect(tagged(documentRels, "Relationship").some((rel) => rel.getAttribute("Target") === "media/logo.png")).toBe(true);
+  });
+
+  it("names an internal catalog by its handling statement", () => {
+    const doc = buildCatalogDocument({
+      workspaceName: WORKSPACE,
+      logoUrl: null,
+      audience: "internal",
+      marking: distributionMarking(WORKSPACE, "all"),
+      generatedOn: "2026-11-12",
+      services: layoutServices().slice(0, 1),
+      fields,
+      lookups: [],
+    });
+    const document = parseXml(strFromU8(unzipSync(buildDocx(doc))["word/document.xml"]));
+    const title = titlePageText(document);
+    expect(title).toContain("DO NOT DISTRIBUTE EXTERNALLY");
+    expect(title).not.toContain("Internal use only");
+    expect(textOf(document)).toContain("Internal use only");
+    expect(textOf(document)).not.toContain("Audience: Internal");
+    expect(textOf(document)).not.toContain(SECRET);
+  });
+});
