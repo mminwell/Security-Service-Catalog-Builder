@@ -26,6 +26,7 @@ import {
   SERVICENOW_PRESET,
   type TargetMapping,
 } from "@/lib/catalog/import-presets";
+import { catalogJsonFile } from "@/lib/catalog/json-catalog";
 import { buildCatalogPdf, loadPdfFonts } from "@/lib/catalog/pdf-catalog";
 import { localToday } from "@/lib/catalog/present";
 import type { FrameworkElement, FrameworkRelease } from "@/lib/catalog/framework";
@@ -49,6 +50,7 @@ const FORMATS: Array<{ id: ExportFormat; label: string; hint: string }> = [
   { id: "xlsx", label: "Excel workbook", hint: "Services, fields, lookups, mappings, coverage, and an Artifacts sheet." },
   { id: "docx", label: "Word", hint: "Editable catalog with a header and footer." },
   { id: "pdf", label: "PDF", hint: "Paginated catalog for reading and sharing." },
+  { id: "json", label: "JSON", hint: "Selected fields, linked artifacts, and CSF mappings. Built in the browser." },
   { id: "jira", label: "Jira CSV preset", hint: "Local file only. Not a Jira connection. Artifact links stay in the catalog files." },
   { id: "servicenow", label: "ServiceNow CSV preset", hint: "Local file only. Not an instance update. Artifact links stay in the catalog files." },
 ];
@@ -217,6 +219,28 @@ export function ExportDialog({
           today: localToday(),
         });
         saveBytes(buildDocx(doc), exportFileName(slug, audience, "docx"), "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+      } else if (format === "json") {
+        const file = catalogJsonFile({
+          workspaceName: companyName,
+          slug,
+          logoUrl,
+          audience,
+          profileName: resolved.profileName,
+          profileId: resolved.profileId,
+          marking: fileMarking,
+          exportedAt: new Date().toISOString(),
+          services,
+          fields: resolved.fields,
+          lookups,
+          artifacts,
+          artifactLinks,
+          mappings,
+          elements,
+          frameworks,
+          tenantId,
+          today: localToday(),
+        });
+        saveText(file.body, file.filename, file.mime);
       } else {
         const doc = buildCatalogDocument({
           workspaceName: companyName,
@@ -339,7 +363,7 @@ export function ExportDialog({
             {(mapped ? mapped.columns.map((column) => column.field.label) : resolved.fields.map((field) => field.label)).join(", ")}
           </p>
           {format === "jira" || format === "servicenow" ? (
-            <p className="hint">Artifact links stay out of the Jira and ServiceNow presets. They are in the catalog CSV, Excel, Word, and PDF files.</p>
+            <p className="hint">Artifact links stay out of the Jira and ServiceNow presets. They are in the catalog CSV, Excel, Word, PDF, and JSON files.</p>
           ) : (
             <p className="hint">
               Supporting artifacts: {artifactPreview.rows.length}{" "}
@@ -682,6 +706,8 @@ function downloadLabel(format: ExportFormat): string {
       return "Download Word";
     case "pdf":
       return "Download PDF";
+    case "json":
+      return "Download JSON";
     case "jira":
       return "Download Jira CSV";
     case "servicenow":
