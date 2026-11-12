@@ -30,7 +30,7 @@ export function FieldAdmin() {
           <p className="micro">Admin</p>
           <h1>Fields</h1>
           <p className="lede">
-            Visibility and depth are per workspace. Marking a field internal keeps it out of the public CSV. Retire a
+            Visibility and depth are per workspace. Marking a field internal keeps it out of a public export. Retire a
             field to hide it from the service form, filters, completeness, and exports without deleting values already
             stored on a service. Service code and name stay active.
           </p>

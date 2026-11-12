@@ -23,4 +23,6 @@ The NIST CSF 2.0 provenance is unchanged in [nist-csf-2.0-provenance.md](nist-cs
 
 Files are built locally. A logo is embedded only when it is already an inline PNG or JPEG. HTTP logo URLs are not fetched. PDF text uses the SIL Open Font License Liberation fonts in `public/fonts`. Characters those fonts do not contain are replaced in the PDF so the file still opens. Word keeps the original characters.
 
+JSON is UTF-8, pretty-printed with two-space indentation. It uses the same audience profile and field list as the other catalog files, including linked artifacts and CSF mappings. A workspace logo is included only when it is an https URL. A data URL is left out.
+
 Spreadsheet cells that start with `=`, `+`, `-`, `@`, or a tab are prefixed so the spreadsheet treats them as text.
