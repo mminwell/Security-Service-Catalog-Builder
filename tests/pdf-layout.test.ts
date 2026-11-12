@@ -75,6 +75,7 @@ describe("PDF catalog page structure", () => {
     expect(flat[0]).not.toContain("internal-facing");
     expect(flat[0]).not.toContain("not a certification");
     expect(titleOrder(pages[0])).toBe(true);
+    expectRunningChrome(pages, "DO NOT DISTRIBUTE EXTERNALLY");
 
     expect(flat[1]).toContain("Export details");
     expect(flat[1]).toContain("Northwind Security");
@@ -135,9 +136,6 @@ describe("PDF catalog page structure", () => {
     expect(flat[vendorStart - 1]).not.toContain(doc.services[2].heading);
     expect(flat[packetEnd - 1]).not.toContain(doc.services[2].name);
 
-    for (let index = 0; index < pages.length; index += 1) {
-      expect(flat[index]).toContain(`Page ${index + 1} of ${pages.length}`);
-    }
     expect(flat.join("\n")).toContain(PUBLIC_ARTIFACT);
     expect(flat.join("\n")).toContain(PUBLIC_URL);
     expect(flat.join("\n")).not.toContain(SECRET);
@@ -161,6 +159,7 @@ describe("PDF catalog page structure", () => {
     });
     const pdf = await buildCatalogPdf(doc, fonts);
     const pages = await readPages(pdf);
+    expectRunningChrome(pages, "DO NOT DISTRIBUTE EXTERNALLY");
     expect(indexPages(pages).length).toBeGreaterThan(1);
     expect(await imagePaints(pdf, 1)).toBe(0);
 
@@ -210,8 +209,12 @@ describe("PDF catalog page structure", () => {
       profileName: "Full catalog",
       fields: fullPreset(fields).fields,
     });
-    const publicText = (await readPages(await buildCatalogPdf(pub, fonts))).map((page) => page.flat).join("\n");
-    const fullText = (await readPages(await buildCatalogPdf(full, fonts))).map((page) => page.flat).join("\n");
+    const publicPages = await readPages(await buildCatalogPdf(pub, fonts));
+    const fullPages = await readPages(await buildCatalogPdf(full, fonts));
+    const publicText = publicPages.map((page) => page.flat).join("\n");
+    const fullText = fullPages.map((page) => page.flat).join("\n");
+    expectRunningChrome(publicPages, "APPROVED FOR CLIENT/LIMITED DISTRIBUTION");
+    expectRunningChrome(fullPages, "DO NOT DISTRIBUTE EXTERNALLY");
 
     expect(publicText).toContain("Service Catalog");
     expect(publicText).toContain("APPROVED FOR CLIENT/LIMITED DISTRIBUTION");
@@ -238,6 +241,7 @@ describe("PDF catalog page structure", () => {
       fields: selected(["name", "summary"]),
     });
     const pages = await readPages(await buildCatalogPdf(doc, fonts));
+    expectRunningChrome(pages, null);
     expect(pages[0].flat).toContain("Service Catalog");
     expect(pages[0].flat).toContain(`Exported ${EXPORTED_ON}`);
     expect(pages[0].flat).not.toContain("DO NOT DISTRIBUTE");
@@ -478,6 +482,36 @@ function textY(page: PageText | undefined, text: string): number {
   const hits = page?.items.filter((item) => item.str.includes(text)).map((item) => item.y) ?? [];
   if (hits.length === 0) return -1;
   return Math.max(...hits);
+}
+
+function band(page: PageText, keep: (y: number) => boolean): string {
+  return page.items
+    .filter((item) => keep(item.y))
+    .sort((a, b) => b.y - a.y || a.x - b.x)
+    .map((item) => item.str)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Header text sits above the rule. Footer text sits with the page number. */
+function expectRunningChrome(pages: PageText[], statement: string | null): void {
+  pages.forEach((page, index) => {
+    const header = band(page, (y) => y > 700);
+    const footer = band(page, (y) => y < 48);
+    expect(header).not.toContain("DO NOT DISTRIBUTE");
+    expect(header).not.toContain("APPROVED FOR CLIENT");
+    if (statement) expect(footer).toContain(statement);
+    else {
+      expect(footer).not.toContain("DO NOT DISTRIBUTE");
+      expect(footer).not.toContain("APPROVED FOR CLIENT");
+    }
+    expect(footer).toContain(`Page ${index + 1} of ${pages.length}`);
+  });
+  if (!statement || !pages[0]) return;
+  const titleBody = band(pages[0], (y) => y >= 48 && y <= 700);
+  expect(titleBody).toContain("Service Catalog");
+  expect(titleBody).toContain(statement);
 }
 
 function titleOrder(page: PageText | undefined): boolean {

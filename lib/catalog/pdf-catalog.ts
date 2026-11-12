@@ -520,31 +520,31 @@ function drawChrome(
   cleanSans: (value: string) => string,
   cleanBold: (value: string) => string,
 ): void {
-  let x = LEFT;
-  if (logo) {
-    const fit = fitBox(logo, 22, 22);
-    const top = PAGE_H - 26;
-    page.drawImage(logo, { x: LEFT, y: top - fit.height, width: fit.width, height: fit.height });
-    x += fit.width + 6;
-  } else {
-    page.drawText(cleanBold(document.monogram), { x, y: PAGE_H - 42, size: 11, font: bold, color: CLAY });
-    x += bold.widthOfTextAtSize(cleanBold(document.monogram), 11) + 8;
-  }
-  page.drawText(cleanSans(document.workspaceName), { x, y: PAGE_H - 42, size: 11, font: sans, color: SLATE });
-  if (document.marking) {
-    const marking = cleanBold(document.marking);
-    const size = 8;
-    const lines = wrapText(marking, (sample) => bold.widthOfTextAtSize(sample, size), RIGHT - LEFT);
-    let y = PAGE_H - 58;
-    for (const line of lines.slice(0, 2)) {
-      page.drawText(line, { x: LEFT, y, size, font: bold, color: SLATE });
-      y -= 10;
+  const name = cleanSans(document.workspaceName).trim();
+  const showHeader = Boolean(logo) || name.length > 0;
+  if (showHeader) {
+    let x = LEFT;
+    if (logo) {
+      const fit = fitBox(logo, 22, 22);
+      const top = PAGE_H - 26;
+      page.drawImage(logo, { x: LEFT, y: top - fit.height, width: fit.width, height: fit.height });
+      x += fit.width + 6;
+    } else {
+      const mark = cleanBold(document.monogram);
+      page.drawText(mark, { x, y: PAGE_H - 42, size: 11, font: bold, color: CLAY });
+      x += bold.widthOfTextAtSize(mark, 11) + 8;
     }
+    if (name) page.drawText(name, { x, y: PAGE_H - 42, size: 11, font: sans, color: SLATE });
+    page.drawLine({ start: { x: LEFT, y: HEADER_BOTTOM }, end: { x: RIGHT, y: HEADER_BOTTOM }, thickness: 1, color: CLAY });
   }
-  page.drawLine({ start: { x: LEFT, y: HEADER_BOTTOM }, end: { x: RIGHT, y: HEADER_BOTTOM }, thickness: 1, color: CLAY });
-  const audience = document.audience === "internal" ? "Internal" : "Public";
-  const footer = cleanSans(`Service catalog · ${audience} · Page ${pageNumber} of ${pageCount}`);
-  page.drawText(footer, { x: LEFT, y: 28, size: 8, font: sans, color: GRAY });
+  const pageLabel = `Page ${pageNumber} of ${pageCount}`;
+  const footer = cleanSans(document.marking ? `${document.marking} · ${pageLabel}` : pageLabel);
+  const lines = wrapText(footer, (sample) => sans.widthOfTextAtSize(sample, 8), MAX_W);
+  let y = 28 + (lines.length - 1) * 10;
+  for (const line of lines) {
+    if (line) page.drawText(line, { x: LEFT, y, size: 8, font: sans, color: GRAY });
+    y -= 10;
+  }
 }
 
 function fitBox(image: PDFImage, maxW: number, maxH: number): { width: number; height: number } {
