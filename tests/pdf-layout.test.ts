@@ -423,10 +423,11 @@ async function readPages(bytes: Uint8Array): Promise<PageText[]> {
   for (let number = 1; number <= pdf.numPages; number += 1) {
     const page = await pdf.getPage(number);
     const content = await page.getTextContent();
-    const items = content.items
-      .filter((item): item is { str: string; transform: number[] } => "str" in item && "transform" in item)
-      .map((item) => ({ str: item.str, x: item.transform[4] ?? 0, y: item.transform[5] ?? 0 }))
-      .filter((item) => item.str);
+    const items: PageText["items"] = [];
+    for (const item of content.items) {
+      if (!("str" in item) || !item.str) continue;
+      items.push({ str: item.str, x: item.transform[4] ?? 0, y: item.transform[5] ?? 0 });
+    }
     const rows: Array<{ y: number; parts: Array<{ x: number; str: string }> }> = [];
     for (const item of [...items].sort((a, b) => b.y - a.y || a.x - b.x)) {
       const last = rows[rows.length - 1];
