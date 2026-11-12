@@ -1,6 +1,5 @@
 import { PDFDocument, rgb, type PDFFont, type PDFImage, type PDFPage, type PDFRef } from "pdf-lib";
 import type { CatalogDocument } from "@/lib/catalog/catalog-document";
-import { visibilityLabel } from "@/lib/catalog/present";
 
 export type PdfFonts = {
   sans: Uint8Array;
@@ -18,6 +17,15 @@ const CONTENT_TOP = 684;
 const CONTENT_BOTTOM = 56;
 const LEADING = 4;
 const INDEX_TRAIL_W = 56;
+const LABEL_W = (MAX_W * 2400) / 9360;
+const VALUE_W = MAX_W - LABEL_W;
+const CELL = 10;
+const CELL_LINE = 14;
+const PAD_X = 6;
+const PAD_Y = 5;
+const PAGE_ROOM = CONTENT_TOP - CONTENT_BOTTOM;
+const BEIGE = rgb(240 / 255, 238 / 255, 230 / 255);
+const RULE = rgb(209 / 255, 207 / 255, 197 / 255);
 
 const SLATE = rgb(20 / 255, 20 / 255, 19 / 255);
 const CLAY = rgb(217 / 255, 119 / 255, 87 / 255);
@@ -40,42 +48,49 @@ type GlyphLine = {
 
 type Block = { lines: GlyphLine[]; atomic?: boolean };
 type PlacedLine = { line: GlyphLine; baseline: number };
+type CellLine = { text: string; font: PDFFont; size: number; color: Ink };
+type TableChunk = { label: CellLine[]; value: CellLine[]; height: number };
+type BodyPage = { lines: PlacedLine[]; tables: Array<{ top: number; chunks: TableChunk[] }> };
+type Piece =
+  | { kind: "lines"; lines: GlyphLine[] }
+  | { kind: "rows"; rows: Array<{ label: string; value: string }>; gapBefore: number };
+
+function textHeight(lineCount: number): number {
+  const lines = Math.max(lineCount, 1);
+  return PAD_Y * 2 + CELL + (lines - 1) * CELL_LINE;
+}
 type FaceName = "sans" | "bold" | "serif";
 type Face = { font: PDFFont; clean: (value: string) => string };
 
 const NO_LINKS = new Map<string, PDFPage>();
 
-function countPhrase(count: number, singular: string): string {
-  return `${count} ${count === 1 ? singular : `${singular}s`}`;
-}
-
-/** Facts that describe the file. Shown once, on the details page. */
+/** Same rows as the Word export-details table. */
 export function catalogPdfDetailRows(document: CatalogDocument): Array<{ label: string; value: string }> {
-  const rows: Array<{ label: string; value: string }> = [
+  const geography = document.notes.some((note) => /geography and privacy/i.test(note));
+  return [
     { label: "Workspace", value: document.workspaceName },
-    { label: "Exported", value: document.generatedAt || document.generatedOn },
-  ];
-  if (document.exportedBy) rows.push({ label: "Exported by", value: document.exportedBy });
-  if (document.profileName) rows.push({ label: "Profile", value: document.profileName });
-  rows.push(
-    { label: "Audience", value: visibilityLabel(document.audience) },
-    { label: "Distribution", value: document.marking ?? "Not included" },
-    { label: "Services", value: countPhrase(document.serviceCount, "service") },
-    { label: "Fields included", value: document.fieldLabels.join(", ") || "None" },
+    { label: "Export date", value: document.generatedOn },
+    { label: "Distribution", value: document.marking ?? "None" },
+    { label: "Audience", value: document.audience === "internal" ? "Internal use only" : "Approved for client distribution" },
+    { label: "Services", value: String(document.serviceCount) },
+    { label: "Fields", value: document.fieldLabels.length > 0 ? document.fieldLabels.join(", ") : "None" },
     { label: "Sections", value: "Services, Supporting artifacts" },
-    { label: "Artifacts", value: countPhrase(document.artifactCount, "artifact") },
+    { label: "Artifacts", value: String(document.artifactCount) },
     {
-      label: "CSF mappings",
-      value: document.csfMappingCount == null ? "Not included" : countPhrase(document.csfMappingCount, "mapping"),
+      label: "Geography and privacy",
+      value: geography
+        ? "Included. Geography and privacy fields are workspace records. They are not legal conclusions."
+        : "Not included.",
     },
-    { label: "Geography", value: document.geographySummary },
-    { label: "Privacy", value: document.privacySummary },
-  );
-  return rows;
+  ];
 }
 
-function supplementalNotes(document: CatalogDocument): string[] {
-  return document.notes.filter((note) => !note.startsWith("Audience:") && !/^\d+ services? in the current search/.test(note));
+function detailNotes(): string[] {
+  return [
+    "Fields follow the selected order. Empty values are shown as an em dash.",
+    "This is a service catalog. It is not a certification, an audit report, or a compliance determination.",
+    "Supporting artifacts are links. This file does not contain the documents themselves.",
+  ];
 }
 
 /** Body text drawn in the PDF, in order. Header and footer chrome are separate. Page numbers are not included. */
@@ -90,7 +105,7 @@ export function catalogPdfBlocks(document: CatalogDocument): PdfBlock[] {
   for (const row of catalogPdfDetailRows(document)) {
     blocks.push({ text: row.label, kind: "label" }, { text: row.value, kind: "value" });
   }
-  for (const note of supplementalNotes(document)) blocks.push({ text: note, kind: "note" });
+  for (const note of detailNotes()) blocks.push({ text: note, kind: "note" });
   blocks.push({ text: "Index", kind: "section" });
   if (document.services.length === 0) blocks.push({ text: "No services are in this export.", kind: "empty" });
   for (const service of document.services) {
@@ -149,42 +164,83 @@ export async function buildCatalogPdf(document: CatalogDocument, fonts: PdfFonts
     }));
   };
 
-  const fieldBlock = (label: string, value: string, gap = 12): Block => {
-    const labels = paragraph(label, "bold", 9, CLAY, gap);
-    const values = paragraph(value, "sans", 11, SLATE, 2);
-    if (labels.length > 0) labels[labels.length - 1].keepWithNext = true;
-    return { lines: [...labels, ...values] };
+  const cellLines = (text: string, faceName: FaceName, width: number): CellLine[] => {
+    const face = faces[faceName];
+    const wrapped = wrapText(face.clean(text), (sample) => face.font.widthOfTextAtSize(sample, CELL), Math.max(12, width - PAD_X * 2));
+    const lines = wrapped.length > 0 ? wrapped : [""];
+    return lines.map((line) => ({ text: line, font: face.font, size: CELL, color: SLATE }));
   };
 
-  const headingLines = (text: string, size: number, gapBefore: number): GlyphLine[] => {
-    const lines = paragraph(text, "serif", size, SLATE, gapBefore);
-    for (const line of lines) line.keepWithNext = true;
-    return lines;
-  };
-
-  const serviceBlocks = (service: CatalogDocument["services"][number]): Block[] => {
-    const head = headingLines(service.heading, 18, 0);
-    if (service.rows.length === 0) {
-      for (const line of head) line.keepWithNext = false;
-      return [{ atomic: true, lines: head }];
+  const chunkRow = (label: string, value: string): TableChunk[] => {
+    const labelLines = cellLines(label, "bold", LABEL_W);
+    const valueLines = cellLines(value, "sans", VALUE_W);
+    const capacity = Math.max(1, Math.floor((PAGE_ROOM - PAD_Y * 2 - CELL) / CELL_LINE) + 1);
+    const slices: CellLine[][] = [];
+    if (valueLines.length <= capacity && textHeight(Math.max(labelLines.length, valueLines.length)) <= PAGE_ROOM) {
+      slices.push(valueLines);
+    } else {
+      for (let index = 0; index < valueLines.length; index += capacity) slices.push(valueLines.slice(index, index + capacity));
     }
-    const [first, ...rest] = service.rows;
-    const blocks: Block[] = [{ lines: [...head, ...fieldBlock(first.label, first.value).lines] }];
-    for (const row of rest) blocks.push(fieldBlock(row.label, row.value));
-    return blocks;
+    return (slices.length > 0 ? slices : [[]]).map((slice) => ({
+      label: labelLines,
+      value: slice,
+      height: textHeight(Math.max(labelLines.length, slice.length, 1)),
+    }));
   };
 
-  const detailBlocks = (): Block[] => {
-    const blocks: Block[] = [{ atomic: true, lines: paragraph("Export details", "serif", 22, SLATE, 0) }];
-    for (const row of catalogPdfDetailRows(document)) blocks.push(fieldBlock(row.label, row.value, 8));
-    const notes = supplementalNotes(document);
-    if (notes.length > 0) {
-      const label = paragraph("Notes", "bold", 9, CLAY, 12);
-      if (label.length > 0) label[label.length - 1].keepWithNext = true;
-      blocks.push({ lines: [...label, ...paragraph(notes[0], "sans", 10, SLATE, 3)] });
-      for (const note of notes.slice(1)) blocks.push({ lines: paragraph(note, "sans", 10, SLATE, 4) });
+  const layoutPieces = (pieces: Piece[]): BodyPage[] => {
+    const pages: BodyPage[] = [];
+    let lines: PlacedLine[] = [];
+    let tables: BodyPage["tables"] = [];
+    let open: { top: number; chunks: TableChunk[] } | null = null;
+    let y = CONTENT_TOP;
+
+    const occupied = () => lines.length > 0 || tables.length > 0 || (open !== null && open.chunks.length > 0);
+    const pushPage = () => {
+      if (open && open.chunks.length > 0) tables.push(open);
+      open = null;
+      pages.push({ lines, tables });
+      lines = [];
+      tables = [];
+      y = CONTENT_TOP;
+    };
+    const ensure = (height: number) => {
+      if (occupied() && y - height < CONTENT_BOTTOM) pushPage();
+    };
+
+    for (const piece of pieces) {
+      if (piece.kind === "lines") {
+        if (open && open.chunks.length > 0) {
+          tables.push(open);
+          open = null;
+        }
+        for (const line of piece.lines) {
+          const gap = lines.length === 0 && tables.length === 0 ? 0 : line.gapBefore;
+          ensure(gap + line.size + LEADING);
+          const usedGap = lines.length === 0 && tables.length === 0 ? 0 : line.gapBefore;
+          const baseline = y - usedGap - line.size;
+          lines.push({ line, baseline });
+          y = baseline - LEADING;
+        }
+        continue;
+      }
+      const gap = occupied() ? piece.gapBefore : 0;
+      ensure(gap);
+      y -= occupied() ? gap : 0;
+      for (const row of piece.rows) {
+        for (const chunk of chunkRow(row.label, row.value)) {
+          ensure(chunk.height);
+          if (!open) open = { top: y, chunks: [] };
+          open.chunks.push(chunk);
+          y -= chunk.height;
+        }
+      }
     }
-    return blocks;
+    if (occupied()) {
+      if (open && open.chunks.length > 0) tables.push(open);
+      pages.push({ lines, tables });
+    }
+    return pages.length > 0 ? pages : [{ lines: [], tables: [] }];
   };
 
   const indexBlocks = (pageNumbers: number[]): Block[] => {
@@ -202,29 +258,36 @@ export async function buildCatalogPdf(document: CatalogDocument, fonts: PdfFonts
     return blocks;
   };
 
-  const artifactBlocks = (): Block[] => {
-    const blocks: Block[] = [{ atomic: true, lines: paragraph("Supporting artifacts", "serif", 18, SLATE, 0) }];
-    if (document.artifactCount === 0) {
-      blocks.push({ lines: paragraph("No artifacts in this export.", "sans", 11, SLATE, 14) });
-      return blocks;
-    }
+  const detailPacked = layoutPieces([
+    { kind: "lines", lines: paragraph("Export details", "serif", 22, SLATE, 0) },
+    { kind: "rows", rows: catalogPdfDetailRows(document), gapBefore: 10 },
+    {
+      kind: "lines",
+      lines: detailNotes().flatMap((note, index) => paragraph(note, "sans", 10, SLATE, index === 0 ? 14 : 4)),
+    },
+  ]);
+  const servicePacked = document.services.map((service) =>
+    layoutPieces([
+      { kind: "lines", lines: paragraph(service.heading, "serif", 18, SLATE, 0) },
+      { kind: "rows", rows: service.rows, gapBefore: 8 },
+    ]),
+  );
+  const artifactPieces: Piece[] = [{ kind: "lines", lines: paragraph("Supporting artifacts", "serif", 18, SLATE, 0) }];
+  if (document.artifactCount === 0) {
+    artifactPieces.push({
+      kind: "rows",
+      rows: [{ label: "Artifacts", value: "No artifacts in this export." }],
+      gapBefore: 8,
+    });
+  } else {
     for (const artifact of document.artifacts) {
-      const head = headingLines(artifact.heading, 14, 16);
-      const [first, ...rest] = artifact.rows;
-      if (!first) {
-        for (const line of head) line.keepWithNext = false;
-        blocks.push({ atomic: true, lines: head });
-        continue;
+      if (artifact.heading !== "Supporting artifacts") {
+        artifactPieces.push({ kind: "lines", lines: paragraph(artifact.heading, "serif", 14, SLATE, 12) });
       }
-      blocks.push({ lines: [...head, ...fieldBlock(first.label, first.value).lines] });
-      for (const row of rest) blocks.push(fieldBlock(row.label, row.value));
+      artifactPieces.push({ kind: "rows", rows: artifact.rows, gapBefore: 6 });
     }
-    return blocks;
-  };
-
-  const detailPacked = packBlocks(detailBlocks());
-  const servicePacked = document.services.map((service) => packBlocks(serviceBlocks(service)));
-  const artifactPacked = packBlocks(artifactBlocks());
+  }
+  const artifactPacked = layoutPieces(artifactPieces);
   const serviceCounts = servicePacked.map((pages) => pages.length);
 
   // The index prints the page each service starts on, and those page numbers
@@ -257,31 +320,26 @@ export async function buildCatalogPdf(document: CatalogDocument, fonts: PdfFonts
 
   drawTitle(pages[0], document, logo, faces);
   let cursor = 1;
-  for (const placed of detailPacked) {
-    drawPlaced(pdf, pages[cursor], placed, NO_LINKS);
+  const paint = (body: BodyPage, links: Map<string, PDFPage>) => {
+    const page = pages[cursor];
+    drawPlaced(pdf, page, body.lines, links);
+    for (const table of body.tables) drawTable(page, table);
     cursor += 1;
-  }
-  for (const placed of indexPacked) {
-    drawPlaced(pdf, pages[cursor], placed, linkTargets);
-    cursor += 1;
-  }
+  };
+  for (const body of detailPacked) paint(body, NO_LINKS);
+  for (const placed of indexPacked) paint({ lines: placed, tables: [] }, linkTargets);
   servicePacked.forEach((packed, serviceIndex) => {
     const expected = starts[serviceIndex];
     if (cursor + 1 !== expected) {
       throw new Error(`Service ${serviceIndex} was drawn on page ${cursor + 1}, index says ${expected}.`);
     }
-    for (const placed of packed) {
-      drawPlaced(pdf, pages[cursor], placed, NO_LINKS);
-      cursor += 1;
-    }
+    for (const body of packed) paint(body, NO_LINKS);
   });
-  for (const placed of artifactPacked) {
-    drawPlaced(pdf, pages[cursor], placed, NO_LINKS);
-    cursor += 1;
-  }
+  for (const body of artifactPacked) paint(body, NO_LINKS);
   if (cursor !== total) throw new Error(`PDF used ${cursor} pages, expected ${total}.`);
 
   pages.forEach((page, index) => {
+    if (index === 0) return;
     drawChrome(page, document, logo, faces.sans.font, faces.bold.font, index + 1, pages.length, faces.sans.clean, faces.bold.clean);
   });
   return pdf.save();
@@ -385,8 +443,10 @@ function drawTitle(page: PDFPage, document: CatalogDocument, logo: PDFImage | nu
   centered(`Exported ${document.generatedOn}`, faces.sans, 11, GRAY);
 
   const height = ops.reduce((sum, op) => sum + titleOpHeight(op), 0);
-  let y = (CONTENT_TOP + CONTENT_BOTTOM + height) / 2;
-  if (y > CONTENT_TOP) y = CONTENT_TOP;
+  const titleTop = PAGE_H - 64;
+  const titleBottom = 64;
+  let y = (titleTop + titleBottom + height) / 2;
+  if (y > titleTop) y = titleTop;
   for (const op of ops) {
     if (op.kind === "gap") {
       y -= op.height;
@@ -507,6 +567,36 @@ async function supportedText(bytes: Uint8Array): Promise<(value: string) => stri
     }
     return out;
   };
+}
+
+function drawTable(page: PDFPage | undefined, table: { top: number; chunks: TableChunk[] }): void {
+  if (!page || table.chunks.length === 0) return;
+  let y = table.top;
+  const boundaries = [y];
+  for (const chunk of table.chunks) {
+    const bottom = y - chunk.height;
+    page.drawRectangle({ x: LEFT, y: bottom, width: LABEL_W, height: chunk.height, color: BEIGE });
+    drawCell(page, chunk.label, LEFT, y);
+    drawCell(page, chunk.value, LEFT + LABEL_W, y);
+    y = bottom;
+    boundaries.push(y);
+  }
+  const top = boundaries[0] ?? table.top;
+  const bottom = boundaries[boundaries.length - 1] ?? table.top;
+  for (const x of [LEFT, LEFT + LABEL_W, LEFT + MAX_W]) {
+    page.drawLine({ start: { x, y: bottom }, end: { x, y: top }, thickness: 0.6, color: RULE });
+  }
+  for (const line of boundaries) {
+    page.drawLine({ start: { x: LEFT, y: line }, end: { x: LEFT + MAX_W, y: line }, thickness: 0.6, color: RULE });
+  }
+}
+
+function drawCell(page: PDFPage, lines: CellLine[], x: number, top: number): void {
+  let baseline = top - PAD_Y - CELL;
+  for (const line of lines) {
+    if (line.text) page.drawText(line.text, { x: x + PAD_X, y: baseline, size: line.size, font: line.font, color: line.color });
+    baseline -= CELL_LINE;
+  }
 }
 
 function drawChrome(

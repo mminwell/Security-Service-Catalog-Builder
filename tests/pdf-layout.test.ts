@@ -78,23 +78,24 @@ describe("PDF catalog page structure", () => {
     expectRunningChrome(pages, "DO NOT DISTRIBUTE EXTERNALLY");
 
     expect(flat[1]).toContain("Export details");
+    expect(flat[1]).toContain("Workspace");
     expect(flat[1]).toContain("Northwind Security");
-    expect(flat[1]).toContain(EXPORTED_AT);
-    expect(flat[1]).toContain("owner@northwind.example");
-    expect(flat[1]).toContain("Full catalog");
-    expect(flat[1]).toContain("Internal");
+    expect(flat[1]).toContain("Export date");
+    expect(flat[1]).toContain(EXPORTED_ON);
+    expect(flat[1]).toContain("Internal use only");
     expect(flat[1]).toContain("DO NOT DISTRIBUTE EXTERNALLY");
-    expect(flat[1]).toContain("6 services");
+    expect(flat[1]).toContain("Services");
+    expect(flat[1]).toContain("Fields");
     expect(flat[1]).toContain("Service Name");
     expect(flat[1]).toContain("Service Description");
     expect(flat[1]).toContain("Data residency regions");
-    expect(flat[1]).toContain("Included: Data residency regions");
-    expect(flat[1]).toContain("Privacy");
-    expect(flat[1]).toContain("Not included");
-    expect(flat[1]).toContain("CSF mappings");
-    expect(flat[1]).toContain("2 artifacts");
+    expect(flat[1]).toContain("Included. Geography and privacy fields are workspace records.");
     expect(flat[1]).toContain("Services, Supporting artifacts");
+    expect(flat[1]).toContain("Fields follow the selected order. Empty values are shown as an em dash.");
     expect(flat[1]).toContain("not a certification");
+    expect(flat[1]).toContain("Supporting artifacts are links.");
+    expect(flat[1]).not.toContain("Exported by");
+    expect(flat[1]).not.toContain("CSF mappings");
     expect(flat[1]).not.toContain("internal-facing");
 
     expect(flat[2]).toContain("Index");
@@ -102,7 +103,7 @@ describe("PDF catalog page structure", () => {
 
     const loaded = await PDFDocument.load(copyBytes(pdf));
     expect(linkCount(loaded)).toBe(services.length);
-    expect(await imagePaints(pdf, 1)).toBe(2);
+    expect(await imagePaints(pdf, 1)).toBe(1);
     expect(await imagePaints(pdf, 4)).toBe(1);
 
     let previous = 0;
@@ -248,7 +249,8 @@ describe("PDF catalog page structure", () => {
     expect(pages[0].flat).not.toContain("APPROVED FOR CLIENT");
     expect(pages[0].flat).not.toContain("internal-facing");
     expect(pages[1].flat).toContain("Distribution");
-    expect(pages[1].flat).toContain("Not included");
+    expect(pages[1].flat).toContain("None");
+    expect(pages[1].flat).toContain("Approved for client distribution");
   });
 });
 
@@ -494,11 +496,16 @@ function band(page: PageText, keep: (y: number) => boolean): string {
     .trim();
 }
 
-/** Header text sits above the rule. Footer text sits with the page number. */
+/** The title page has no running header or footer. Later pages keep both. */
 function expectRunningChrome(pages: PageText[], statement: string | null): void {
   pages.forEach((page, index) => {
     const header = band(page, (y) => y > 700);
     const footer = band(page, (y) => y < 48);
+    if (index === 0) {
+      expect(header).toBe("");
+      expect(footer).toBe("");
+      return;
+    }
     expect(header).not.toContain("DO NOT DISTRIBUTE");
     expect(header).not.toContain("APPROVED FOR CLIENT");
     if (statement) expect(footer).toContain(statement);
@@ -524,7 +531,7 @@ function titleOrder(page: PageText | undefined): boolean {
   const bodyName = Math.min(...names);
   const bodyDate = Math.min(...dates);
   const bodyStatement = statements.filter((y) => y < title).sort((a, b) => b - a)[0];
-  return bodyName > title && title > (bodyStatement ?? 0) && (bodyStatement ?? 0) > bodyDate && Math.max(...names) > 720;
+  return bodyName > title && title > (bodyStatement ?? 0) && (bodyStatement ?? 0) > bodyDate;
 }
 
 function linkCount(pdf: PDFDocument): number {
