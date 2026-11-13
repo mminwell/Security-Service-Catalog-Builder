@@ -26,5 +26,7 @@ export function roleLabel(role: Role): string {
       return "Editor";
     case "viewer":
       return "Viewer";
+    case "service_manager":
+      return "Service Manager";
   }
 }

@@ -35,6 +35,32 @@ export async function assertLevel(
   }
 }
 
+export async function assertCanMutateService(
+  supabase: SupabaseClient,
+  userId: string,
+  tenantId: string,
+  serviceId: string,
+): Promise<void> {
+  if (!isUuid(tenantId) || !isUuid(serviceId)) throw new Error("That service is not valid.");
+  const rows = await loadOwnMemberships(supabase, userId);
+  const role = membershipRole(rows, userId, tenantId);
+  if (allows(role, "write")) return;
+  if (role !== "service_manager") throw new Error("You do not have permission for that workspace.");
+  const service = await supabase.from("services").select("owner_id").eq("id", serviceId).maybeSingle();
+  if (service.error) throw new Error(service.error.message);
+  const ownerId = service.data && typeof service.data.owner_id === "string" ? service.data.owner_id : null;
+  if (!ownerId) throw new Error("You can edit only services you own.");
+  const owner = await supabase
+    .from("service_owners")
+    .select("user_id, is_active, deactivated_user")
+    .eq("id", ownerId)
+    .maybeSingle();
+  if (owner.error) throw new Error(owner.error.message);
+  if (owner.data?.user_id !== userId || owner.data.is_active !== true || owner.data.deactivated_user === true) {
+    throw new Error("You can edit only services you own.");
+  }
+}
+
 export async function runMutation<T>(
   tenantId: string,
   level: AccessLevel,

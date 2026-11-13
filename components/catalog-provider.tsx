@@ -51,6 +51,8 @@ import {
   type AccountProfileInput,
 } from "@/lib/auth/profile";
 import { canAdminister, canGrantPlatformOwner, canProvision, canWriteServices, roleLabel } from "@/lib/catalog/access";
+import { serviceHasOwnerGap } from "@/lib/catalog/owner-names";
+import { canEditServiceContent } from "@/lib/catalog/service-edit";
 import { planBlueprintCheckout } from "@/lib/catalog/checkout";
 import type { ExportLogMeta } from "@/lib/catalog/export-plan";
 import type { FieldGroupId } from "@/lib/catalog/fields";
@@ -68,8 +70,10 @@ import type {
   LookupOption,
   Member,
   OutcomeMapping,
+  OwnerHistoryEntry,
   Role,
   ServiceCodeMode,
+  ServiceOwner,
   ServiceRecord,
   Tenant,
 } from "@/lib/catalog/types";
@@ -90,7 +94,7 @@ import { writeActiveTenantId } from "@/lib/data/storage";
 import { createBrowserSupabase } from "@/lib/supabase/browser";
 import type { ActionResult } from "@/lib/server/result";
 
-type CatalogApi = {
+export type CatalogApi = {
   ready: boolean;
   error: string | null;
   warning: string | null;
@@ -116,6 +120,12 @@ type CatalogApi = {
   audit: AuditEntryLike[];
   members: Member[];
   invitations: Invitation[];
+  owners: ServiceOwner[];
+  ownerHistory: OwnerHistoryEntry[];
+  ownersReady: boolean;
+  ownerReminderDue: boolean;
+  canEditService: (serviceId: string) => boolean;
+  refresh: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (input: AccountProfileInput & { email: string; password: string }) => Promise<string | null>;
   requestPasswordReset: (email: string) => Promise<void>;
@@ -184,9 +194,17 @@ type AuditEntryLike = CatalogDb["audit"][number];
 
 const CatalogContext = createContext<CatalogApi | null>(null);
 
+export function CatalogFixture({ api, children }: { api: CatalogApi; children: ReactNode }) {
+  return <CatalogContext.Provider value={api}>{children}</CatalogContext.Provider>;
+}
+
 export function CatalogProvider({ children }: { children: ReactNode }) {
   const [db, setDb] = useState<CatalogDb | null>(null);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [owners, setOwners] = useState<ServiceOwner[]>([]);
+  const [ownerHistory, setOwnerHistory] = useState<OwnerHistoryEntry[]>([]);
+  const [ownersReady, setOwnersReady] = useState(false);
+  const [loadedAt, setLoadedAt] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
@@ -198,6 +216,10 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     const result = await hydrateFromSupabase(supabase);
     setDb(result.db);
     setInvitations(result.invitations);
+    setOwners(result.owners);
+    setOwnerHistory(result.ownerHistory);
+    setOwnersReady(result.ownersReady);
+    setLoadedAt(Date.now());
     setWarning(result.warning);
   }, []);
 
@@ -211,6 +233,10 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         if (!cancelled) {
           setDb(result.db);
           setInvitations(result.invitations);
+          setOwners(result.owners);
+          setOwnerHistory(result.ownerHistory);
+          setOwnersReady(result.ownersReady);
+          setLoadedAt(Date.now());
           setWarning(result.warning);
         }
       } catch (err) {
@@ -248,7 +274,16 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     const role = db && session ? roleFor(db, tenantId, session.userId) : null;
     const fields = db?.fields.filter((field) => field.tenant_id === tenantId) ?? [];
     const lookups = db?.lookups.filter((option) => option.tenant_id === tenantId) ?? [];
-    const services = db?.services.filter((service) => service.tenant_id === tenantId) ?? [];
+    const services = (db?.services.filter((service) => service.tenant_id === tenantId) ?? []).map((service) => ({
+      ...service,
+      owner_gap: serviceHasOwnerGap(
+        service,
+        owners
+          .filter((owner) => owner.tenant_id === tenantId)
+          .map((owner) => ({ id: owner.id, isActive: owner.is_active, deactivatedUser: owner.deactivated_user })),
+        ownersReady,
+      ),
+    }));
     const artifacts = db?.artifacts.filter((artifact) => artifact.tenant_id === tenantId) ?? [];
     const artifactLinks = db?.artifactLinks.filter((link) => link.tenant_id === tenantId) ?? [];
     const mappings = db?.mappings.filter((mapping) => mapping.tenant_id === tenantId) ?? [];
@@ -256,6 +291,15 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     const audit = db?.audit.filter((entry) => entry.tenant_id === tenantId) ?? [];
     const members = db?.members.filter((member) => member.tenant_id === tenantId) ?? [];
     const pendingInvites = invitations.filter((invite) => invite.tenant_id === tenantId);
+    const tenantOwners = owners.filter((owner) => owner.tenant_id === tenantId);
+    const seenAt = activeTenant?.owner_reminder_seen_at ? Date.parse(activeTenant.owner_reminder_seen_at) : Number.NaN;
+    const reminderDue = Boolean(
+      loadedAt != null &&
+        ownersReady &&
+        activeTenant?.owner_reminder_enabled &&
+        (role === "tenant_admin" || role === "platform_owner") &&
+        (Number.isNaN(seenAt) || loadedAt - seenAt > 30 * 24 * 60 * 60 * 1000),
+    );
 
     return {
       ready,
@@ -283,6 +327,24 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       audit,
       members,
       invitations: pendingInvites,
+      owners: tenantOwners,
+      ownerHistory: ownerHistory.filter((entry) => entry.tenant_id === tenantId),
+      ownersReady,
+      ownerReminderDue: reminderDue,
+      canEditService: (serviceId: string) => {
+        const service = services.find((item) => item.id === serviceId);
+        const owner = tenantOwners.find((item) => item.id === service?.owner_id);
+        return canEditServiceContent({
+          role,
+          userId: session?.userId ?? null,
+          ownerUserId: owner?.user_id ?? null,
+          ownerActive: Boolean(owner?.is_active),
+          ownerDeactivated: Boolean(owner?.deactivated_user),
+        });
+      },
+      refresh: () => guard(async () => {
+        await reload();
+      }),
       signIn: (email, password) =>
         guard(async () => {
           const emailError = validateEmail(email);
@@ -437,10 +499,9 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           if (!tenantId) throw new Error("Choose a workspace.");
           const result = await unwrap(inviteMemberAction(tenantId, email, memberRole));
           await reload();
-          if (result.status === "invited") {
-            return `Invitation saved. They join this workspace when they sign up with that email.`;
-          }
-          return `Added as ${roleLabel(memberRole)}.`;
+          return result.notice || (result.status === "invited"
+            ? `Invitation saved as ${roleLabel(memberRole)}.`
+            : `Added as ${roleLabel(memberRole)}.`);
         }),
       setTenantLogo: (logoUrl: string | null) =>
         guard(async () => {
@@ -613,7 +674,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           return { created: result.created, updated: result.updated };
         }),
     };
-  }, [db, invitations, ready, error, warning, commit, guard, reload]);
+  }, [db, invitations, owners, ownerHistory, ownersReady, loadedAt, ready, error, warning, commit, guard, reload]);
 
   return <CatalogContext.Provider value={api}>{children}</CatalogContext.Provider>;
 }

@@ -22,7 +22,9 @@ export function membershipRole(rows: Membership[], userId: string, tenantId: str
 export function allows(role: Role | null, level: AccessLevel): boolean {
   if (!role) return false;
   if (role === "platform_owner") return true;
-  if (level === "read") return role === "tenant_admin" || role === "editor" || role === "viewer";
+  if (level === "read") {
+    return role === "tenant_admin" || role === "editor" || role === "viewer" || role === "service_manager";
+  }
   if (level === "write") return role === "tenant_admin" || role === "editor";
   return role === "tenant_admin";
 }

@@ -174,6 +174,9 @@ export function FilterChipRow({
     ...(filters.scope === "archived"
       ? [{ id: "scope", label: "Archived", remove: () => onChange({ ...filters, scope: "active" }) }]
       : []),
+    ...(filters.ownerGap
+      ? [{ id: "owner-gap", label: "Archived or missing owner", remove: () => onChange({ ...filters, ownerGap: false }) }]
+      : []),
     ...filters.rules.map((rule) => ({
       id: rule.id,
       label: describeRule(rule, fields.find((field) => field.field_key === rule.fieldKey), lookups),

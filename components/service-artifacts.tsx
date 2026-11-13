@@ -40,7 +40,7 @@ export function ServiceArtifacts({ serviceId }: { serviceId: string }) {
                 {flags.overdue ? <Badge tone="warning">Overdue for review</Badge> : null}
                 {flags.retiredLinked ? <Badge tone="danger">Retired but still linked</Badge> : null}
                 <ExternalUrl url={artifact.link_url}>Open</ExternalUrl>
-                {api.canWrite ? (
+                {api.canEditService(serviceId) ? (
                   <button type="button" className="btn btn-ghost" onClick={() => void api.deleteArtifactLink(link.id)}>
                     Unlink
                   </button>
@@ -51,7 +51,7 @@ export function ServiceArtifacts({ serviceId }: { serviceId: string }) {
           );
         })}
       </div>
-      {api.canWrite ? (
+      {api.canEditService(serviceId) ? (
         <div className="form-grid" style={{ marginTop: 12 }}>
           <div>
             <div className="field-label">
