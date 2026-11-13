@@ -130,12 +130,26 @@ p { margin: 0; }
 .who {
   font-size: 13px;
   color: var(--gray-700);
-  max-width: 220px;
+  max-width: 160px;
   min-width: 0;
   flex-shrink: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.user-menu { position: relative; }
+.user-trigger {
+  max-width: 188px;
+  min-width: 0;
+  padding: 0 10px;
+}
+.user-trigger .who { display: block; }
+
+@media (min-width: 1280px) {
+  .brand { min-width: 156px; }
+  .nav { overflow: visible; }
+  .nav a { padding: 8px 7px; }
 }
 
 .banner {
@@ -281,6 +295,31 @@ p { margin: 0; }
   outline: none;
 }
 .input, .select { height: 38px; padding: 0 12px; }
+.password-field { position: relative; }
+.password-field .input { padding-right: 44px; }
+.password-toggle {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--gray-700);
+  cursor: pointer;
+}
+.password-toggle:hover { background: var(--gray-100); }
+.password-toggle:focus-visible {
+  outline: 2px solid var(--clay);
+  outline-offset: 2px;
+}
+.profile-prompt { width: min(440px, 100%); }
+.profile-prompt .stack { margin-top: 14px; }
+.profile-prompt .row-actions { margin-top: 8px; }
 .textarea { min-height: 96px; padding: 10px 12px; resize: vertical; }
 .input:focus, .select:focus, .textarea:focus {
   border-color: var(--clay);

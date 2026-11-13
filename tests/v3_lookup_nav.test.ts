@@ -18,28 +18,28 @@ const byKey = (key: string) => {
 };
 
 describe("primary navigation", () => {
-  it("places Fields after CSF Mapping and Lookups before Templates", () => {
+  it("places Catalog, Fields, Lookups, Artifacts, CSF Mapping, then Templates", () => {
     expect(primaryNavFor(true).map((item) => item.label)).toEqual([
       "Catalog",
-      "CSF Mapping",
-      "Artifacts",
       "Fields",
       "Lookups",
+      "Artifacts",
+      "CSF Mapping",
       TEMPLATES_LABEL,
     ]);
     expect(primaryNavFor(false).map((item) => item.label)).toEqual([
       "Catalog",
-      "CSF Mapping",
       "Artifacts",
+      "CSF Mapping",
       TEMPLATES_LABEL,
     ]);
     expect(primaryNavFor(true).find((item) => item.cart)?.href).toBe("/templates");
     expect(primaryNavFor(true).map((item) => item.href)).toEqual([
       "/catalog",
-      "/coverage",
-      "/artifacts",
       "/admin/fields",
       "/admin/lookups",
+      "/artifacts",
+      "/coverage",
       "/templates",
     ]);
   });

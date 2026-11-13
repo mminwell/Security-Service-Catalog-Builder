@@ -1,4 +1,5 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
+import { accountProfileFromMetadata, type AccountProfile } from "@/lib/auth/profile";
 import { parseColumnConfig } from "@/lib/catalog/columns";
 import { withArtifactComputed } from "@/lib/catalog/artifacts";
 import { withComputed } from "@/lib/catalog/service";
@@ -36,7 +37,14 @@ export async function hydrateFromSupabase(supabase: SupabaseClient): Promise<Hyd
   const user = userData.user;
   if (!user) return { db: emptyDb(), invitations: [], warning: null };
 
-  const session = { userId: user.id, email: user.email ?? user.id };
+  const profile = await loadSessionProfile(supabase, user);
+  const session = {
+    userId: user.id,
+    email: user.email ?? user.id,
+    firstName: profile?.firstName ?? null,
+    lastName: profile?.lastName ?? null,
+    company: profile?.company ?? null,
+  };
   const ensured = await supabase.rpc("ensure_practitioner_access");
   if (ensured.error) {
     return { db: { ...emptyDb(), session }, invitations: [], warning: ensured.error.message };
@@ -100,6 +108,57 @@ export async function hydrateFromSupabase(supabase: SupabaseClient): Promise<Hyd
     invitations,
     warning: null,
   };
+}
+
+export function isMissingUserProfilesError(message: string): boolean {
+  return /user_profiles|schema cache|does not exist/i.test(message);
+}
+
+/** Read this account's profile. Copy signup metadata once when the row is still missing. */
+export async function loadSessionProfile(supabase: SupabaseClient, user: User): Promise<AccountProfile | null> {
+  const query = await supabase
+    .from("user_profiles")
+    .select("first_name, last_name, company")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (query.error) {
+    if (isMissingUserProfilesError(query.error.message)) return accountProfileFromMetadata(user.user_metadata);
+    throw new Error(query.error.message);
+  }
+  if (query.data) {
+    return {
+      firstName: textOrEmpty(query.data.first_name),
+      lastName: textOrEmpty(query.data.last_name),
+      company: textOrEmpty(query.data.company),
+    };
+  }
+
+  const fromMetadata = accountProfileFromMetadata(user.user_metadata);
+  if (!fromMetadata) return null;
+  const saved = await supabase.from("user_profiles").upsert({
+    user_id: user.id,
+    first_name: fromMetadata.firstName,
+    last_name: fromMetadata.lastName,
+    company: fromMetadata.company,
+    updated_at: new Date().toISOString(),
+  });
+  if (saved.error && !isMissingUserProfilesError(saved.error.message)) throw new Error(saved.error.message);
+  return fromMetadata;
+}
+
+export async function persistUserProfile(supabase: SupabaseClient, userId: string, profile: AccountProfile): Promise<void> {
+  const { error } = await supabase.from("user_profiles").upsert({
+    user_id: userId,
+    first_name: profile.firstName,
+    last_name: profile.lastName,
+    company: profile.company,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) throw new Error(error.message);
+}
+
+function textOrEmpty(value: unknown): string {
+  return typeof value === "string" ? value : "";
 }
 
 export async function persistService(supabase: SupabaseClient, service: ServiceRecord): Promise<void> {

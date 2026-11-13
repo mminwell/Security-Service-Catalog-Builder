@@ -221,6 +221,9 @@ export type AuditEntry = {
 export type SessionUser = {
   userId: string;
   email: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  company?: string | null;
 };
 
 export type FilterOp = "eq" | "contains" | "includes" | "before" | "after" | "on" | "gte" | "lte";

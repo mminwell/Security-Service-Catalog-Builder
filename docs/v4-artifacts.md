@@ -14,7 +14,7 @@ Links are many-to-many, with an optional relationship note. Add or remove them o
 
 ## Navigation
 
-Artifacts is the third item: Catalog, CSF Mapping, Artifacts, Fields, Lookups, Templates. It sits with the other workspace views. Fields and Lookups stay admin tools, and Templates stays last. `/blueprints` still opens Templates.
+Artifacts sits after the admin tools: Catalog, Fields, Lookups, Artifacts, CSF Mapping, Templates. Fields and Lookups stay admin tools, and Templates stays last. `/blueprints` still opens Templates.
 
 ## Exports
 

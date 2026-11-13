@@ -3,6 +3,9 @@
 ## Unreleased
 
 - JSON catalog export. The file is `{slug}-catalog-public.json` or `{slug}-catalog-full.json`, built in the browser with the same audience, field, artifact, and CSF mapping rules as the other formats.
+- Show or hide the password on sign-in, create account, and both new-password fields. The eye control is a button, hidden by default.
+- Create account collects a first name, last name, and company. Those are stored on the person’s own profile row. The company name is the default name of the workspace created for the first account. Existing accounts are not backfilled. After sign-in, a missing first or last name opens a one-time Complete your profile prompt, and Profile in the account menu can edit the same fields. The header shows the first name, or the email until a first name is saved.
+- Primary navigation order is Catalog, Fields, Lookups, Artifacts, CSF Mapping, Templates.
 
 ## 5.0.0
 

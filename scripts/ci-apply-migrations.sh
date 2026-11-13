@@ -29,8 +29,11 @@ create schema if not exists auth;
 
 create table if not exists auth.users (
   id uuid primary key,
-  email text
+  email text,
+  raw_user_meta_data jsonb not null default '{}'::jsonb
 );
+
+alter table auth.users add column if not exists raw_user_meta_data jsonb not null default '{}'::jsonb;
 
 create or replace function auth.uid()
 returns uuid
@@ -54,12 +57,62 @@ declare
   v_invite jsonb;
 begin
   insert into auth.users (id, email) values (v_user, 'owner@example.com');
+  if exists (select 1 from public.user_profiles where user_id = v_user) then
+    raise exception 'profile was backfilled for an account with no name';
+  end if;
+
+  insert into public.user_profiles (user_id, first_name, last_name, company)
+  values (v_user, 'Ada', 'Lovelace', 'Northwind Traders');
+  insert into auth.users (id, email)
+  values ('22222222-2222-4222-8222-222222222222', 'other@example.com');
+
   perform set_config('request.jwt.claim.sub', v_user::text, true);
 
   execute 'set role authenticated';
+
+  if not exists (
+    select 1 from public.user_profiles
+    where user_id = v_user and first_name = 'Ada' and company = 'Northwind Traders'
+  ) then
+    raise exception 'user cannot read their own profile';
+  end if;
+
+  begin
+    insert into public.user_profiles (user_id, first_name, last_name, company)
+    values ('22222222-2222-4222-8222-222222222222', 'Eve', 'Hacker', 'Other Co');
+    raise exception 'user inserted another profile';
+  exception
+    when insufficient_privilege then
+      null;
+    when others then
+      if sqlerrm not like '%row-level security%' then
+        raise;
+      end if;
+  end;
+
+  if exists (
+    select 1 from public.user_profiles where user_id = '22222222-2222-4222-8222-222222222222'
+  ) then
+    raise exception 'user can read another profile';
+  end if;
+
   v_tenant := public.ensure_practitioner_access();
   if v_tenant is null then
     raise exception 'ensure_practitioner_access returned null';
+  end if;
+
+  if not exists (
+    select 1 from public.tenants
+    where id = v_tenant and name = 'Northwind Traders' and slug = 'starter-workspace'
+  ) then
+    raise exception 'company was not used as the first workspace name';
+  end if;
+
+  update public.user_profiles set company = 'Changed Later' where user_id = v_user;
+  if not exists (
+    select 1 from public.tenants where id = v_tenant and name = 'Northwind Traders'
+  ) then
+    raise exception 'editing the profile renamed the workspace';
   end if;
 
   v_invite := public.add_tenant_member(v_tenant, 'editor@example.com', 'editor');

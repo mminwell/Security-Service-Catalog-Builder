@@ -2,6 +2,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeEmail, validateEmail } from "@/lib/auth/credentials";
+import { normalizeAccountProfile, type AccountProfile, type AccountProfileInput } from "@/lib/auth/profile";
 import { isUuid } from "@/lib/auth/ids";
 import { allows, membershipRole } from "@/lib/auth/permissions";
 import { assertHttpUrl } from "@/lib/catalog/artifacts";
@@ -44,6 +45,7 @@ import {
   persistServiceArchived,
   persistTenantLogo,
   persistTenantMode,
+  persistUserProfile,
 } from "@/lib/data/remote";
 import { assertLevel, createAuthedClient, loadOwnMemberships, runMutation } from "@/lib/server/guard";
 import { fail, ok, type ActionResult } from "@/lib/server/result";
@@ -425,6 +427,17 @@ export async function importFrameworkAction(
     await importFrameworkRowsRemote(supabase, tenantId, frameworkId, version, planned);
     return null;
   });
+}
+
+export async function saveProfileAction(input: AccountProfileInput): Promise<ActionResult<AccountProfile>> {
+  try {
+    const { supabase, user } = await createAuthedClient();
+    const profile = normalizeAccountProfile(input);
+    await persistUserProfile(supabase, user.id, profile);
+    return ok(profile);
+  } catch (error) {
+    return fail(error);
+  }
 }
 
 export async function recordExportAction(tenantId: string, meta: ExportLogMeta): Promise<ActionResult<null>> {

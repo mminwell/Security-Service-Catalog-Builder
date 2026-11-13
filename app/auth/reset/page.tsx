@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { useCatalog } from "@/components/catalog-provider";
+import { PasswordField } from "@/components/password-field";
 import { Loading } from "@/components/widgets";
 
 export default function ResetPasswordPage() {
@@ -36,23 +37,19 @@ export default function ResetPasswordPage() {
         <h1>Choose a new password</h1>
         <p className="lede">Use at least 8 characters. You will go straight to the catalog after it is saved.</p>
         <form className="stack" onSubmit={(event) => void submit(event)}>
-          <label htmlFor="password">New password</label>
-          <input
+          <PasswordField
             id="password"
-            className="input"
-            type="password"
+            label="New password"
             autoComplete="new-password"
             value={password}
-            onChange={(event) => setPassword(event.target.value)}
+            onChange={setPassword}
           />
-          <label htmlFor="confirm">Confirm password</label>
-          <input
+          <PasswordField
             id="confirm"
-            className="input"
-            type="password"
+            label="Confirm password"
             autoComplete="new-password"
             value={confirm}
-            onChange={(event) => setConfirm(event.target.value)}
+            onChange={setConfirm}
           />
           {localError ? (
             <p className="field-error" role="alert">

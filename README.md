@@ -6,7 +6,7 @@ V1 includes the service form, the catalog list, dropdown and field administratio
 
 ## What you can do
 
-- Sign in, create an account, reset a password, and sign out. The first account on an empty project becomes **Admin** of **Starter Workspace**.
+- Sign in, create an account, reset a password, and sign out. Create account asks for a first name, last name, and company. The first account on an empty project becomes **Admin** of a workspace named for that company. An account created before names existed can add them once after sign-in, or any time from Profile. The header shows the first name, or the email when the first name is still blank.
 - Invite a **Viewer**, **Editor**, or **Admin**. If they already have an account they are added immediately. If they do not, the invite waits until they sign up with that email.
 - Create another workspace from the switcher. You become Admin of that workspace only. A member of workspace A cannot read or write workspace B.
 - Capture a service at three depths: **Core**, **Operations**, and **Governance**. Switching depth hides fields. It does not clear them. Only the six Core fields are required.
@@ -25,7 +25,7 @@ V1 includes the service form, the catalog list, dropdown and field administratio
 - Open CSF Mapping to see the six Functions and drill into categories and outcomes. Counts are explicit assessments on active services. Archived services, blueprint hints, and the primary function dropdown are not coverage.
 - Keep a workspace registry of policies, standards, procedures, and tools. The catalog stores a link. It does not host the file. Public exports include only public artifacts and public columns.
 
-Navigation, in order: **Catalog**, **CSF Mapping**, **Artifacts**, **Fields**, **Lookups**, **Templates**. Fields and Lookups are Admin links. The header is a single row.
+Navigation, in order: **Catalog**, **Fields**, **Lookups**, **Artifacts**, **CSF Mapping**, **Templates**. Fields and Lookups are Admin links. The header is a single row.
 
 ## Why email and password
 
@@ -47,7 +47,7 @@ This repository is not connected to a live Supabase project, and preview deploym
 To make a preview or a production deploy actually sign people in, Mike needs:
 
 1. A Supabase project he controls.
-2. Migrations `0001` through `0011` applied in order, in the SQL editor or with the Supabase CLI.
+2. Migrations `0001` through `0012` applied in order, in the SQL editor or with the Supabase CLI.
 3. These Vercel environment variables set for Preview and Production, then a redeploy so Next.js can inline them:
 
 ```
@@ -72,7 +72,7 @@ Put the project URL and the anon or publishable key in `.env.local`. Then:
 npm run dev
 ```
 
-Open the app and create an account. With email confirmation on, use the link in the message. With it off, you land in Starter Workspace.
+Open the app and create an account. With email confirmation on, use the link in the message. With it off, you land in a workspace named for the company on the form.
 
 ```bash
 npm test
@@ -111,6 +111,7 @@ In **SQL Editor → New query**, paste and run each file in this order:
 9. `supabase/migrations/0009_v5_auth_invites.sql`
 10. `supabase/migrations/0010_v5_function_grants.sql`
 11. `supabase/migrations/0011_v5_rename_workspace.sql`
+12. `supabase/migrations/0012_v6_user_profiles.sql`
 
 With the CLI, `supabase link` and `supabase db push` apply the same files. Do that against the project you intend to use. Skip `supabase/seed.sql`. It inserts fictional workspaces that have no members. **Load sample catalog** on an empty workspace is the supported sample.
 
@@ -154,7 +155,7 @@ Framework preset: Next.js. Build command: `npm run build`. Install command: `npm
 
 ### 5. Create the first Admin
 
-Open the deployment, choose **Create account**, and confirm the email if confirmation is on. You land in Starter Workspace with starter dropdowns and an empty catalog. Invite the next person from the workspace switcher.
+Open the deployment, choose **Create account**, and confirm the email if confirmation is on. The first account lands in a workspace named for the company on that form, with starter dropdowns and an empty catalog. Invite the next person from the workspace switcher. Apply `0012` before relying on profile rows. That migration does not rename an existing workspace and does not fill in names for accounts that already exist.
 
 ## Security notes
 
@@ -187,9 +188,9 @@ Deferred, and not done in this release:
 - `app/actions/catalog.ts` — server mutations and role checks
 - `components/` — Birchline interface
 - `lib/catalog/` — fields, starter lookups, computed values, service IDs, exports, blueprints, artifacts
-- `lib/auth/` — the role matrix, email and password checks, and safe redirects
+- `lib/auth/` — the role matrix, email and password checks, profile names, and safe redirects
 - `lib/data/` — the in-memory catalog model used by unit tests, and the Supabase adapter
-- `supabase/migrations/` — `0001` through `0011`
+- `supabase/migrations/` — `0001` through `0012`
 - `e2e/` — Playwright
 - `docs/byo-supabase-vercel.md` — the short deploy note
 - `docs/nist-csf-2.0-provenance.md` — source, version, and content hash for the CSF core
