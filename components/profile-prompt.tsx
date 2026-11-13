@@ -28,11 +28,12 @@ export function CompleteProfilePrompt() {
 
   useEffect(() => {
     if (!userId || dismissed || !incomplete) return;
+    const accountId = userId;
     document.getElementById("prompt-first-name")?.focus();
     function onKey(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
       const store = browserPromptStore();
-      if (store) dismissProfilePrompt(store, userId);
+      if (store) dismissProfilePrompt(store, accountId);
       setDismissed(true);
     }
     document.addEventListener("keydown", onKey);
