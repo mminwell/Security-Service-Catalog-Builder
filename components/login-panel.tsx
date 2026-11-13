@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { safeNextPath } from "@/lib/auth/redirect";
 import { useCatalog } from "@/components/catalog-provider";
+import { PasswordField } from "@/components/password-field";
 import { Loading } from "@/components/widgets";
 
 type AuthMode = "sign-in" | "create" | "reset";
@@ -15,6 +16,9 @@ export function LoginPanel() {
   const nextPath = safeNextPath(search.get("next"));
   const linkError = search.get("error") === "auth";
   const [mode, setMode] = useState<AuthMode>("sign-in");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [company, setCompany] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
@@ -40,7 +44,7 @@ export function LoginPanel() {
         return;
       }
       if (mode === "create") {
-        const message = await api.signUp(email, password);
+        const message = await api.signUp({ firstName, lastName, email, company, password });
         if (message) setNotice(message);
         else router.replace(nextPath);
         return;
@@ -58,8 +62,9 @@ export function LoginPanel() {
         <p className="micro">Security Service Catalog</p>
         <h1>{title}</h1>
         <p className="lede">
-          One catalog for the security services you deliver. The first account creates a workspace and becomes its
-          Admin.
+          {mode === "create"
+            ? "Your company name is used for the workspace created with the first account. That account is its Admin."
+            : "One catalog for the security services you deliver. The first account creates a workspace and becomes its Admin."}
         </p>
         {linkError ? (
           <p className="field-error" role="alert">
@@ -67,6 +72,32 @@ export function LoginPanel() {
           </p>
         ) : null}
         <form className="stack" onSubmit={(event) => void submit(event)}>
+          {mode === "create" ? (
+            <>
+              <label htmlFor="first-name">First name</label>
+              <input
+                id="first-name"
+                className="input"
+                name="firstName"
+                autoComplete="given-name"
+                required
+                maxLength={80}
+                value={firstName}
+                onChange={(event) => setFirstName(event.target.value)}
+              />
+              <label htmlFor="last-name">Last name</label>
+              <input
+                id="last-name"
+                className="input"
+                name="lastName"
+                autoComplete="family-name"
+                required
+                maxLength={80}
+                value={lastName}
+                onChange={(event) => setLastName(event.target.value)}
+              />
+            </>
+          ) : null}
           <label htmlFor="email">Email</label>
           <input
             id="email"
@@ -77,19 +108,30 @@ export function LoginPanel() {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />
-          {mode === "reset" ? null : (
+          {mode === "create" ? (
             <>
-              <label htmlFor="password">Password</label>
+              <label htmlFor="company">Company</label>
               <input
-                id="password"
+                id="company"
                 className="input"
-                type="password"
-                autoComplete={mode === "create" ? "new-password" : "current-password"}
+                name="company"
+                autoComplete="organization"
                 required
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                maxLength={80}
+                value={company}
+                onChange={(event) => setCompany(event.target.value)}
               />
             </>
+          ) : null}
+          {mode === "reset" ? null : (
+            <PasswordField
+              id="password"
+              label="Password"
+              autoComplete={mode === "create" ? "new-password" : "current-password"}
+              required
+              value={password}
+              onChange={setPassword}
+            />
           )}
           {localError ? (
             <p className="field-error" role="alert">

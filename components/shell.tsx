@@ -5,6 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { roleLabel } from "@/lib/catalog/access";
+import { CompleteProfilePrompt } from "@/components/profile-prompt";
+import { UserMenu } from "@/components/user-menu";
 import { placeAnchoredPanel } from "@/lib/catalog/popup-placement";
 import { cartIdsFor, subscribeCart } from "@/lib/catalog/cart-store";
 import { MAX_LOGO_FILE_BYTES } from "@/lib/catalog/logos";
@@ -46,12 +48,14 @@ export function AppShell({ children }: { children: ReactNode }) {
             Sign out
           </button>
         </div>
+        <CompleteProfilePrompt />
       </main>
     );
   }
 
   return (
     <>
+      <CompleteProfilePrompt />
       <a className="skip" href="#content">
         Skip to content
       </a>
@@ -83,10 +87,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </nav>
           <div className="top-spacer" />
           <WorkspaceSwitcher />
-          <span className="who" title={api.session.email}>
-            {api.session.email}
-            {api.role ? ` · ${roleLabel(api.role)}` : ""}
-          </span>
+          <UserMenu />
           <button type="button" className="btn btn-secondary" onClick={() => void api.signOut()}>
             Sign out
           </button>

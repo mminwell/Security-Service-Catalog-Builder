@@ -11,7 +11,7 @@ export function NotConfigured() {
         <div className="callout">
           <p>
             Set <code>NEXT_PUBLIC_SUPABASE_URL</code> and <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> before the build,
-            apply migrations <code>0001</code> through <code>0011</code>, then redeploy. Do not put the service-role
+            apply migrations <code>0001</code> through <code>0012</code>, then redeploy. Do not put the service-role
             key in the repository or in a public variable.
           </p>
         </div>

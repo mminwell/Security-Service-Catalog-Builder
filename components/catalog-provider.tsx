@@ -32,6 +32,7 @@ import {
   saveArtifactLinkAction,
   saveCatalogColumnsAction,
   saveExportProfilesAction,
+  saveProfileAction,
   saveFieldAction,
   saveFieldsAction,
   saveLookupAction,
@@ -42,6 +43,13 @@ import {
 } from "@/app/actions/catalog";
 import { friendlyAuthError } from "@/lib/auth/messages";
 import { normalizeEmail, validateEmail, validatePassword } from "@/lib/auth/credentials";
+import {
+  browserPromptStore,
+  clearProfilePromptDismissal,
+  normalizeAccountProfile,
+  signupUserMetadata,
+  type AccountProfileInput,
+} from "@/lib/auth/profile";
 import { canAdminister, canGrantPlatformOwner, canProvision, canWriteServices, roleLabel } from "@/lib/catalog/access";
 import { planBlueprintCheckout } from "@/lib/catalog/checkout";
 import type { ExportLogMeta } from "@/lib/catalog/export-plan";
@@ -77,7 +85,7 @@ import {
   switchTenant as switchTenantRow,
   type CatalogDb,
 } from "@/lib/data/model";
-import { hydrateFromSupabase } from "@/lib/data/remote";
+import { hydrateFromSupabase, isMissingUserProfilesError } from "@/lib/data/remote";
 import { writeActiveTenantId } from "@/lib/data/storage";
 import { createBrowserSupabase } from "@/lib/supabase/browser";
 import type { ActionResult } from "@/lib/server/result";
@@ -109,9 +117,10 @@ type CatalogApi = {
   members: Member[];
   invitations: Invitation[];
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<string | null>;
+  signUp: (input: AccountProfileInput & { email: string; password: string }) => Promise<string | null>;
   requestPasswordReset: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
+  saveProfile: (input: AccountProfileInput) => Promise<void>;
   signOut: () => Promise<void>;
   switchTenant: (tenantId: string) => void;
   createTenant: (name: string) => Promise<void>;
@@ -288,8 +297,9 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           if (signError) throw new Error(friendlyAuthError(signError.message));
           await reload();
         }),
-      signUp: (email, password) =>
+      signUp: ({ firstName, lastName, email, company, password }) =>
         guard(async () => {
+          const profile = normalizeAccountProfile({ firstName, lastName, company });
           const emailError = validateEmail(email);
           if (emailError) throw new Error(emailError);
           const passwordError = validatePassword(password);
@@ -299,12 +309,30 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           const { data, error: signError } = await supabase.auth.signUp({
             email: normalizeEmail(email),
             password,
-            options: { emailRedirectTo: `${origin}/auth/callback?next=/catalog` },
+            options: {
+              emailRedirectTo: `${origin}/auth/callback?next=/catalog`,
+              data: signupUserMetadata(profile),
+            },
           });
           if (signError) throw new Error(friendlyAuthError(signError.message));
-          if (!data.session) return "Check your email to confirm the account, then sign in.";
+          if (!data.session || !data.user) return "Check your email to confirm the account, then sign in.";
+          const { error: profileError } = await supabase.from("user_profiles").upsert({
+            user_id: data.user.id,
+            first_name: profile.firstName,
+            last_name: profile.lastName,
+            company: profile.company,
+            updated_at: new Date().toISOString(),
+          });
+          if (profileError && !isMissingUserProfilesError(profileError.message)) {
+            throw new Error(profileError.message);
+          }
           await reload();
           return null;
+        }),
+      saveProfile: (input) =>
+        guard(async () => {
+          await unwrap(saveProfileAction(input));
+          await reload();
         }),
       requestPasswordReset: (email) =>
         guard(async () => {
@@ -328,6 +356,8 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         }),
       signOut: () =>
         guard(async () => {
+          const store = browserPromptStore();
+          if (store) clearProfilePromptDismissal(store);
           await supabaseRef.current?.auth.signOut();
           setDb((current) => (current ? { ...current, session: null } : current));
           setInvitations([]);

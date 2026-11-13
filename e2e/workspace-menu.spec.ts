@@ -16,8 +16,8 @@ test.describe("workspace menu is not clipped by the header", () => {
             <a class="brand" href="/catalog"><strong>Security Service Catalog</strong><span>Catalog builder</span></a>
             <nav class="nav" aria-label="Primary">
               <a href="/catalog">Catalog</a>
-              <a href="/coverage">CSF Mapping</a>
               <a href="/artifacts">Artifacts</a>
+              <a href="/coverage">CSF Mapping</a>
               <a href="/templates">Templates</a>
             </nav>
             <div class="switcher">
