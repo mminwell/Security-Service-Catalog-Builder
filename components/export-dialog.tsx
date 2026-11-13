@@ -75,6 +75,10 @@ export function ExportDialog({
   onSaveProfile,
   onDeleteProfile,
   onRecordExport,
+  defaultFormat = null,
+  defaultProfileId = null,
+  distributionPublic = null,
+  distributionInternal = null,
 }: {
   services: ServiceRecord[];
   fields: FieldDefinition[];
@@ -101,11 +105,16 @@ export function ExportDialog({
   }) => Promise<void>;
   onDeleteProfile: (profileId: string) => Promise<void>;
   onRecordExport: (meta: ReturnType<typeof sanitizeExportLog>) => Promise<void>;
+  defaultFormat?: "csv" | "xlsx" | "docx" | "pdf" | "json" | null;
+  defaultProfileId?: string | null;
+  distributionPublic?: string | null;
+  distributionInternal?: string | null;
 }) {
-  const initial = profiles.find((profile) => profile.is_default);
+  const preferredProfile = profiles.find((profile) => profile.id === defaultProfileId) ?? profiles.find((profile) => profile.is_default);
+  const initial = preferredProfile;
   const [choice, setChoice] = useState(initial ? `profile:${initial.id}` : "public");
   const [customKeys, setCustomKeys] = useState<string[]>(() => publicPreset(fields).fields.map((field) => field.field_key));
-  const [format, setFormat] = useState<ExportFormat>("csv");
+  const [format, setFormat] = useState<ExportFormat>(defaultFormat ?? "csv");
   const [includeMarking, setIncludeMarking] = useState(true);
   const [confirming, setConfirming] = useState(false);
   const [jiraMap, setJiraMap] = useState<TargetMapping[]>(() => mappingFromPreset(JIRA_PRESET));
@@ -125,7 +134,11 @@ export function ExportDialog({
   const mapped =
     format === "jira" || format === "servicenow" ? resolveMappedColumns(fields, preset, audience) : null;
   const requiresConfirmation = audience === "internal";
-  const marking = distributionMarking(companyName, audience === "public" ? "public" : "all");
+  const marking = distributionMarking(
+    companyName,
+    audience === "public" ? "public" : "all",
+    audience === "public" ? distributionPublic : distributionInternal,
+  );
   const previewRows =
     mapped != null ? previewMappedRows(services, lookups, mapped.columns) : [];
   const artifactPreview = useMemo(

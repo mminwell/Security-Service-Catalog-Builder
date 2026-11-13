@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { visibleLookupGroups } from "@/lib/catalog/lookups";
 import type { LookupOption } from "@/lib/catalog/types";
@@ -36,7 +37,11 @@ export function LookupAdmin() {
           <h1>Dropdowns</h1>
           <p className="lede">
             Add options, edit labels and the hover description, change sort order, and retire options you no longer
-            offer. Retired options stay on historical services. They are never deleted.
+            offer. Retired options stay on historical services. They are never deleted. Service Owners are people, so
+            they live on their own page.
+          </p>
+          <p>
+            <Link href="/admin/owners">Open Service Owners</Link>
           </p>
         </div>
       </div>

@@ -27,6 +27,8 @@ end $$;
 
 create schema if not exists auth;
 
+grant usage on schema auth to authenticated, anon;
+
 create table if not exists auth.users (
   id uuid primary key,
   email text,
@@ -42,6 +44,8 @@ stable
 as $$
   select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid;
 $$;
+
+grant execute on function auth.uid() to authenticated, anon;
 SQL
 
 for file in "$ROOT"/supabase/migrations/*.sql; do
@@ -186,6 +190,190 @@ begin
   end if;
 end $$;
 
+do $$
+declare
+  v_admin uuid := '11111111-1111-4111-8111-111111111111';
+  v_manager uuid := '33333333-3333-4333-8333-333333333333';
+  v_invited uuid := '44444444-4444-4444-8444-444444444444';
+  v_tenant uuid;
+  v_owned uuid;
+  v_other uuid;
+  v_owner uuid;
+  v_replacement uuid;
+  v_invite jsonb;
+  v_split jsonb;
+begin
+  v_split := public.split_person_name('Minwell, Mike');
+  if v_split->>'ok' is distinct from 'true' or v_split->>'first_name' is distinct from 'Mike' or v_split->>'last_name' is distinct from 'Minwell' then
+    raise exception 'Last, First did not split: %', v_split;
+  end if;
+  v_split := public.split_person_name('Mike Minwell');
+  if v_split->>'first_name' is distinct from 'Mike' or v_split->>'last_name' is distinct from 'Minwell' then
+    raise exception 'First Last did not split: %', v_split;
+  end if;
+  if (public.split_person_name('SOC Manager')->>'ok') is distinct from 'false' then
+    raise exception 'SOC Manager was treated as a person';
+  end if;
+  if (public.split_person_name('Security Architecture (to be named)')->>'ok') is distinct from 'false' then
+    raise exception 'a note was treated as a person';
+  end if;
+
+  select id into v_tenant from public.tenants where slug = 'starter-workspace';
+  insert into auth.users (id, email) values (v_manager, 'manager@example.com');
+
+  perform set_config('request.jwt.claim.sub', v_admin::text, true);
+  insert into public.services (tenant_id, service_code, name, summary, service_owner)
+  values (v_tenant, 'SVC-900', 'Named service', 'A summary', 'Ada Lovelace');
+  insert into public.services (tenant_id, service_code, name, summary, service_owner)
+  values (v_tenant, 'SVC-901', 'Title service', 'A summary', 'SOC Manager');
+
+  if not exists (
+    select 1 from public.services
+    where service_code = 'SVC-900' and service_owner = 'Lovelace, Ada' and owner_id is not null
+  ) then
+    raise exception 'a clean owner name was not migrated on insert';
+  end if;
+  if not exists (
+    select 1 from public.services
+    where service_code = 'SVC-901' and service_owner = 'SOC Manager' and owner_review = 'SOC Manager' and owner_needed and owner_id is null
+  ) then
+    raise exception 'unsplittable owner text was not kept';
+  end if;
+
+  select id, owner_id into v_owned, v_owner from public.services where service_code = 'SVC-900';
+  update public.service_owners set user_id = v_manager where id = v_owner;
+  insert into public.tenant_members (tenant_id, user_id, role)
+  values (v_tenant, v_manager, 'service_manager');
+
+  perform set_config('request.jwt.claim.sub', v_admin::text, true);
+  insert into public.services (tenant_id, service_code, name, summary)
+  values (v_tenant, 'SVC-902', 'Other service', 'A summary')
+  returning id into v_other;
+  execute 'set role authenticated';
+  v_replacement := public.upsert_service_owner(v_tenant, jsonb_build_object(
+    'first_name', 'Grace', 'last_name', 'Hopper', 'email', 'grace@example.com', 'history_reason', 'edit'
+  ));
+  execute 'reset role';
+
+  perform set_config('request.jwt.claim.sub', v_manager::text, true);
+  execute 'set role authenticated';
+  update public.services set summary = 'Manager edit' where id = v_owned;
+  if not found then
+    raise exception 'service manager could not edit the owned service';
+  end if;
+  update public.services set summary = 'Stolen' where id = v_other;
+  if found then
+    raise exception 'service manager edited a service they do not own';
+  end if;
+  begin
+    update public.services set owner_id = v_replacement where id = v_owned;
+    if found then
+      raise exception 'service manager changed the owner';
+    end if;
+  exception
+    when others then
+      if sqlerrm like '%service manager changed%' then
+        raise;
+      end if;
+  end;
+  execute 'reset role';
+
+  if not exists (select 1 from public.services where id = v_owned and summary = 'Manager edit' and owner_id = v_owner) then
+    raise exception 'service manager could not edit the owned service, or the owner changed';
+  end if;
+  if exists (select 1 from public.services where id = v_other and summary = 'Stolen') then
+    raise exception 'unowned service was changed';
+  end if;
+
+  perform set_config('request.jwt.claim.sub', v_admin::text, true);
+  execute 'set role authenticated';
+  perform public.archive_service_owner(v_owner, v_replacement, 'archive');
+  if not exists (
+    select 1 from public.services where id = v_owned and owner_id = v_replacement and owner_needed = false
+  ) then
+    raise exception 'archive did not reassign the service';
+  end if;
+  if not exists (
+    select 1 from public.service_owner_history
+    where service_id = v_owned and old_owner_id = v_owner and new_owner_id = v_replacement and reason = 'archive'
+  ) then
+    raise exception 'archive was not written to owner history';
+  end if;
+  if not exists (select 1 from public.service_owners where id = v_owner and is_active = false) then
+    raise exception 'archived owner was deleted or left active';
+  end if;
+
+  perform public.upsert_service_owner(v_tenant, jsonb_build_object('first_name', 'Ken', 'last_name', 'Thompson'));
+  perform public.archive_service_owner(
+    (select id from public.service_owners where tenant_id = v_tenant and last_name = 'Thompson'),
+    null,
+    'archive'
+  );
+
+  begin
+    perform public.remove_tenant_member(v_tenant, v_admin);
+    raise exception 'removed the last admin';
+  exception
+    when others then
+      if sqlerrm not like '%another Admin%' and sqlerrm not like '%removed the last admin%' then
+        raise;
+      end if;
+      if sqlerrm like '%removed the last admin%' then
+        raise;
+      end if;
+  end;
+
+  v_invite := public.add_tenant_member(v_tenant, 'sam@example.com', 'service_manager');
+  if v_invite->>'status' is distinct from 'invited' or v_invite->>'role' is distinct from 'service_manager' then
+    raise exception 'service manager invite was not stored: %', v_invite;
+  end if;
+  if (v_invite->>'token') is null then
+    raise exception 'invite has no token';
+  end if;
+  execute 'reset role';
+
+  insert into auth.users (id, email) values (v_invited, 'sam@example.com');
+  perform set_config('request.jwt.claim.sub', v_invited::text, true);
+  execute 'set role authenticated';
+  perform public.ensure_practitioner_access();
+  execute 'reset role';
+  if not exists (
+    select 1 from public.tenant_members
+    where tenant_id = v_tenant and user_id = v_invited and role = 'service_manager'
+  ) then
+    raise exception 'invite acceptance did not apply the stored role';
+  end if;
+
+  perform set_config('request.jwt.claim.sub', v_admin::text, true);
+  execute 'set role authenticated';
+  perform public.add_tenant_member(v_tenant, 'late@example.com', 'viewer');
+  execute 'reset role';
+  update public.workspace_invitations
+  set expires_at = now() - interval '1 minute'
+  where email = 'late@example.com' and accepted_at is null;
+  insert into auth.users (id, email) values ('55555555-5555-4555-8555-555555555555', 'late@example.com');
+  perform set_config('request.jwt.claim.sub', '55555555-5555-4555-8555-555555555555', true);
+  execute 'set role authenticated';
+  begin
+    perform public.ensure_practitioner_access();
+    raise exception 'expired invite created a membership';
+  exception
+    when others then
+      if sqlerrm not like '%must invite%' and sqlerrm not like '%expired invite%' then
+        raise;
+      end if;
+      if sqlerrm like '%expired invite created%' then
+        raise;
+      end if;
+  end;
+  execute 'reset role';
+  if exists (
+    select 1 from public.tenant_members where user_id = '55555555-5555-4555-8555-555555555555'
+  ) then
+    raise exception 'expired invite created a membership';
+  end if;
+end $$;
+
 -- anon and PUBLIC must not execute any public function. authenticated keeps the allowlist.
 do $$
 declare
@@ -203,7 +391,26 @@ declare
     'can_access_tenant',
     'can_write_services',
     'can_admin_tenant',
-    'rename_workspace'
+    'rename_workspace',
+    'cancel_workspace_invitation',
+    'resend_workspace_invitation',
+    'set_member_role',
+    'remove_tenant_member',
+    'save_workspace_settings',
+    'preview_invitation',
+    'accept_invitation',
+    'list_site_accounts',
+    'set_account_active',
+    'delete_site_account',
+    'can_manage_site',
+    'can_edit_service',
+    'service_owner_unchanged',
+    'upsert_service_owner',
+    'archive_service_owner',
+    'reactivate_service_owner',
+    'import_service_owners',
+    'apply_owner_reconciliation',
+    'reassign_owned_services'
   ];
 begin
   for r in

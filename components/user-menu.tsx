@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { headerLabel } from "@/lib/auth/profile";
@@ -80,6 +81,16 @@ export function UserMenu() {
             >
               <p className="micro">Profile</p>
               <p className="hint">{session.email}</p>
+              {api.canAdmin ? (
+                <Link href="/admin/owners" onClick={() => setOpen(false)}>
+                  Service Owners
+                </Link>
+              ) : null}
+              {api.role === "platform_owner" ? (
+                <Link href="/admin/users" onClick={() => setOpen(false)}>
+                  Site Admin
+                </Link>
+              ) : null}
               <ProfileForm
                 key={`${session.userId}:${session.firstName ?? ""}:${session.lastName ?? ""}:${session.company ?? ""}`}
                 idPrefix="account"

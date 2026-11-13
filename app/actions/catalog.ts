@@ -47,7 +47,7 @@ import {
   persistTenantMode,
   persistUserProfile,
 } from "@/lib/data/remote";
-import { assertLevel, createAuthedClient, loadOwnMemberships, runMutation } from "@/lib/server/guard";
+import { assertCanMutateService, assertLevel, createAuthedClient, loadOwnMemberships, runMutation } from "@/lib/server/guard";
 import { fail, ok, type ActionResult } from "@/lib/server/result";
 
 const MAX_PAYLOAD = 500_000;
@@ -107,10 +107,16 @@ export async function inviteMemberAction(
   tenantId: string,
   email: string,
   role: Role,
-): Promise<ActionResult<{ status: "member" | "invited" }>> {
+): Promise<ActionResult<{ status: "member" | "invited"; notice: string }>> {
   const emailError = validateEmail(email);
   if (emailError) return fail(new Error(emailError));
-  if (role !== "tenant_admin" && role !== "editor" && role !== "viewer" && role !== "platform_owner") {
+  if (
+    role !== "tenant_admin" &&
+    role !== "editor" &&
+    role !== "viewer" &&
+    role !== "service_manager" &&
+    role !== "platform_owner"
+  ) {
     return fail(new Error("Unknown role."));
   }
   return runMutation(tenantId, "admin", async (supabase, user) => {
@@ -129,8 +135,17 @@ export async function inviteMemberAction(
       p_role: role,
     });
     if (error) throw new Error(error.message);
-    const status = data && typeof data === "object" && "status" in data && data.status === "invited" ? "invited" : "member";
-    return { status };
+    const record = data && typeof data === "object" ? (data as Record<string, unknown>) : {};
+    const status = record.status === "invited" ? "invited" : "member";
+    const { sendInviteNotice } = await import("@/lib/auth/invite-mail");
+    const mailed = await sendInviteNotice({
+      email: typeof record.email === "string" ? record.email : normalizeEmail(email),
+      token: typeof record.token === "string" ? record.token : null,
+      workspaceName: typeof record.workspace_name === "string" ? record.workspace_name : "your workspace",
+      role,
+      kind: status,
+    });
+    return { status, notice: mailed.detail };
   });
 }
 
@@ -149,10 +164,25 @@ export async function saveServiceAction(service: ServiceRecord): Promise<ActionR
   } catch (error) {
     return fail(error);
   }
-  return runMutation(cleaned.tenant_id, "write", async (supabase) => {
+  try {
+    const { supabase, user } = await createAuthedClient();
+    if (cleaned.id) {
+      const existing = await supabase.from("services").select("id").eq("id", cleaned.id).maybeSingle();
+      if (existing.error && !/schema cache|does not exist/i.test(existing.error.message)) {
+        throw new Error(existing.error.message);
+      }
+      if (existing.data) {
+        await assertCanMutateService(supabase, user.id, cleaned.tenant_id, cleaned.id);
+        await persistService(supabase, cleaned);
+        return ok(null);
+      }
+    }
+    await assertLevel(supabase, user.id, cleaned.tenant_id, "write");
     await persistService(supabase, cleaned);
-    return null;
-  });
+    return ok(null);
+  } catch (error) {
+    return fail(error);
+  }
 }
 
 export async function archiveServiceAction(serviceId: string, archivedAt: string | null): Promise<ActionResult<null>> {
@@ -214,17 +244,25 @@ export async function saveArtifactLinkAction(link: ArtifactLink): Promise<Action
   } catch (error) {
     return fail(error);
   }
-  return runMutation(link.tenant_id, "write", async (supabase) => {
+  try {
+    const { supabase, user } = await createAuthedClient();
+    await assertCanMutateService(supabase, user.id, link.tenant_id, link.service_id);
     await persistArtifactLink(supabase, link);
-    return null;
-  });
+    return ok(null);
+  } catch (error) {
+    return fail(error);
+  }
 }
 
 export async function deleteArtifactLinkAction(linkId: string): Promise<ActionResult<null>> {
   try {
     const { supabase, user } = await createAuthedClient();
-    const tenantId = await tenantOf(supabase, "artifact_service_links", linkId);
-    await assertLevel(supabase, user.id, tenantId, "write");
+    const link = await supabase.from("artifact_service_links").select("tenant_id, service_id").eq("id", linkId).maybeSingle();
+    if (link.error) throw new Error(link.error.message);
+    const tenantId = link.data && typeof link.data.tenant_id === "string" ? link.data.tenant_id : "";
+    const serviceId = link.data && typeof link.data.service_id === "string" ? link.data.service_id : "";
+    if (!tenantId || !serviceId) throw new Error("That link is not in a workspace you can access.");
+    await assertCanMutateService(supabase, user.id, tenantId, serviceId);
     await deleteArtifactLinkRow(supabase, linkId);
     return ok(null);
   } catch (error) {
@@ -372,17 +410,25 @@ export async function saveOutcomeMappingAction(mapping: OutcomeMapping): Promise
   if (mapping.coverage !== "full" && mapping.coverage !== "partial" && mapping.coverage !== "none") {
     return fail(new Error("Coverage must be full, partial, or none."));
   }
-  return runMutation(mapping.tenant_id, "write", async (supabase) => {
+  try {
+    const { supabase, user } = await createAuthedClient();
+    await assertCanMutateService(supabase, user.id, mapping.tenant_id, mapping.service_id);
     await persistOutcomeMapping(supabase, mapping);
-    return null;
-  });
+    return ok(null);
+  } catch (error) {
+    return fail(error);
+  }
 }
 
 export async function removeOutcomeMappingAction(mappingId: string): Promise<ActionResult<null>> {
   try {
     const { supabase, user } = await createAuthedClient();
-    const tenantId = await tenantOf(supabase, "service_outcome_mappings", mappingId);
-    await assertLevel(supabase, user.id, tenantId, "write");
+    const mapping = await supabase.from("service_outcome_mappings").select("tenant_id, service_id").eq("id", mappingId).maybeSingle();
+    if (mapping.error) throw new Error(mapping.error.message);
+    const tenantId = mapping.data && typeof mapping.data.tenant_id === "string" ? mapping.data.tenant_id : "";
+    const serviceId = mapping.data && typeof mapping.data.service_id === "string" ? mapping.data.service_id : "";
+    if (!tenantId || !serviceId) throw new Error("That assessment is not in a workspace you can access.");
+    await assertCanMutateService(supabase, user.id, tenantId, serviceId);
     await deleteOutcomeMappingRow(supabase, mappingId);
     return ok(null);
   } catch (error) {

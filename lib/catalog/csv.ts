@@ -18,7 +18,9 @@ export type CsvExportOptions = {
   columns?: FieldDefinition[];
 };
 
-export function distributionMarking(companyName: string, visibility: CsvVisibility): string {
+export function distributionMarking(companyName: string, visibility: CsvVisibility, override?: string | null): string {
+  const custom = override?.replace(/\s+/g, " ").trim();
+  if (custom) return custom;
   const name = companyName.trim().toLocaleUpperCase();
   const suffix =
     visibility === "public"

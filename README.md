@@ -7,7 +7,7 @@ V1 includes the service form, the catalog list, dropdown and field administratio
 ## What you can do
 
 - Sign in, create an account, reset a password, and sign out. Create account asks for a first name, last name, and company. The first account on an empty project becomes **Admin** of a workspace named for that company. An account created before names existed can add them once after sign-in, or any time from Profile. The header shows the first name, or the email when the first name is still blank.
-- Invite a **Viewer**, **Editor**, or **Admin**. If they already have an account they are added immediately. If they do not, the invite waits until they sign up with that email.
+- Invite a **Viewer**, **Editor**, **Service Manager**, or **Admin** from Workspace Settings. The admin chooses the role. If they already have an account they are added immediately. If they do not, the invite is stored for seven days and Supabase Auth emails a link to finish the account.
 - Create another workspace from the switcher. You become Admin of that workspace only. A member of workspace A cannot read or write workspace B.
 - Capture a service at three depths: **Core**, **Operations**, and **Governance**. Switching depth hides fields. It does not clear them. Only the six Core fields are required.
 - See a live service ID suggestion (`SVC-001`, or `SEC-SOC-001` when the workspace uses category prefixes). The code stays editable.
@@ -37,6 +37,7 @@ The anon key, or the newer publishable key, is public by design and is the only 
 | --- | --- |
 | Admin (`tenant_admin`) | One workspace. Services, artifacts, dropdowns, fields, members, and new workspaces they will administer. |
 | Editor | One workspace. Create and edit services, artifacts, and assessments. |
+| Service Manager (`service_manager`) | One workspace. Edit only services whose Service Owner record is linked to their account. |
 | Viewer | One workspace. Read and export. |
 | Platform owner | Every workspace. Kept for an operator account that already has this role. New projects do not grant it to the first user. |
 
@@ -47,7 +48,7 @@ This repository is not connected to a live Supabase project, and preview deploym
 To make a preview or a production deploy actually sign people in, Mike needs:
 
 1. A Supabase project he controls.
-2. Migrations `0001` through `0012` applied in order, in the SQL editor or with the Supabase CLI.
+2. Migrations `0001` through `0014` applied in order, in the SQL editor or with the Supabase CLI. `0013` and `0014` are the V6 Phase 2 members and Service Owner migrations. They are safe to apply to a database that already has catalog rows; see the comments at the top of each file for what they change on existing data.
 3. These Vercel environment variables set for Preview and Production, then a redeploy so Next.js can inline them:
 
 ```

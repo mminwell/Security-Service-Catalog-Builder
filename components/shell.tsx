@@ -4,15 +4,12 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { roleLabel } from "@/lib/catalog/access";
 import { CompleteProfilePrompt } from "@/components/profile-prompt";
 import { UserMenu } from "@/components/user-menu";
 import { placeAnchoredPanel } from "@/lib/catalog/popup-placement";
 import { cartIdsFor, subscribeCart } from "@/lib/catalog/cart-store";
-import { MAX_LOGO_FILE_BYTES } from "@/lib/catalog/logos";
 import { primaryNavCurrent, primaryNavFor } from "@/lib/catalog/primary-nav";
 import { TEMPLATES_LABEL } from "@/lib/catalog/shop-label";
-import type { Role, ServiceCodeMode } from "@/lib/catalog/types";
 import { useCatalog } from "@/components/catalog-provider";
 import { CartIcon } from "@/components/icons";
 import { Loading, useDismiss } from "@/components/widgets";
@@ -93,6 +90,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
         </div>
       </header>
+      {api.warning ? (
+        <div className="banner" role="status">
+          {api.warning}
+        </div>
+      ) : null}
       {api.error ? (
         <div className="banner" role="alert">
           {api.error}{" "}
@@ -108,62 +110,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
-function WorkspaceNameForm({ name, onSave }: { name: string; onSave: (value: string) => Promise<void> }) {
-  const [draft, setDraft] = useState(name);
-  const [error, setError] = useState<string | null>(null);
-  return (
-    <form
-      className="stack"
-      onSubmit={(event) => {
-        event.preventDefault();
-        setError(null);
-        void onSave(draft).catch((err: unknown) => {
-          setError(err instanceof Error ? err.message : "Could not rename the workspace.");
-        });
-      }}
-    >
-      <label htmlFor="workspace-name">Workspace name</label>
-      <input
-        id="workspace-name"
-        className="input"
-        value={draft}
-        maxLength={80}
-        aria-label="Workspace name"
-        onChange={(event) => setDraft(event.target.value)}
-      />
-      <div className="row-actions">
-        <button type="submit" className="btn btn-primary" disabled={draft.trim().length === 0}>
-          Save
-        </button>
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={() => {
-            setDraft(name);
-            setError(null);
-          }}
-        >
-          Cancel
-        </button>
-      </div>
-      {error ? (
-        <p className="field-error" role="alert">
-          {error}
-        </p>
-      ) : null}
-    </form>
-  );
-}
-
 function WorkspaceSwitcher() {
   const api = useCatalog();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState<Role>("editor");
-  const [inviteNotice, setInviteNotice] = useState<string | null>(null);
-  const [logoUrl, setLogoUrl] = useState("");
-  const [logoError, setLogoError] = useState<string | null>(null);
   const [panelStyle, setPanelStyle] = useState<CSSProperties>({});
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -243,163 +193,9 @@ function WorkspaceSwitcher() {
               </button>
             ))}
           </div>
-          {api.canAdmin ? (
-            <WorkspaceNameForm
-              key={`${tenant.id}:${tenant.name}`}
-              name={tenant.name}
-              onSave={(value) => api.renameWorkspace(value)}
-            />
-          ) : null}
-          <div className="logo-setting">
-            <p className="micro">Company logo</p>
-            <div className="row-actions">
-              <WorkspaceMark name={tenant.name} logoUrl={tenant.logo_url} size={36} />
-              {api.canAdmin ? (
-                <>
-                  <label className="btn btn-secondary">
-                    Upload image
-                    <input
-                      className="file-input"
-                      type="file"
-                      accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
-                      aria-label="Upload company logo"
-                      onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        event.target.value = "";
-                        if (!file) return;
-                        if (file.size > MAX_LOGO_FILE_BYTES) {
-                          setLogoError("Use an image under 80 KB.");
-                          return;
-                        }
-                        const reader = new FileReader();
-                        reader.onload = () => {
-                          const result = typeof reader.result === "string" ? reader.result : "";
-                          void api.setTenantLogo(result).then(
-                            () => setLogoError(null),
-                            (err: unknown) => setLogoError(err instanceof Error ? err.message : "Could not update the logo."),
-                          );
-                        };
-                        reader.readAsDataURL(file);
-                      }}
-                    />
-                  </label>
-                  {tenant.logo_url ? (
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      onClick={() => {
-                        void api.setTenantLogo(null).then(
-                          () => setLogoError(null),
-                          (err: unknown) => setLogoError(err instanceof Error ? err.message : "Could not update the logo."),
-                        );
-                      }}
-                    >
-                      Remove
-                    </button>
-                  ) : null}
-                </>
-              ) : null}
-            </div>
-            {api.canAdmin ? (
-              <form
-                className="stack"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void api.setTenantLogo(logoUrl).then(
-                    () => {
-                      setLogoUrl("");
-                      setLogoError(null);
-                    },
-                    (err: unknown) => setLogoError(err instanceof Error ? err.message : "Could not update the logo."),
-                  );
-                }}
-              >
-                <input
-                  className="input"
-                  value={logoUrl}
-                  placeholder="https://example.com/logo.png"
-                  aria-label="Logo image URL"
-                  onChange={(event) => setLogoUrl(event.target.value)}
-                />
-                <button type="submit" className="btn btn-secondary" disabled={logoUrl.trim().length === 0}>
-                  Use URL
-                </button>
-              </form>
-            ) : null}
-            {logoError ? <p className="field-error">{logoError}</p> : null}
-            {api.canAdmin ? <p className="hint">PNG, JPEG, GIF, WebP, or SVG under 80 KB, or an image URL.</p> : null}
-          </div>
-          <p className="micro">Service IDs</p>
-          <div className="segmented" role="radiogroup" aria-label="Service ID style" style={{ margin: "8px 0 12px" }}>
-            {(
-              [
-                ["sequential", "SVC-001"],
-                ["category_prefix", "SEC-SOC-001"],
-              ] as const
-            ).map(([mode, label]) => (
-              <button
-                key={mode}
-                type="button"
-                role="radio"
-                aria-checked={tenant.service_code_mode === mode}
-                onClick={() => void api.setServiceCodeMode(mode as ServiceCodeMode)}
-                disabled={!api.canAdmin}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <p className="micro">Members</p>
-          {api.members.map((member) => (
-            <div className="member" key={member.id}>
-              <span>{member.email}</span>
-              <span className="muted">{roleLabel(member.role)}</span>
-            </div>
-          ))}
-          {api.invitations.map((invite) => (
-            <div className="member" key={invite.id}>
-              <span>{invite.email}</span>
-              <span className="muted">{roleLabel(invite.role)} · Pending</span>
-            </div>
-          ))}
-          {api.canAdmin ? (
-            <form
-              className="stack"
-              onSubmit={(event) => {
-                event.preventDefault();
-                setInviteNotice(null);
-                void api.addMember(email, role).then(
-                  (message) => {
-                    setEmail("");
-                    setInviteNotice(message);
-                  },
-                  () => setInviteNotice(null),
-                );
-              }}
-            >
-              <input
-                className="input"
-                type="email"
-                placeholder="person@example.com"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                aria-label="Member email"
-                required
-              />
-              <div className="row-actions">
-                <select className="select" value={role} onChange={(event) => setRole(event.target.value as Role)} aria-label="Role">
-                  <option value="tenant_admin">Admin</option>
-                  <option value="editor">Editor</option>
-                  <option value="viewer">Viewer</option>
-                  {api.canGrantOwner ? <option value="platform_owner">Platform owner</option> : null}
-                </select>
-                <button type="submit" className="btn btn-secondary">
-                  Invite
-                </button>
-              </div>
-              {inviteNotice ? <p className="hint">{inviteNotice}</p> : null}
-            </form>
-          ) : null}
+          <Link className="btn btn-secondary" href="/settings" onClick={() => setOpen(false)}>
+            Workspace settings
+          </Link>
           {api.canCreateWorkspace ? (
             <form
               className="stack"
