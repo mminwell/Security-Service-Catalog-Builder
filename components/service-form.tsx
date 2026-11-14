@@ -36,7 +36,6 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
   });
   const [codeTouched, setCodeTouched] = useState(serviceId !== "new");
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [saved, setSaved] = useState(false);
   const [history, setHistory] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -89,7 +88,6 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
       const savedRecord = await api.archiveService(existing.id, archived);
       setDraft(savedRecord);
       setDirty(false);
-      setSaved(false);
       setPrompt(null);
     } catch {
       setPrompt(null);
@@ -152,7 +150,6 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
   }
 
   function update(field: FieldDefinition, value: unknown) {
-    setSaved(false);
     setDirty(true);
     setDraft((current) => (current ? writeField(current, field.field_key, value) : current));
     if (field.field_key === "service_code") setCodeTouched(true);
@@ -167,12 +164,11 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
     setSaving(true);
     try {
       await api.saveService(normalized);
-      setSaved(true);
       setDirty(false);
       setDraft(normalized);
       if (serviceId === "new") router.replace(`/services/${normalized.id}`);
     } catch {
-      setSaved(false);
+      setDirty(true);
     } finally {
       setSaving(false);
     }
@@ -227,8 +223,6 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
           ) : null}
         </div>
       ) : null}
-      {saved ? <div className="saved-banner">Saved. Deeper fields you cannot see right now were kept.</div> : null}
-
       <DepthToggle value={depth} onChange={setDepth} />
 
       {groups.map((group) => (
@@ -255,7 +249,6 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
                     service_owner: owner ? ownerDisplayName(owner.first_name, owner.last_name) : null,
                   });
                   setDirty(true);
-                  setSaved(false);
                 }}
                 showSuggestion={!codeTouched}
                 onUseSuggestion={() => {

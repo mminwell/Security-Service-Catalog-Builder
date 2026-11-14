@@ -48,7 +48,7 @@ This repository is not connected to a live Supabase project, and preview deploym
 To make a preview or a production deploy actually sign people in, Mike needs:
 
 1. A Supabase project he controls.
-2. Migrations `0001` through `0014` applied in order, in the SQL editor or with the Supabase CLI. `0013` and `0014` are the V6 Phase 2 members and Service Owner migrations. They are safe to apply to a database that already has catalog rows; see the comments at the top of each file for what they change on existing data.
+2. Migrations `0001` through `0015` applied in order, in the SQL editor or with the Supabase CLI. `0013` and `0014` add members and Service Owners. `0015` only replaces the invite functions so they can create a token when pgcrypto lives in the `extensions` schema. None of them delete existing rows.
 3. These Vercel environment variables set for Preview and Production, then a redeploy so Next.js can inline them:
 
 ```

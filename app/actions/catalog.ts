@@ -2,6 +2,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeEmail, validateEmail } from "@/lib/auth/credentials";
+import { readableInviteError } from "@/lib/auth/invites";
 import { normalizeAccountProfile, type AccountProfile, type AccountProfileInput } from "@/lib/auth/profile";
 import { isUuid } from "@/lib/auth/ids";
 import { allows, membershipRole } from "@/lib/auth/permissions";
@@ -134,7 +135,7 @@ export async function inviteMemberAction(
       p_email: normalizeEmail(email),
       p_role: role,
     });
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(readableInviteError(error.message));
     const record = data && typeof data === "object" ? (data as Record<string, unknown>) : {};
     const status = record.status === "invited" ? "invited" : "member";
     const { sendInviteNotice } = await import("@/lib/auth/invite-mail");

@@ -2,7 +2,7 @@
 
 import { normalizeEmail, validateEmail, validatePassword } from "@/lib/auth/credentials";
 import { sendInviteNotice } from "@/lib/auth/invite-mail";
-import { isWorkspaceRole } from "@/lib/auth/invites";
+import { isWorkspaceRole, readableInviteError } from "@/lib/auth/invites";
 import { normalizeAccountProfile } from "@/lib/auth/profile";
 import { isUuid } from "@/lib/auth/ids";
 import type { PlannedOwnerImport } from "@/lib/catalog/owner-names";
@@ -28,7 +28,7 @@ export async function resendInviteAction(inviteId: string): Promise<ActionResult
     if (!isUuid(inviteId)) throw new Error("That invite is not valid.");
     const { supabase } = await createAuthedClient();
     const { data, error } = await supabase.rpc("resend_workspace_invitation", { p_invite: inviteId });
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(readableInviteError(error.message));
     const record = data && typeof data === "object" ? (data as Record<string, unknown>) : {};
     const role = typeof record.role === "string" && isWorkspaceRole(record.role) ? record.role : "viewer";
     const mailed = await sendInviteNotice({

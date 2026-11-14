@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { CatalogProvider } from "@/components/catalog-provider";
 import { NotConfigured } from "@/components/not-configured";
+import { SaveToastProvider } from "@/components/save-toast";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import "./globals.css";
 
@@ -19,7 +20,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        {isSupabaseConfigured() ? <CatalogProvider>{children}</CatalogProvider> : <NotConfigured />}
+        <SaveToastProvider>
+          {isSupabaseConfigured() ? <CatalogProvider>{children}</CatalogProvider> : <NotConfigured />}
+        </SaveToastProvider>
       </body>
     </html>
   );

@@ -374,6 +374,37 @@ begin
   end if;
 end $$;
 
+-- Hosted Supabase keeps pgcrypto in extensions, not public. The invite RPC must still insert a row.
+do $$
+declare
+  v_admin uuid := '11111111-1111-4111-8111-111111111111';
+  v_tenant uuid;
+  v_invite jsonb;
+begin
+  create schema if not exists extensions;
+  alter extension pgcrypto set schema extensions;
+  select id into v_tenant from public.tenants where slug = 'starter-workspace';
+  perform set_config('request.jwt.claim.sub', v_admin::text, true);
+  execute 'set role authenticated';
+  v_invite := public.add_tenant_member(v_tenant, 'newperson@example.com', 'viewer');
+  execute 'reset role';
+  if v_invite->>'status' is distinct from 'invited' then
+    raise exception 'invite failed when pgcrypto is in extensions: %', v_invite;
+  end if;
+  if not exists (
+    select 1
+    from public.workspace_invitations
+    where tenant_id = v_tenant
+      and email = 'newperson@example.com'
+      and role = 'viewer'
+      and accepted_at is null
+      and token is not null
+      and expires_at > now()
+  ) then
+    raise exception 'invite row was not stored';
+  end if;
+end $$;
+
 -- anon and PUBLIC must not execute any public function. authenticated keeps the allowlist.
 do $$
 declare

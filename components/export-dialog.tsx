@@ -306,7 +306,7 @@ export function ExportDialog({
         fieldKeys: resolved.fields.map((field) => field.field_key),
         isDefault: makeDefault,
       });
-      setNotice(`Saved “${profileName.trim()}” as ${audienceForSave === "internal" ? "internal" : "public"}.`);
+      setNotice(null);
       setProfileName("");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "The profile could not be saved.");

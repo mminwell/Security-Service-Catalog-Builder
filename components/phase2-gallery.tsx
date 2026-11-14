@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CatalogFixture, type CatalogApi } from "@/components/catalog-provider";
+import { useSaveToast } from "@/components/save-toast";
 import { CatalogScreen } from "@/components/catalog-screen";
 import { OwnersAdmin } from "@/components/owners-admin";
 import { ServiceForm } from "@/components/service-form";
@@ -235,9 +236,13 @@ function fixture(): CatalogApi {
 
 export function Phase2Gallery() {
   const [api] = useState(fixture);
+  const toast = useSaveToast();
   return (
     <CatalogFixture api={api}>
       <main className="main">
+        <button type="button" className="btn btn-secondary" onClick={() => toast.success("Settings saved")}>
+          Show save confirmation
+        </button>
         <section id="shot-settings">
           <WorkspaceSettings />
         </section>

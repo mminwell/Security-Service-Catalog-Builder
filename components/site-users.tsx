@@ -11,6 +11,7 @@ import { roleLabel } from "@/lib/catalog/access";
 import { ownerDisplayName } from "@/lib/catalog/owner-names";
 import type { Role, SiteAccount } from "@/lib/catalog/types";
 import { useCatalog } from "@/components/catalog-provider";
+import { useSaveToast } from "@/components/save-toast";
 import { OwnerSelect } from "@/components/owner-select";
 
 export function SiteUsers({ previewAccounts }: { previewAccounts?: SiteAccount[] }) {
@@ -23,7 +24,7 @@ export function SiteUsers({ previewAccounts }: { previewAccounts?: SiteAccount[]
   const [replacementFor, setReplacementFor] = useState<string[] | null>(null);
   const [replacement, setReplacement] = useState<string | null>(null);
   const [none, setNone] = useState(true);
-  const [notice, setNotice] = useState<string | null>(null);
+  const toast = useSaveToast();
 
   async function load() {
     const result = await listSiteAccountsAction();
@@ -93,7 +94,6 @@ export function SiteUsers({ previewAccounts }: { previewAccounts?: SiteAccount[]
       <label htmlFor="account-search">Search accounts</label>
       <input id="account-search" className="input" value={query} onChange={(event) => setQuery(event.target.value)} />
       {error ? <p className="field-error">{error}</p> : null}
-      {notice ? <p className="hint">{notice}</p> : null}
       <div className="panel table-wrap">
         <table className="catalog">
           <thead>
@@ -125,15 +125,15 @@ export function SiteUsers({ previewAccounts }: { previewAccounts?: SiteAccount[]
                     onClick={() => {
                       void setAccountActiveAction(account.user_id, Boolean(account.deactivated_at)).then(async (result) => {
                         if (!result.ok) {
-                          setNotice(result.error);
+                          toast.error(result.error);
                           return;
                         }
                         const linked = api.owners.filter((owner) => owner.user_id === account.user_id).map((owner) => owner.id);
                         if (!account.deactivated_at && result.data.services > 0 && linked.length > 0) {
                           setReplacementFor(linked);
-                          setNotice(`Deactivated. ${result.data.services} services still name this person.`);
+                          toast.success(`Account deactivated. ${result.data.services} services still name this person.`);
                         } else {
-                          setNotice(account.deactivated_at ? "Account reactivated." : "Account deactivated.");
+                          toast.success(account.deactivated_at ? "Account reactivated" : "Account deactivated");
                         }
                         await load();
                         await api.refresh();
@@ -162,7 +162,8 @@ export function SiteUsers({ previewAccounts }: { previewAccounts?: SiteAccount[]
               className="btn btn-primary"
               onClick={() => {
                 void deleteAccountAction(pendingDelete, confirmEmail).then(async (result) => {
-                  setNotice(result.ok ? "Account deleted." : result.error);
+                  if (result.ok) toast.success("Account deleted");
+                  else toast.error(result.error);
                   if (result.ok) {
                     setPendingDelete(null);
                     setConfirmEmail("");
@@ -202,7 +203,8 @@ export function SiteUsers({ previewAccounts }: { previewAccounts?: SiteAccount[]
             className="btn btn-primary"
             onClick={() => {
               void reassignDeactivatedOwnersAction(replacementFor, none ? null : replacement).then(async (result) => {
-                setNotice(result.ok ? "Services updated." : result.error);
+                if (result.ok) toast.success("Services updated");
+                else toast.error(result.error);
                 if (result.ok) {
                   setReplacementFor(null);
                   await api.refresh();

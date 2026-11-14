@@ -13,6 +13,7 @@ import { parseCsv } from "@/lib/catalog/lookup-csv";
 import { ownerDisplayName, planOwnerImport, planOwnerReconciliation, servicesOwnedBy } from "@/lib/catalog/owner-names";
 import type { ServiceOwner } from "@/lib/catalog/types";
 import { useCatalog } from "@/components/catalog-provider";
+import { useSaveToast } from "@/components/save-toast";
 import { OwnerSelect } from "@/components/owner-select";
 
 export function OwnersAdmin() {
@@ -20,7 +21,7 @@ export function OwnersAdmin() {
   const [adding, setAdding] = useState(false);
   const [archiveId, setArchiveId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const toast = useSaveToast();
   if (!api.canAdmin) {
     return (
       <section className="empty">
@@ -56,7 +57,6 @@ export function OwnersAdmin() {
           Add owner
         </button>
       </div>
-      {notice ? <p className="hint">{notice}</p> : null}
       <div className="panel table-wrap">
         <table className="catalog">
           <thead>
@@ -94,7 +94,8 @@ export function OwnersAdmin() {
                       className="btn btn-ghost"
                       onClick={() => {
                         void reactivateOwnerAction(owner.id).then((result) => {
-                          setNotice(result.ok ? "Owner reactivated." : result.error);
+                          if (result.ok) toast.success("Owner reactivated");
+                          else toast.error(result.error);
                           if (result.ok) void api.refresh();
                         });
                       }}
@@ -121,17 +122,18 @@ export function OwnersAdmin() {
           </ul>
         </section>
       ) : null}
-      <ImportPanel onNotice={setNotice} />
-      <ReconcilePanel onNotice={setNotice} />
+      <ImportPanel />
+      <ReconcilePanel />
       {selected ? <OwnerHistory owner={selected} onClose={() => setSelectedId(null)} /> : null}
-      {adding ? <AddOwnerDialog onClose={() => setAdding(false)} onNotice={setNotice} /> : null}
-      {archiveId ? <ArchiveDialog ownerId={archiveId} onClose={() => setArchiveId(null)} onNotice={setNotice} /> : null}
+      {adding ? <AddOwnerDialog onClose={() => setAdding(false)} /> : null}
+      {archiveId ? <ArchiveDialog ownerId={archiveId} onClose={() => setArchiveId(null)} /> : null}
     </>
   );
 }
 
-function AddOwnerDialog({ onClose, onNotice }: { onClose: () => void; onNotice: (message: string) => void }) {
+function AddOwnerDialog({ onClose }: { onClose: () => void }) {
   const api = useCatalog();
+  const toast = useSaveToast();
   const tenant = api.activeTenant;
   const [mode, setMode] = useState<"member" | "manual">("member");
   const [query, setQuery] = useState("");
@@ -159,7 +161,11 @@ function AddOwnerDialog({ onClose, onNotice }: { onClose: () => void; onNotice: 
       teamCode: team,
       userId,
     });
-    onNotice(result.ok ? "Owner saved." : result.error);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success("Owner saved");
     if (result.ok) {
       await api.refresh();
       onClose();
@@ -240,13 +246,12 @@ function AddOwnerDialog({ onClose, onNotice }: { onClose: () => void; onNotice: 
 function ArchiveDialog({
   ownerId,
   onClose,
-  onNotice,
 }: {
   ownerId: string;
   onClose: () => void;
-  onNotice: (message: string) => void;
 }) {
   const api = useCatalog();
+  const toast = useSaveToast();
   const owner = api.owners.find((item) => item.id === ownerId);
   const [replacement, setReplacement] = useState<string | null>(null);
   const [none, setNone] = useState(false);
@@ -291,7 +296,8 @@ function ArchiveDialog({
             className="btn btn-primary"
             onClick={() => {
               void archiveOwnerAction(owner.id, none ? null : replacement).then((result) => {
-                onNotice(result.ok ? `Archived. ${result.data.services} services updated.` : result.error);
+                if (!result.ok) toast.error(result.error);
+                else toast.success(`Archived. ${result.data.services} services updated.`);
                 if (result.ok) void api.refresh();
                 if (result.ok) onClose();
               });
@@ -308,8 +314,9 @@ function ArchiveDialog({
   );
 }
 
-function ImportPanel({ onNotice }: { onNotice: (message: string) => void }) {
+function ImportPanel() {
   const api = useCatalog();
+  const toast = useSaveToast();
   const [rows, setRows] = useState<ReturnType<typeof planOwnerImport>["rows"]>([]);
   const [error, setError] = useState<string | null>(null);
   const teams = api.lookups
@@ -355,7 +362,8 @@ function ImportPanel({ onNotice }: { onNotice: (message: string) => void }) {
           onClick={() => {
             if (!api.activeTenant) return;
             void importOwnersAction(api.activeTenant.id, rows).then((result) => {
-              onNotice(result.ok ? `Imported ${result.data.created} owners.` : result.error);
+              if (!result.ok) toast.error(result.error);
+              else toast.success(`Imported ${result.data.created} owners.`);
               if (result.ok) void api.refresh();
             });
           }}
@@ -367,8 +375,9 @@ function ImportPanel({ onNotice }: { onNotice: (message: string) => void }) {
   );
 }
 
-function ReconcilePanel({ onNotice }: { onNotice: (message: string) => void }) {
+function ReconcilePanel() {
   const api = useCatalog();
+  const toast = useSaveToast();
   const [mode, setMode] = useState<"active" | "termination">("active");
   const [plan, setPlan] = useState<ReturnType<typeof planOwnerReconciliation> | null>(null);
   const [replacement, setReplacement] = useState<string | null>(null);
@@ -474,7 +483,8 @@ function ReconcilePanel({ onNotice }: { onNotice: (message: string) => void }) {
                 plan.archive.map((item) => item.ownerId),
                 none ? null : replacement,
               ).then((result) => {
-                onNotice(result.ok ? `Reconciled. ${result.data.services} services updated.` : result.error);
+                if (!result.ok) toast.error(result.error);
+                else toast.success(`Reconciled. ${result.data.services} services updated.`);
                 if (result.ok) void api.refresh();
               });
             }}

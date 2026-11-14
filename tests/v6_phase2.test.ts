@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decideInvite, inviteExpiry } from "@/lib/auth/invites";
+import { decideInvite, inviteExpiry, readableInviteError } from "@/lib/auth/invites";
 import { allows } from "@/lib/auth/permissions";
 import { canAdminister, canWriteServices, roleLabel } from "@/lib/catalog/access";
 import {
@@ -140,5 +140,10 @@ describe("invites keep the admin's role", () => {
     expect(decideInvite(invite, "other@example.com", new Date("2026-11-14T00:00:00Z")).accept).toBe(false);
     expect(decideInvite({ ...invite, cancelledAt: "2026-11-13T01:00:00Z" }, "sam@example.com", new Date("2026-11-14T00:00:00Z")).accept).toBe(false);
     expect(decideInvite(invite, "sam@example.com", new Date("2026-11-21T00:00:00Z")).accept).toBe(false);
+  });
+
+  it("explains a missing invite-token function instead of hiding the failure", () => {
+    expect(readableInviteError("function gen_random_bytes(integer) does not exist")).toMatch(/was not saved/i);
+    expect(readableInviteError("Only an Admin can invite members")).toMatch(/Only an Admin/);
   });
 });
