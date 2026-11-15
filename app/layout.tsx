@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import { AppState } from "@/components/app-state";
 import { HelpContentProvider } from "@/components/help-panel";
 import { SaveToastProvider } from "@/components/save-toast";
@@ -16,7 +17,10 @@ export const metadata: Metadata = {
   applicationName: "Security Service Catalog",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Nonces are minted per request. Waiting for the request keeps every page dynamic
+  // so Next can stamp that nonce onto its scripts.
+  await connection();
   const articles = loadHelpArticles();
   return (
     <html lang="en">

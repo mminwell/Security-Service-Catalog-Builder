@@ -1,3 +1,5 @@
+import { RATE_LIMIT_MESSAGE } from "@/lib/security/copy";
+
 export type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
 export function ok<T>(data: T): ActionResult<T> {
@@ -5,6 +7,8 @@ export function ok<T>(data: T): ActionResult<T> {
 }
 
 export function fail(error: unknown): ActionResult<never> {
-  if (error instanceof Error && error.message.trim()) return { ok: false, error: error.message };
+  const message = error instanceof Error ? error.message.trim() : "";
+  if (/rate_limited/i.test(message)) return { ok: false, error: RATE_LIMIT_MESSAGE };
+  if (message) return { ok: false, error: message };
   return { ok: false, error: "Something went wrong." };
 }

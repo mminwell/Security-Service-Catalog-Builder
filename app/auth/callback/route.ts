@@ -40,12 +40,16 @@ export async function GET(request: NextRequest) {
 
   // No server-visible credential, or the code exchange failed. Invite links put
   // access_token in the fragment, which only the browser can read. Stay on this URL.
-  return new NextResponse(authCallbackBootstrapHtml(), {
+  const nonce = request.headers.get("x-nonce");
+  const headers: Record<string, string> = {
+    "content-type": "text/html; charset=utf-8",
+    "cache-control": "private, no-store",
+  };
+  const csp = request.headers.get("content-security-policy");
+  if (csp) headers["content-security-policy"] = csp;
+  return new NextResponse(authCallbackBootstrapHtml(nonce), {
     status: 200,
-    headers: {
-      "content-type": "text/html; charset=utf-8",
-      "cache-control": "private, no-store",
-    },
+    headers,
   });
 }
 

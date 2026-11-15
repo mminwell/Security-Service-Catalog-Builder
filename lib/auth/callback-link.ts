@@ -58,7 +58,8 @@ export function readCallbackField(value: unknown, max = 8192): string | null {
 }
 
 /** Stay on this URL so the browser can read the fragment. Do not redirect before that. */
-export function authCallbackBootstrapHtml(): string {
+export function authCallbackBootstrapHtml(nonce?: string | null): string {
+  const nonceAttr = scriptNonceAttribute(nonce);
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -69,7 +70,7 @@ export function authCallbackBootstrapHtml(): string {
 <body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#faf9f5;color:#141413;font-family:system-ui,sans-serif">
   <p>Opening your invite…</p>
   <noscript><p>This link needs JavaScript so the invite can be opened.</p></noscript>
-  <script>
+  <script${nonceAttr}>
     (function () {
       var query = new URLSearchParams(window.location.search);
       var hash = new URLSearchParams((window.location.hash || "").replace(/^#/, ""));
@@ -98,4 +99,10 @@ export function authCallbackBootstrapHtml(): string {
   </script>
 </body>
 </html>`;
+}
+
+/** The callback page is raw HTML, so Next cannot stamp this script. The nonce has to be written here. */
+export function scriptNonceAttribute(nonce: string | null | undefined): string {
+  if (!nonce || !/^[A-Za-z0-9+/_-]+=*$/.test(nonce)) return "";
+  return ` nonce="${nonce}"`;
 }

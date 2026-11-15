@@ -1,4 +1,5 @@
 import type { Role } from "@/lib/catalog/types";
+import { RATE_LIMIT_MESSAGE } from "@/lib/security/copy";
 
 export const INVITE_DAYS = 7;
 
@@ -13,6 +14,7 @@ export function isWorkspaceRole(role: string): role is WorkspaceRole {
 /** Turn a database failure into a sentence the person who clicked Send can act on. */
 export function readableInviteError(message: string): string {
   const text = message.trim();
+  if (/rate_limited/i.test(text)) return RATE_LIMIT_MESSAGE;
   if (/gen_random_bytes/i.test(text)) {
     return "The invite was not saved. The database could not create the invite link. Apply the latest database update and try again.";
   }

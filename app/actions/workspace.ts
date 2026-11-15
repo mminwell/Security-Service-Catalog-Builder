@@ -1,5 +1,6 @@
 "use server";
 
+import { headers } from "next/headers";
 import { normalizeEmail, validateEmail, validatePassword } from "@/lib/auth/credentials";
 import { sendInviteNotice } from "@/lib/auth/invite-mail";
 import { isWorkspaceRole, readableInviteError } from "@/lib/auth/invites";
@@ -10,6 +11,7 @@ import type { Role } from "@/lib/catalog/types";
 import { createAuthedClient, loadOwnMemberships } from "@/lib/server/guard";
 import { fail, ok, type ActionResult } from "@/lib/server/result";
 import { persistUserProfile } from "@/lib/data/remote";
+import { clientAddress, enforceRateLimits } from "@/lib/security/rate-limit";
 
 export async function cancelInviteAction(inviteId: string): Promise<ActionResult<null>> {
   try {
@@ -359,6 +361,7 @@ export async function acceptInviteAction(token: string): Promise<ActionResult<{ 
   try {
     if (!/^[a-f0-9]{32,128}$/i.test(token)) throw new Error("That invite link is not valid.");
     const { supabase } = await createAuthedClient();
+    await enforceRateLimits(supabase, [{ action: "invite_accept_ip", material: clientAddress(await headers()) }]);
     const accepted = await supabase.rpc("accept_invitation", { p_token: token });
     if (accepted.error) throw new Error(accepted.error.message);
     if (typeof accepted.data !== "string") throw new Error("The invite could not be accepted.");
@@ -378,6 +381,10 @@ export async function completeInvitedAccountAction(input: {
     const passwordError = validatePassword(input.password);
     if (passwordError) throw new Error(passwordError);
     const { supabase, user } = await createAuthedClient();
+    await enforceRateLimits(supabase, [
+      { action: "finish_account", material: null },
+      { action: "finish_account_ip", material: clientAddress(await headers()) },
+    ]);
     const ensured = await supabase.rpc("ensure_practitioner_access");
     if (ensured.error && !/no workspace membership/i.test(ensured.error.message)) {
       throw new Error(ensured.error.message);
@@ -414,6 +421,7 @@ export async function finishInviteAction(input: {
     const passwordError = validatePassword(input.password);
     if (passwordError) throw new Error(passwordError);
     const { supabase, user } = await createAuthedClient();
+    await enforceRateLimits(supabase, [{ action: "finish_account_ip", material: clientAddress(await headers()) }]);
     const preview = await supabase.rpc("preview_invitation", { p_token: input.token });
     if (preview.error) throw new Error(preview.error.message);
     const row = Array.isArray(preview.data) ? preview.data[0] : preview.data;

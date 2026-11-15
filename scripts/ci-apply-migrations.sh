@@ -405,7 +405,120 @@ begin
   end if;
 end $$;
 
--- anon and PUBLIC must not execute any public function. authenticated keeps the allowlist.
+-- Rate limits store hashes, refuse the sixth sign-in email, and do not change catalog rows.
+do $$
+declare
+  v_admin uuid := '11111111-1111-4111-8111-111111111111';
+  v_tenant uuid;
+  v_bucket text := encode(extensions.digest(convert_to('ada@example.com', 'UTF8'), 'sha256'), 'hex');
+  v_admin_bucket text := encode(extensions.digest(convert_to(v_admin::text, 'UTF8'), 'sha256'), 'hex');
+  v_tenants integer;
+  v_invites integer;
+  v_services integer;
+  v_existing integer;
+  i integer;
+begin
+  select count(*) into v_tenants from public.tenants;
+  select count(*) into v_invites from public.workspace_invitations;
+  select count(*) into v_services from public.services;
+  if v_tenants < 1 or v_invites < 1 or v_services < 1 then
+    raise exception 'rate limit test ran before catalog rows existed';
+  end if;
+
+  insert into public.rate_limits (action, bucket, created_at)
+  values ('sign_in_ip', encode(extensions.digest(convert_to('stale', 'UTF8'), 'sha256'), 'hex'), now() - interval '3 hours');
+
+  execute 'set role anon';
+  for i in 1..5 loop
+    perform public.enforce_rate_limit('sign_in_email', v_bucket);
+  end loop;
+  begin
+    perform public.enforce_rate_limit('sign_in_email', v_bucket);
+    raise exception 'sixth sign-in email was allowed';
+  exception
+    when others then
+      if sqlerrm like '%sixth sign-in email was allowed%' then
+        raise;
+      end if;
+      if sqlerrm not like '%rate_limited%' then
+        raise;
+      end if;
+  end;
+  begin
+    perform public.enforce_rate_limit('invite_send', null);
+    raise exception 'anon sent an invite';
+  exception
+    when others then
+      if sqlerrm like '%anon sent an invite%' then
+        raise;
+      end if;
+      if sqlerrm not like '%Authentication required%' then
+        raise;
+      end if;
+  end;
+  begin
+    perform 1 from public.rate_limits;
+    raise exception 'anon read rate_limits';
+  exception
+    when insufficient_privilege then
+      null;
+    when others then
+      if sqlerrm like '%anon read rate_limits%' then
+        raise;
+      end if;
+      if sqlerrm not like '%permission denied%' and sqlerrm not like '%row-level security%' then
+        raise;
+      end if;
+  end;
+  execute 'reset role';
+
+  if exists (select 1 from public.rate_limits where created_at < now() - interval '2 hours') then
+    raise exception 'old rate limit rows were kept';
+  end if;
+
+  select count(*) into v_existing
+  from public.rate_limits
+  where action = 'invite_send' and bucket = v_admin_bucket and created_at > now() - interval '1 hour';
+  if v_existing < 20 then
+    insert into public.rate_limits (action, bucket, created_at)
+    select 'invite_send', v_admin_bucket, now()
+    from generate_series(1, 20 - v_existing);
+  end if;
+
+  select id into v_tenant from public.tenants where slug = 'starter-workspace';
+  perform set_config('request.jwt.claim.sub', v_admin::text, true);
+  execute 'set role authenticated';
+  begin
+    perform public.add_tenant_member(v_tenant, 'blocked@example.com', 'viewer');
+    raise exception 'invite over the hourly limit was stored';
+  exception
+    when others then
+      if sqlerrm like '%invite over the hourly limit was stored%' then
+        raise;
+      end if;
+      if sqlerrm not like '%rate_limited%' then
+        raise;
+      end if;
+  end;
+  execute 'reset role';
+
+  if exists (
+    select 1 from public.workspace_invitations where email = 'blocked@example.com'
+  ) then
+    raise exception 'a rate-limited invite was written';
+  end if;
+  if (select count(*) from public.tenants) <> v_tenants then
+    raise exception 'rate limit cleanup changed tenants';
+  end if;
+  if (select count(*) from public.workspace_invitations) <> v_invites then
+    raise exception 'rate limit cleanup changed invitations';
+  end if;
+  if (select count(*) from public.services) <> v_services then
+    raise exception 'rate limit cleanup changed services';
+  end if;
+end $$;
+
+-- anon may execute only enforce_rate_limit. PUBLIC executes nothing. authenticated keeps the allowlist.
 do $$
 declare
   r record;
@@ -441,7 +554,8 @@ declare
     'reactivate_service_owner',
     'import_service_owners',
     'apply_owner_reconciliation',
-    'reassign_owned_services'
+    'reassign_owned_services',
+    'enforce_rate_limit'
   ];
 begin
   for r in
@@ -454,7 +568,11 @@ begin
         where d.objid = p.oid and d.deptype = 'e'
       )
   loop
-    if has_function_privilege('anon', r.oid, 'execute') then
+    if r.proname = 'enforce_rate_limit' then
+      if not has_function_privilege('anon', r.oid, 'execute') then
+        raise exception 'anon lost execute on enforce_rate_limit';
+      end if;
+    elsif has_function_privilege('anon', r.oid, 'execute') then
       raise exception 'anon can execute %', r.proname;
     end if;
     if has_function_privilege('public', r.oid, 'execute') then
