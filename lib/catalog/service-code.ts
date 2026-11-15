@@ -1,5 +1,22 @@
 import type { ServiceCodeMode } from "@/lib/catalog/types";
 
+export const SERVICE_ID_STYLES: ReadonlyArray<{
+  mode: ServiceCodeMode;
+  label: string;
+  description: string;
+}> = [
+  {
+    mode: "sequential",
+    label: "SVC-001",
+    description: "One number sequence for the whole catalog, such as SVC-001.",
+  },
+  {
+    mode: "category_prefix",
+    label: "SEC-SOC-001",
+    description: "The category prefix plus a number, such as SEC-SOC-001.",
+  },
+];
+
 export function suggestServiceCode(args: {
   existingCodes: string[];
   mode: ServiceCodeMode;

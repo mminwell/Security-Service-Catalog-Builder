@@ -343,6 +343,53 @@ export async function previewInviteAction(token: string): Promise<
   }
 }
 
+export async function acceptInviteAction(token: string): Promise<ActionResult<{ tenantId: string }>> {
+  try {
+    if (!/^[a-f0-9]{32,128}$/i.test(token)) throw new Error("That invite link is not valid.");
+    const { supabase } = await createAuthedClient();
+    const accepted = await supabase.rpc("accept_invitation", { p_token: token });
+    if (accepted.error) throw new Error(accepted.error.message);
+    if (typeof accepted.data !== "string") throw new Error("The invite could not be accepted.");
+    return ok({ tenantId: accepted.data });
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+export async function completeInvitedAccountAction(input: {
+  firstName: string;
+  lastName: string;
+  company: string;
+  password: string;
+}): Promise<ActionResult<null>> {
+  try {
+    const passwordError = validatePassword(input.password);
+    if (passwordError) throw new Error(passwordError);
+    const { supabase, user } = await createAuthedClient();
+    const ensured = await supabase.rpc("ensure_practitioner_access");
+    if (ensured.error && !/no workspace membership/i.test(ensured.error.message)) {
+      throw new Error(ensured.error.message);
+    }
+    let company = input.company.trim();
+    if (!company) {
+      const tenant = await supabase.from("tenants").select("name").limit(1).maybeSingle();
+      company = typeof tenant.data?.name === "string" ? tenant.data.name.trim() : "";
+    }
+    if (!company) throw new Error("Enter a company name.");
+    const profile = normalizeAccountProfile({
+      firstName: input.firstName,
+      lastName: input.lastName,
+      company,
+    });
+    const password = await supabase.auth.updateUser({ password: input.password });
+    if (password.error) throw new Error(password.error.message);
+    await persistUserProfile(supabase, user.id, profile);
+    return ok(null);
+  } catch (error) {
+    return fail(error);
+  }
+}
+
 export async function finishInviteAction(input: {
   token: string;
   firstName: string;

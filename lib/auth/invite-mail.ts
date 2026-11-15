@@ -27,12 +27,16 @@ export async function sendInviteNotice(input: {
     return { sent: false, detail: "Supabase is not configured, so no email was sent. The invite is saved." };
   }
   const origin = await requestOrigin();
-  const next = input.kind === "invited" && input.token ? `/invite/${input.token}` : "/catalog";
+  const next = inviteEmailNextPath(input.kind, input.token);
   const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(next)}`;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  // Implicit, not PKCE. This email is opened in the invitee's browser, which does not
+  // have the code verifier a server-side PKCE challenge would store only in this process.
+  // GoTrue then returns the session in the URL fragment, and /auth/callback reads it.
+  const auth = { persistSession: false, autoRefreshToken: false, flowType: "implicit" as const };
   if (serviceKey && input.kind === "invited") {
     const admin = createClient(config.url, serviceKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
+      auth,
     });
     const invited = await admin.auth.admin.inviteUserByEmail(input.email, {
       redirectTo,
@@ -47,7 +51,7 @@ export async function sendInviteNotice(input: {
   }
 
   const anon = createClient(config.url, config.anonKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
+    auth,
   });
   const otp = await anon.auth.signInWithOtp({
     email: input.email,
@@ -71,6 +75,10 @@ export async function sendInviteNotice(input: {
     sent: true,
     detail: `Invite saved as ${roleText}. A link was sent through Supabase Auth to finish the account. The Auth template does not include the role name unless SUPABASE_SERVICE_ROLE_KEY is configured.`,
   };
+}
+
+export function inviteEmailNextPath(kind: "invited" | "member", token: string | null): string {
+  return kind === "invited" && token ? `/invite/${token}` : "/catalog";
 }
 
 async function requestOrigin(): Promise<string> {

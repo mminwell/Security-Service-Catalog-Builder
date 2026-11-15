@@ -52,13 +52,35 @@ export async function requestMagicLink(
   return { notice: MAGIC_LINK_NOTICE };
 }
 
-/** After the link is verified, a deactivated account is signed out instead of entering the app. */
+function isInvitePath(path: string): boolean {
+  return path === "/invite" || path.startsWith("/invite/");
+}
+
+/**
+ * After the link is verified, a deactivated account is signed out instead of entering the app.
+ * An invite for someone who still needs a name and password stays on the finish-account page.
+ * Someone who already has an account is sent to sign in; the invite is accepted after that.
+ * `linkType` is the Supabase email type (`invite`, `magiclink`, `recovery`, …).
+ */
 export function authCallbackDestination(input: {
   verified: boolean;
   deactivated: boolean;
   next: string;
+  accountReady?: boolean;
+  linkType?: string | null;
 }): { path: string; signOut: boolean } {
-  if (!input.verified) return { path: "/login?error=auth", signOut: false };
+  if (!input.verified) {
+    if (isInvitePath(input.next)) {
+      return { path: `/login?error=auth&next=${encodeURIComponent(input.next)}`, signOut: false };
+    }
+    return { path: "/login?error=auth", signOut: false };
+  }
   if (input.deactivated) return { path: "/login?error=deactivated", signOut: true };
+  if (isInvitePath(input.next)) {
+    if (input.accountReady) return { path: `/login?next=${encodeURIComponent(input.next)}`, signOut: true };
+    return { path: input.next, signOut: false };
+  }
+  if (input.linkType === "invite" && !input.accountReady) return { path: "/invite/continue", signOut: false };
+  if (input.linkType === "invite" && input.accountReady) return { path: "/login?next=/catalog", signOut: true };
   return { path: input.next, signOut: false };
 }

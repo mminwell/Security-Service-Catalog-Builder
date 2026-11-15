@@ -1145,7 +1145,7 @@ table.catalog tr.clickable:hover td { background: rgba(240, 238, 230, 0.55); }
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
-  align-items: start;
+  align-items: stretch;
 }
 .settings-span { grid-column: 1 / -1; }
 .settings-block { margin: 0; padding: 10px 12px; }
@@ -1153,6 +1153,13 @@ table.catalog tr.clickable:hover td { background: rgba(240, 238, 230, 0.55); }
 .settings-block .stack { gap: 6px; }
 .settings-block label { margin-top: 0; }
 .settings-block .textarea { min-height: 0; height: 48px; padding: 6px 8px; }
+.distribution-card { display: flex; flex-direction: column; height: 100%; }
+.distribution-card .stack { flex: 1; }
+.distribution-card .textarea { flex: 1 1 auto; height: auto; min-height: 48px; }
+.id-style-row { display: flex; align-items: center; gap: 10px; }
+.settings-block .id-style-row .segmented { flex: 0 0 auto; width: max-content; align-self: center; }
+.settings-block .id-style-row .segmented button { width: 148px; padding: 0 8px; text-align: center; }
+.id-style-copy { margin: 0; flex: 1; min-width: 0; color: var(--gray-500); font-size: 13px; line-height: 1.35; }
 .settings-page .btn { height: 32px; padding: 0 10px; font-size: 13px; }
 .name-row, .invite-row {
   display: flex;
@@ -1166,7 +1173,7 @@ table.catalog tr.clickable:hover td { background: rgba(240, 238, 230, 0.55); }
 .settings-check { display: flex; gap: 8px; align-items: center; font-size: 13px; }
 @media (max-width: 860px) {
   .settings-grid { grid-template-columns: 1fr; }
-  .name-row, .invite-row { flex-wrap: wrap; }
+  .name-row, .invite-row, .id-style-row { flex-wrap: wrap; }
   .invite-row .select, .name-row .btn, .invite-row .btn { width: 100%; }
 }
 .save-toast-live { position: relative; }
