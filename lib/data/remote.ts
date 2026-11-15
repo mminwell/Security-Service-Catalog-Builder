@@ -1,5 +1,6 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { accountIsDeactivated } from "@/lib/auth/account-status";
+import { isAuthSessionMissing } from "@/lib/auth/messages";
 import { accountProfileFromMetadata, type AccountProfile } from "@/lib/auth/profile";
 import { parseColumnConfig } from "@/lib/catalog/columns";
 import { withArtifactComputed } from "@/lib/catalog/artifacts";
@@ -41,8 +42,8 @@ export type Hydration = {
 
 export async function hydrateFromSupabase(supabase: SupabaseClient): Promise<Hydration> {
   const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError) throw new Error(userError.message);
-  const user = userData.user;
+  if (userError && !isAuthSessionMissing(userError.message)) throw new Error(userError.message);
+  const user = userError ? null : userData.user;
   if (!user) return { db: emptyDb(), invitations: [], owners: [], ownerHistory: [], ownersReady: false, warning: null };
 
   if (await accountIsDeactivated(supabase)) {

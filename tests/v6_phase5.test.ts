@@ -1,10 +1,13 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import { postAuthAttempt } from "@/lib/auth/browser-attempt";
 import { runAuthAttempt, sameOrigin, type AuthAttemptClient } from "@/lib/auth/attempt-gate";
 import { BLUEPRINT_VIEW_KEY, readBlueprintView, writeBlueprintView } from "@/lib/catalog/blueprint-view";
 import { aggregateCoverage, countsFor } from "@/lib/catalog/coverage";
 import { ancestorOfType, CSF_ELEMENTS } from "@/lib/catalog/framework";
+import { hydrateFromSupabase } from "@/lib/data/remote";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 describe("category outcome counts", () => {
   it("sums Full, Partial, None, and Unmapped to that category's subcategory count", () => {
@@ -54,6 +57,31 @@ describe("blueprint store default", () => {
     const source = readFileSync("components/blueprint-store.tsx", "utf8");
     expect(source).toContain('() => "list" as const');
     expect(source).not.toContain('() => "cards"');
+  });
+});
+
+describe("password sign-in without a session", () => {
+  it("does not treat the login page as a successful sign-in", async () => {
+    vi.stubGlobal(
+      "fetch",
+      async () =>
+        new Response("<!DOCTYPE html><p>Sign in</p>", {
+          status: 200,
+          headers: { "content-type": "text/html; charset=utf-8" },
+        }),
+    );
+    await expect(postAuthAttempt("/api/auth/sign-in", { email: "ada@example.com", password: "long-enough" })).rejects.toThrow(
+      /could not complete that request/i,
+    );
+
+    const signedOut = {
+      auth: {
+        getUser: async () => ({ data: { user: null }, error: { message: "Auth session missing!" } }),
+      },
+    } as unknown as SupabaseClient;
+    const hydration = await hydrateFromSupabase(signedOut);
+    expect(hydration.db.session).toBeNull();
+    expect(hydration.deactivated).toBeUndefined();
   });
 });
 

@@ -14,6 +14,10 @@ export async function postAuthAttempt(
   } catch {
     throw new Error("The request could not be sent. Try again in a moment.");
   }
+  const contentType = response.headers.get("content-type") ?? "";
+  if (response.redirected || !contentType.toLowerCase().includes("json")) {
+    throw new Error("Could not complete that request.");
+  }
   const payload = (await response.json().catch(() => null)) as {
     error?: unknown;
     notice?: unknown;

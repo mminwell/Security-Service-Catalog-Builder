@@ -2,9 +2,16 @@ import { isDemoPath } from "@/lib/demo/paths";
 
 const PUBLIC_PATHS = ["/login", "/auth/callback", "/auth/confirm", "/auth/reset"];
 
+/**
+ * Password sign-in, magic link, sign-up, and password reset are POSTed here
+ * before a session exists. The proxy must not redirect them to /login.
+ */
+const PUBLIC_API_PREFIX = "/api/auth/";
+
 export function isPublicPath(pathname: string): boolean {
   if (isDemoPath(pathname)) return true;
   if (process.env.PHASE2_SCREENSHOTS === "1" && pathname.startsWith("/preview/phase2")) return true;
+  if (pathname === "/api/auth" || pathname.startsWith(PUBLIC_API_PREFIX)) return true;
   return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
 }
 
