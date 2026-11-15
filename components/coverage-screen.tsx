@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { AppLink } from "@/components/app-path";
 import { useMemo, useState } from "react";
 import {
   AGGREGATION_SUMMARY,
@@ -375,9 +375,9 @@ function OutcomeRow({
               if (!service) return null;
               const itemLabel = optionByCode(api.lookups, "outcome_coverage", item.coverage)?.label ?? item.coverage;
               return (
-                <Link key={item.mappingId} href={`/services/${service.id}#mapping`}>
+                <AppLink key={item.mappingId} href={`/services/${service.id}#mapping`}>
                   {service.service_code} · {service.name} · {itemLabel}
-                </Link>
+                </AppLink>
               );
             })}
             {outcome.excludedArchived > 0 ? (

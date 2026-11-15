@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useAppHref } from "@/components/app-path";
+import { HelpButton } from "@/components/help-panel";
 import { CompleteProfilePrompt } from "@/components/profile-prompt";
 import { UserMenu } from "@/components/user-menu";
 import { placeAnchoredPanel } from "@/lib/catalog/popup-placement";
@@ -19,6 +21,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const api = useCatalog();
   const pathname = usePathname();
   const router = useRouter();
+  const to = useAppHref();
   const cartCount = useSyncExternalStore(
     subscribeCart,
     () => cartIdsFor(api.activeTenant?.id ?? null).length,
@@ -56,9 +59,17 @@ export function AppShell({ children }: { children: ReactNode }) {
       <a className="skip" href="#content">
         Skip to content
       </a>
+      {api.demo ? (
+        <div className="banner demo-banner" role="status">
+          <span>
+            <strong>Demo mode, nothing is saved.</strong> Refreshing or closing this tab starts over.
+          </span>
+          <Link href="/login">Create an account</Link>
+        </div>
+      ) : null}
       <header className="topbar">
         <div className="topbar-main">
-          <Link href="/catalog" className="brand">
+          <Link href={to("/catalog")} className="brand">
             <strong>Security Service Catalog</strong>
             <span>Catalog builder</span>
           </Link>
@@ -67,7 +78,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               item.cart ? (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  href={to(item.href)}
                   aria-label={TEMPLATES_LABEL}
                   aria-current={primaryNavCurrent(pathname, item.href) ? "page" : undefined}
                 >
@@ -76,17 +87,18 @@ export function AppShell({ children }: { children: ReactNode }) {
                   {cartCount > 0 ? <span className="cart-badge">{cartCount}</span> : null}
                 </Link>
               ) : (
-                <Link key={item.href} href={item.href} aria-current={primaryNavCurrent(pathname, item.href) ? "page" : undefined}>
+                <Link key={item.href} href={to(item.href)} aria-current={primaryNavCurrent(pathname, item.href) ? "page" : undefined}>
                   {item.label}
                 </Link>
               ),
             )}
           </nav>
           <div className="top-spacer" />
+          <HelpButton />
           <WorkspaceSwitcher />
           <UserMenu />
           <button type="button" className="btn btn-secondary" onClick={() => void api.signOut()}>
-            Sign out
+            {api.demo ? "Leave demo" : "Sign out"}
           </button>
         </div>
       </header>
@@ -112,6 +124,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
 function WorkspaceSwitcher() {
   const api = useCatalog();
+  const to = useAppHref();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [panelStyle, setPanelStyle] = useState<CSSProperties>({});
@@ -193,7 +206,7 @@ function WorkspaceSwitcher() {
               </button>
             ))}
           </div>
-          <Link className="btn btn-secondary" href="/settings" onClick={() => setOpen(false)}>
+          <Link className="btn btn-secondary" href={to("/settings")} onClick={() => setOpen(false)}>
             Workspace settings
           </Link>
           {api.canCreateWorkspace ? (

@@ -167,7 +167,7 @@ describe("templates label", () => {
     const shell = readFileSync("components/shell.tsx", "utf8");
     expect(shell).toContain("TEMPLATES_LABEL");
     expect(shell).toContain("<CartIcon />");
-    expect(shell).toContain('href={item.href}');
+    expect(shell).toContain("to(item.href)");
     expect(shell).toContain("aria-label={TEMPLATES_LABEL}");
     const catalog = readFileSync("components/catalog-screen.tsx", "utf8");
     expect(catalog).toContain("ADD_TEMPLATES_LABEL");

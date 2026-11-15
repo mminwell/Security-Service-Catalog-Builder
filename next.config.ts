@@ -36,6 +36,9 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  outputFileTracingIncludes: {
+    "/**": ["./content/help/**/*.md"],
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

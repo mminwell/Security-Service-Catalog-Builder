@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { AppLink, useAppHref } from "@/components/app-path";
 import { useMemo, useState } from "react";
 import { ARTIFACT_STATUS_KEY, ARTIFACT_TYPE_KEY, emptyArtifact, linksForArtifact, withArtifactComputed } from "@/lib/catalog/artifacts";
 import { activeOptions } from "@/lib/catalog/lookups";
@@ -13,6 +13,7 @@ import { ConfirmDialog } from "@/components/widgets";
 export function ArtifactEditor({ artifactId }: { artifactId: string }) {
   const api = useCatalog();
   const router = useRouter();
+  const to = useAppHref();
   const params = useSearchParams();
   const serviceHint = params.get("service");
   const isNew = artifactId === "new";
@@ -39,7 +40,7 @@ export function ArtifactEditor({ artifactId }: { artifactId: string }) {
     return (
       <section className="empty">
         <h2>That artifact is not in this workspace.</h2>
-        <Link href="/artifacts">Back to artifacts</Link>
+        <AppLink href="/artifacts">Back to artifacts</AppLink>
       </section>
     );
   }
@@ -59,7 +60,7 @@ export function ArtifactEditor({ artifactId }: { artifactId: string }) {
       if (isNew && serviceId) {
         await api.saveArtifactLink({ artifactId: id, serviceId, relationshipNote: note });
       }
-      router.replace(`/artifacts/${id}`);
+      router.replace(to(`/artifacts/${id}`));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save the artifact.");
     } finally {
@@ -72,7 +73,7 @@ export function ArtifactEditor({ artifactId }: { artifactId: string }) {
       <div className="page-head">
         <div>
           <p className="micro">
-            <Link href="/artifacts">Artifacts</Link>
+            <AppLink href="/artifacts">Artifacts</AppLink>
             {" · "}
             {isNew ? "New artifact" : draft.visibility === "public" ? "Public" : "Internal"}
           </p>
@@ -84,9 +85,9 @@ export function ArtifactEditor({ artifactId }: { artifactId: string }) {
         </div>
         <div className="row-actions">
           {isNew ? (
-            <Link className="btn btn-secondary" href="/artifacts">
+            <AppLink className="btn btn-secondary" href="/artifacts">
               Cancel
-            </Link>
+            </AppLink>
           ) : null}
           {api.canAdmin && !isNew ? (
             <button type="button" className="btn btn-secondary" onClick={() => setConfirmDelete(true)}>
@@ -292,7 +293,7 @@ export function ArtifactEditor({ artifactId }: { artifactId: string }) {
           confirmLabel="Delete"
           tone="danger"
           onConfirm={() => {
-            void api.deleteArtifact(draft.id).then(() => router.push("/artifacts"));
+            void api.deleteArtifact(draft.id).then(() => router.push(to("/artifacts")));
           }}
           onCancel={() => setConfirmDelete(false)}
         />
@@ -320,7 +321,7 @@ function LinkedRow({
   return (
     <div className="panel" style={{ padding: 12 }}>
       <div className="row-actions">
-        <Link href={href}>{title}</Link>
+        <AppLink href={href}>{title}</AppLink>
         {readOnly ? null : (
           <button type="button" className="btn btn-ghost" onClick={onUnlink}>
             Unlink

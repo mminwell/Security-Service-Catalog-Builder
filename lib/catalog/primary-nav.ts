@@ -1,3 +1,4 @@
+import { stripDemoPrefix } from "@/lib/demo/paths";
 import { TEMPLATES_LABEL } from "@/lib/catalog/shop-label";
 
 export type PrimaryNavItem = {
@@ -26,6 +27,7 @@ export function primaryNavFor(canAdmin: boolean): PrimaryNavItem[] {
 }
 
 export function primaryNavCurrent(pathname: string, href: string): boolean {
-  if (href === "/templates") return pathname.startsWith("/templates") || pathname.startsWith("/blueprints");
-  return pathname.startsWith(href);
+  const path = stripDemoPrefix(pathname);
+  if (href === "/templates") return path.startsWith("/templates") || path.startsWith("/blueprints");
+  return path.startsWith(href);
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { AppLink } from "@/components/app-path";
 import { useMemo, useState } from "react";
 import {
   archiveOwnerAction,
@@ -93,6 +93,12 @@ export function OwnersAdmin() {
                       type="button"
                       className="btn btn-ghost"
                       onClick={() => {
+                        if (api.demo) {
+                          const result = api.demoDispatch({ type: "reactivate-owner", ownerId: owner.id });
+                          if (!result.ok) toast.error(result.error);
+                          else toast.success("Owner reactivated");
+                          return;
+                        }
                         void reactivateOwnerAction(owner.id).then((result) => {
                           if (result.ok) toast.success("Owner reactivated");
                           else toast.error(result.error);
@@ -116,7 +122,7 @@ export function OwnersAdmin() {
           <ul>
             {reviews.map((service) => (
               <li key={service.id}>
-                <Link href={`/services/${service.id}`}>{service.service_code}</Link> — {service.owner_review}
+                <AppLink href={`/services/${service.id}`}>{service.service_code}</AppLink> — {service.owner_review}
               </li>
             ))}
           </ul>
@@ -152,6 +158,24 @@ function AddOwnerDialog({ onClose }: { onClose: () => void }) {
 
   async function save() {
     if (!tenant) return;
+    if (api.demo) {
+      const result = api.demoDispatch({
+        type: "save-owner",
+        firstName,
+        lastName,
+        email,
+        title,
+        teamCode: team,
+        userId,
+      });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success("Owner saved");
+      onClose();
+      return;
+    }
     const result = await saveOwnerAction({
       tenantId: tenant.id,
       firstName,
@@ -295,6 +319,19 @@ function ArchiveDialog({
             type="button"
             className="btn btn-primary"
             onClick={() => {
+              if (api.demo) {
+                const result = api.demoDispatch({
+                  type: "archive-owner",
+                  ownerId: owner.id,
+                  replacementId: none ? null : replacement,
+                });
+                if (!result.ok) toast.error(result.error);
+                else {
+                  toast.success(result.notice);
+                  onClose();
+                }
+                return;
+              }
               void archiveOwnerAction(owner.id, none ? null : replacement).then((result) => {
                 if (!result.ok) toast.error(result.error);
                 else toast.success(`Archived. ${result.data.services} services updated.`);
@@ -361,6 +398,12 @@ function ImportPanel() {
           className="btn btn-secondary"
           onClick={() => {
             if (!api.activeTenant) return;
+            if (api.demo) {
+              const result = api.demoDispatch({ type: "import-owners", rows });
+              if (!result.ok) toast.error(result.error);
+              else toast.success(result.notice);
+              return;
+            }
             void importOwnersAction(api.activeTenant.id, rows).then((result) => {
               if (!result.ok) toast.error(result.error);
               else toast.success(`Imported ${result.data.created} owners.`);
@@ -478,6 +521,16 @@ function ReconcilePanel() {
             disabled={plan.archive.length === 0 || !api.activeTenant}
             onClick={() => {
               if (!api.activeTenant) return;
+              if (api.demo) {
+                const result = api.demoDispatch({
+                  type: "reconcile-owners",
+                  ownerIds: plan.archive.map((item) => item.ownerId),
+                  replacementId: none ? null : replacement,
+                });
+                if (!result.ok) toast.error(result.error);
+                else toast.success(result.notice);
+                return;
+              }
               void reconcileOwnersAction(
                 api.activeTenant.id,
                 plan.archive.map((item) => item.ownerId),

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Magic-link sign-in sits beside the password. The request uses the same calm confirmation for every email. A deactivated account is signed out on the callback.
+- The top bar has a help panel. Guide pages live in `content/help` and are searched in the browser. Contact support is `support@minwell.app`.
+- `/demo` is a public fictional catalog. Add, edit, delete, mapping, and export stay in the tab and reset on refresh. The demo does not call Supabase.
 - Workspace settings, role-carrying invites, a Service Owner directory, the Service Manager role, and Site Admin account controls.
 - Invite send works when pgcrypto is installed in `extensions` (`0015_v6_invite_token.sql`). A failed invite stays on screen until dismissed.
 - Saves across the app use one centered confirmation. Workspace Settings is a compact two-column page.

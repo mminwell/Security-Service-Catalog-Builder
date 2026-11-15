@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AppLink, useAppHref } from "@/components/app-path";
 import { useMemo, useState } from "react";
 import { fieldUsesLookup } from "@/lib/catalog/lookup-toggle";
 import { activeOptions, optionByCode } from "@/lib/catalog/lookups";
@@ -27,6 +27,7 @@ import { AuditDrawer, Badge, ConfirmDialog, DepthToggle, FieldHelp, InfoTip, Loo
 export function ServiceForm({ serviceId }: { serviceId: string }) {
   const api = useCatalog();
   const router = useRouter();
+  const to = useAppHref();
   const existing = serviceId === "new" ? null : api.services.find((service) => service.id === serviceId) ?? null;
   const [depth, setDepth] = useState<DepthLevel>(existing ? 3 : 1);
   const [draft, setDraft] = useState<ServiceRecord | null>(() => {
@@ -56,9 +57,9 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
     return (
       <section className="empty">
         <h2>Service not found</h2>
-        <Link className="btn btn-secondary" href="/catalog" style={{ marginTop: 12 }}>
+        <AppLink className="btn btn-secondary" href="/catalog" style={{ marginTop: 12 }}>
           Back to catalog
-        </Link>
+        </AppLink>
       </section>
     );
   }
@@ -78,7 +79,7 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
       setPrompt("discard");
       return;
     }
-    router.push("/catalog");
+    router.push(to("/catalog"));
   }
 
   async function commitArchive(archived: boolean) {
@@ -101,7 +102,7 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
     setSaving(true);
     try {
       await api.deleteService(existing.id);
-      router.push("/catalog");
+      router.push(to("/catalog"));
     } catch {
       setPrompt(null);
       setSaving(false);
@@ -166,7 +167,7 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
       await api.saveService(normalized);
       setDirty(false);
       setDraft(normalized);
-      if (serviceId === "new") router.replace(`/services/${normalized.id}`);
+      if (serviceId === "new") router.replace(to(`/services/${normalized.id}`));
     } catch {
       setDirty(true);
     } finally {
@@ -188,13 +189,13 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
     <>
       {isNew ? (
         <p className="scratch-banner">
-          Don&apos;t start from scratch — <Link href="/templates">browse templates →</Link>
+          Don&apos;t start from scratch — <AppLink href="/templates">browse templates →</AppLink>
         </p>
       ) : null}
       <div className="page-head">
         <div>
           <p className="micro">
-            <Link href="/catalog">Catalog</Link>
+            <AppLink href="/catalog">Catalog</AppLink>
             {" · "}
             {isNew ? "New service" : shown.service_code}
           </p>
@@ -302,7 +303,7 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
           title="Discard unsaved changes?"
           message="You will return to the catalog."
           confirmLabel="Discard"
-          onConfirm={() => router.push("/catalog")}
+          onConfirm={() => router.push(to("/catalog"))}
           onCancel={() => setPrompt(null)}
         />
       ) : null}

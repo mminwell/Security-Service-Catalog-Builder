@@ -1,4 +1,5 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
+import { accountIsDeactivated } from "@/lib/auth/account-status";
 import { accountProfileFromMetadata, type AccountProfile } from "@/lib/auth/profile";
 import { parseColumnConfig } from "@/lib/catalog/columns";
 import { withArtifactComputed } from "@/lib/catalog/artifacts";
@@ -34,6 +35,8 @@ export type Hydration = {
   ownerHistory: OwnerHistoryEntry[];
   ownersReady: boolean;
   warning: string | null;
+  /** Set when this session was signed out because the account is deactivated. */
+  deactivated?: boolean;
 };
 
 export async function hydrateFromSupabase(supabase: SupabaseClient): Promise<Hydration> {
@@ -41,6 +44,11 @@ export async function hydrateFromSupabase(supabase: SupabaseClient): Promise<Hyd
   if (userError) throw new Error(userError.message);
   const user = userData.user;
   if (!user) return { db: emptyDb(), invitations: [], owners: [], ownerHistory: [], ownersReady: false, warning: null };
+
+  if (await accountIsDeactivated(supabase)) {
+    await supabase.auth.signOut();
+    return { db: emptyDb(), invitations: [], owners: [], ownerHistory: [], ownersReady: false, warning: null, deactivated: true };
+  }
 
   const profile = await loadSessionProfile(supabase, user);
   const session = {
@@ -52,6 +60,10 @@ export async function hydrateFromSupabase(supabase: SupabaseClient): Promise<Hyd
   };
   const ensured = await supabase.rpc("ensure_practitioner_access");
   if (ensured.error) {
+    if (/deactivated/i.test(ensured.error.message)) {
+      await supabase.auth.signOut();
+      return { db: emptyDb(), invitations: [], owners: [], ownerHistory: [], ownersReady: false, warning: null, deactivated: true };
+    }
     return { db: { ...emptyDb(), session }, invitations: [], owners: [], ownerHistory: [], ownersReady: false, warning: ensured.error.message };
   }
 
