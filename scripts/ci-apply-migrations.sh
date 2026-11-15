@@ -107,14 +107,14 @@ begin
 
   if not exists (
     select 1 from public.tenants
-    where id = v_tenant and name = 'Northwind Traders' and slug = 'starter-workspace'
+    where id = v_tenant and name = 'Ada''s workspace' and slug = 'starter-workspace'
   ) then
-    raise exception 'company was not used as the first workspace name';
+    raise exception 'first name was not used as the first workspace name';
   end if;
 
   update public.user_profiles set company = 'Changed Later' where user_id = v_user;
   if not exists (
-    select 1 from public.tenants where id = v_tenant and name = 'Northwind Traders'
+    select 1 from public.tenants where id = v_tenant and name = 'Ada''s workspace'
   ) then
     raise exception 'editing the profile renamed the workspace';
   end if;
@@ -546,6 +546,8 @@ declare
     'list_site_accounts',
     'set_account_active',
     'delete_site_account',
+    'delete_workspace',
+    'transfer_workspace_owner',
     'can_manage_site',
     'can_edit_service',
     'service_owner_unchanged',
@@ -586,6 +588,261 @@ begin
       raise exception 'authenticated can still execute %', r.proname;
     end if;
   end loop;
+end $$;
+
+-- Ownership, audit rows, and site-admin delete. The invite bucket for the first admin is already full.
+do $$
+declare
+  v_admin uuid := '11111111-1111-4111-8111-111111111111';
+  v_manager uuid := '33333333-3333-4333-8333-333333333333';
+  v_ops uuid := '66666666-6666-4666-8666-666666666666';
+  v_viewer uuid := '77777777-7777-4777-8777-777777777777';
+  v_future uuid := '88888888-8888-4888-8888-888888888888';
+  v_departing uuid := '99999999-9999-4999-8999-999999999999';
+  v_tenant uuid;
+  v_other uuid;
+  v_invite jsonb;
+begin
+  select id into v_tenant from public.tenants where slug = 'starter-workspace';
+  if not exists (
+    select 1 from public.tenants where id = v_tenant and owner_user_id = v_admin
+  ) then
+    raise exception 'first account was not the workspace owner';
+  end if;
+
+  insert into auth.users (id, email) values (v_ops, 'ops@example.com');
+  insert into public.tenant_members (tenant_id, user_id, role)
+  values (v_tenant, v_ops, 'platform_owner');
+  insert into auth.users (id, email) values (v_viewer, 'viewer@example.com');
+  insert into public.tenant_members (tenant_id, user_id, role)
+  values (v_tenant, v_viewer, 'viewer');
+
+  perform set_config('request.jwt.claim.sub', v_admin::text, true);
+  execute 'set role authenticated';
+  begin
+    perform public.delete_workspace(v_tenant, 'Northwind Security');
+    raise exception 'workspace admin deleted a workspace';
+  exception
+    when others then
+      if sqlerrm like '%workspace admin deleted%' then
+        raise;
+      end if;
+      if sqlerrm not like '%platform owner%' then
+        raise;
+      end if;
+  end;
+  begin
+    perform public.transfer_workspace_owner(v_tenant, v_manager, null);
+    raise exception 'workspace admin transferred ownership';
+  exception
+    when others then
+      if sqlerrm like '%workspace admin transferred%' then
+        raise;
+      end if;
+      if sqlerrm not like '%platform owner%' then
+        raise;
+      end if;
+  end;
+  execute 'reset role';
+
+  perform set_config('request.jwt.claim.sub', v_ops::text, true);
+  execute 'set role authenticated';
+  perform public.set_member_role(v_tenant, v_manager, 'editor');
+  perform public.remove_tenant_member(v_tenant, v_viewer);
+  v_invite := public.add_tenant_member(v_tenant, 'audit-invite@example.com', 'viewer');
+  v_invite := public.resend_workspace_invitation((v_invite->>'id')::uuid);
+  perform public.cancel_workspace_invitation((v_invite->>'id')::uuid);
+  execute 'reset role';
+
+  if not exists (
+    select 1 from public.audit_log
+    where tenant_id = v_tenant
+      and table_name = 'tenant_members'
+      and action = 'update'
+      and actor_user_id = v_ops
+      and before_data->>'role' = 'service_manager'
+      and after_data->>'role' = 'editor'
+      and after_data->>'email' = 'manager@example.com'
+  ) then
+    raise exception 'role change was not audited';
+  end if;
+  if not exists (
+    select 1 from public.audit_log
+    where tenant_id = v_tenant
+      and table_name = 'tenant_members'
+      and action = 'delete'
+      and actor_user_id = v_ops
+      and before_data->>'email' = 'viewer@example.com'
+      and before_data->>'role' = 'viewer'
+  ) then
+    raise exception 'member removal was not audited';
+  end if;
+  if not exists (
+    select 1 from public.audit_log
+    where tenant_id = v_tenant
+      and table_name = 'workspace_invitations'
+      and action = 'insert'
+      and actor_user_id = v_ops
+      and after_data->>'email' = 'audit-invite@example.com'
+      and after_data->>'role' = 'viewer'
+  ) then
+    raise exception 'invitation send was not audited';
+  end if;
+  if not exists (
+    select 1 from public.audit_log
+    where tenant_id = v_tenant
+      and table_name = 'workspace_invitations'
+      and action = 'update'
+      and actor_user_id = v_ops
+      and after_data->>'email' = 'audit-invite@example.com'
+      and after_data->>'resent' = 'true'
+  ) then
+    raise exception 'invitation resend was not audited';
+  end if;
+  if not exists (
+    select 1 from public.audit_log
+    where tenant_id = v_tenant
+      and table_name = 'workspace_invitations'
+      and action = 'update'
+      and actor_user_id = v_ops
+      and after_data->>'email' = 'audit-invite@example.com'
+      and after_data->>'cancelled' = 'true'
+  ) then
+    raise exception 'invitation cancel was not audited';
+  end if;
+
+  insert into auth.users (id, email) values (v_departing, 'departing@example.com');
+  perform set_config('request.jwt.claim.sub', v_ops::text, true);
+  execute 'set role authenticated';
+  perform public.set_account_active(v_departing, false);
+  perform public.delete_site_account(v_departing, 'departing@example.com');
+  execute 'reset role';
+  if exists (select 1 from auth.users where id = v_departing) then
+    raise exception 'account was not deleted';
+  end if;
+  if not exists (
+    select 1 from public.audit_log
+    where tenant_id is null
+      and actor_user_id = v_ops
+      and table_name = 'account_status'
+      and action = 'update'
+      and after_data->>'email' = 'departing@example.com'
+      and after_data->>'active' = 'false'
+  ) then
+    raise exception 'deactivation was not audited';
+  end if;
+  if not exists (
+    select 1 from public.audit_log
+    where tenant_id is null
+      and actor_user_id = v_ops
+      and table_name = 'account_status'
+      and action = 'delete'
+      and before_data->>'email' = 'departing@example.com'
+  ) then
+    raise exception 'account deletion was not audited';
+  end if;
+
+  perform set_config('request.jwt.claim.sub', v_ops::text, true);
+  execute 'set role authenticated';
+  v_other := public.provision_tenant('Ops Workspace', 'ops-workspace');
+  v_invite := public.transfer_workspace_owner(v_other, null, 'future-owner@example.com');
+  execute 'reset role';
+  if (select owner_user_id from public.tenants where id = v_other) is distinct from v_ops then
+    raise exception 'ownership invite replaced the owner immediately';
+  end if;
+  if not exists (
+    select 1
+    from public.workspace_invitations
+    where tenant_id = v_other
+      and email = 'future-owner@example.com'
+      and becomes_owner
+      and accepted_at is null
+      and cancelled_at is null
+  ) then
+    raise exception 'ownership invite was not stored';
+  end if;
+  if not exists (
+    select 1 from public.audit_log
+    where tenant_id = v_other
+      and table_name = 'workspace_invitations'
+      and action = 'insert'
+      and after_data->>'becomes_owner' = 'true'
+      and after_data->>'email' = 'future-owner@example.com'
+  ) then
+    raise exception 'ownership invite was not audited';
+  end if;
+
+  insert into auth.users (id, email) values (v_future, 'future-owner@example.com');
+  perform set_config('request.jwt.claim.sub', v_future::text, true);
+  execute 'set role authenticated';
+  perform public.accept_invitation(v_invite->>'token');
+  execute 'reset role';
+  if (select owner_user_id from public.tenants where id = v_other) is distinct from v_future then
+    raise exception 'accepted ownership invite did not transfer ownership';
+  end if;
+  if not exists (
+    select 1 from public.tenant_members
+    where tenant_id = v_other and user_id = v_ops and role = 'tenant_admin'
+  ) then
+    raise exception 'previous owner did not become admin';
+  end if;
+  if not exists (
+    select 1 from public.tenant_members
+    where tenant_id = v_other and user_id = v_future and role = 'tenant_admin'
+  ) then
+    raise exception 'new owner is not an admin';
+  end if;
+
+  perform set_config('request.jwt.claim.sub', v_ops::text, true);
+  execute 'set role authenticated';
+  perform public.transfer_workspace_owner(v_tenant, v_manager, null);
+  perform public.delete_workspace(v_other, 'Ops Workspace');
+  execute 'reset role';
+  if (select owner_user_id from public.tenants where id = v_tenant) is distinct from v_manager then
+    raise exception 'member transfer did not change the owner';
+  end if;
+  if not exists (
+    select 1 from public.tenant_members
+    where tenant_id = v_tenant and user_id = v_admin and role = 'tenant_admin'
+  ) then
+    raise exception 'previous starter owner did not stay admin';
+  end if;
+  if not exists (
+    select 1 from public.tenant_members
+    where tenant_id = v_tenant and user_id = v_manager and role = 'tenant_admin'
+  ) then
+    raise exception 'new starter owner was not made admin';
+  end if;
+  if exists (select 1 from public.tenants where id = v_other) then
+    raise exception 'workspace was not deleted';
+  end if;
+  if not exists (
+    select 1 from public.audit_log
+    where tenant_id is null
+      and table_name = 'tenants'
+      and action = 'delete'
+      and actor_user_id = v_ops
+      and before_data->>'name' = 'Ops Workspace'
+      and before_data->>'tenant_id' = v_other::text
+  ) then
+    raise exception 'workspace deletion audit did not survive';
+  end if;
+
+  perform set_config('request.jwt.claim.sub', v_ops::text, true);
+  execute 'set role authenticated';
+  begin
+    perform public.remove_tenant_member(v_tenant, v_manager);
+    raise exception 'removed the owner';
+  exception
+    when others then
+      if sqlerrm like '%removed the owner%' then
+        raise;
+      end if;
+      if sqlerrm not like '%Transfer ownership%' then
+        raise;
+      end if;
+  end;
+  execute 'reset role';
 end $$;
 SQL
 

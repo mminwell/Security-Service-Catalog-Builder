@@ -70,7 +70,6 @@ export function ProfileForm({
         className="input"
         name="company"
         autoComplete="organization"
-        required
         maxLength={80}
         value={company}
         onChange={(event) => setCompany(event.target.value)}

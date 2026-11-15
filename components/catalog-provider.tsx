@@ -50,7 +50,7 @@ import { validateEmail, validatePassword } from "@/lib/auth/credentials";
 import {
   browserPromptStore,
   clearProfilePromptDismissal,
-  normalizeAccountProfile,
+  normalizeSignupProfile,
   type AccountProfileInput,
 } from "@/lib/auth/profile";
 import { canAdminister, canGrantPlatformOwner, canProvision, canWriteServices, roleLabel } from "@/lib/catalog/access";
@@ -135,7 +135,7 @@ export type CatalogApi = {
   canEditService: (serviceId: string) => boolean;
   refresh: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (input: AccountProfileInput & { email: string; password: string }) => Promise<string | null>;
+  signUp: (input: { firstName: string; lastName: string; email: string; password: string }) => Promise<string | null>;
   requestPasswordReset: (email: string) => Promise<void>;
   requestMagicLink: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
@@ -394,14 +394,14 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           const outcome = await reload();
           if (outcome === "deactivated") throw new Error(DEACTIVATED_MESSAGE);
         }),
-      signUp: ({ firstName, lastName, email, company, password }) =>
+      signUp: ({ firstName, lastName, email, password }) =>
         guard(async () => {
-          const profile = normalizeAccountProfile({ firstName, lastName, company });
+          const profile = normalizeSignupProfile({ firstName, lastName });
           const emailError = validateEmail(email);
           if (emailError) throw new Error(emailError);
           const passwordError = validatePassword(password);
           if (passwordError) throw new Error(passwordError);
-          const result = await postAuthAttempt("/api/auth/sign-up", { firstName, lastName, email, company, password });
+          const result = await postAuthAttempt("/api/auth/sign-up", { firstName, lastName, email, password });
           if (!result.accessToken || !result.refreshToken) {
             return result.notice ?? "Check your email to confirm the account, then sign in.";
           }
@@ -412,7 +412,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
             user_id: data.user.id,
             first_name: profile.firstName,
             last_name: profile.lastName,
-            company: profile.company,
+            company: null,
             updated_at: new Date().toISOString(),
           });
           if (profileError && !isMissingUserProfilesError(profileError.message)) {

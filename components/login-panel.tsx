@@ -28,7 +28,6 @@ export function LoginPanel() {
   const [mode, setMode] = useState<AuthMode>("sign-in");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [company, setCompany] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
@@ -91,7 +90,7 @@ export function LoginPanel() {
         return;
       }
       if (mode === "create") {
-        const message = await api.signUp({ firstName, lastName, email, company, password });
+        const message = await api.signUp({ firstName, lastName, email, password });
         if (message) setNotice(message);
         else router.replace(nextPath);
         return;
@@ -110,7 +109,7 @@ export function LoginPanel() {
         <h1>{title}</h1>
         <p className="lede">
           {mode === "create"
-            ? "Your company name is used for the workspace created with the first account. That account is its Admin."
+            ? "The first account creates a workspace and becomes its Admin. The workspace starts with a placeholder name you can rename in Workspace Settings."
             : "One catalog for the security services you deliver. The first account creates a workspace and becomes its Admin."}
         </p>
         {linkMessage ? (
@@ -155,21 +154,6 @@ export function LoginPanel() {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />
-          {mode === "create" ? (
-            <>
-              <label htmlFor="company">Company</label>
-              <input
-                id="company"
-                className="input"
-                name="company"
-                autoComplete="organization"
-                required
-                maxLength={80}
-                value={company}
-                onChange={(event) => setCompany(event.target.value)}
-              />
-            </>
-          ) : null}
           {mode === "reset" ? null : (
             <PasswordField
               id="password"

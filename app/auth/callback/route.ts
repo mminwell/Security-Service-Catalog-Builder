@@ -1,6 +1,7 @@
 import { type EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { accountIsDeactivated } from "@/lib/auth/account-status";
+import { sameOrigin } from "@/lib/auth/attempt-gate";
 import { authCallbackBootstrapHtml, callbackRoutePlan, readCallbackField } from "@/lib/auth/callback-link";
 import { authCallbackDestination } from "@/lib/auth/magic-link";
 import { profileIsIncomplete } from "@/lib/auth/profile";
@@ -54,6 +55,12 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  if (!sameOrigin(request)) {
+    return NextResponse.json(
+      { error: "That request was refused." },
+      { status: 403, headers: { "cache-control": "private, no-store" } },
+    );
+  }
   if (!isSupabaseConfigured()) {
     return NextResponse.json({ path: "/" });
   }

@@ -6,7 +6,7 @@ V1 includes the service form, the catalog list, dropdown and field administratio
 
 ## What you can do
 
-- Sign in with email and password, or ask for a one-time sign-in link. The link confirmation is the same whether or not that email has an account. Create account asks for a first name, last name, and company. The first account on an empty project becomes **Admin** of a workspace named for that company. An account created before names existed can add them once after sign-in, or any time from Profile. The header shows the first name, or the email when the first name is still blank. A deactivated account cannot stay signed in.
+- Sign in with email and password, or ask for a one-time sign-in link. The link confirmation is the same whether or not that email has an account. Create account asks for a first name, last name, and password. The first account on an empty project becomes **Admin** of a workspace named from that first name, such as "Ada's workspace", or "My workspace" when no first name is available. Rename it later in Workspace Settings. An account created before names existed can add them once after sign-in, or any time from Profile. The header shows the first name, or the email when the first name is still blank. A deactivated account cannot stay signed in.
 - Open **Try the demo** at `/demo` with no account. The sample catalog is fictional, edits last until you refresh or close the tab, and nothing is written to Supabase.
 - Invite a **Viewer**, **Editor**, **Service Manager**, or **Admin** from Workspace Settings. The admin chooses the role. If they already have an account they are added immediately. If they do not, the invite is stored for seven days and Supabase Auth emails a link to finish the account.
 - Create another workspace from the switcher. You become Admin of that workspace only. A member of workspace A cannot read or write workspace B.
@@ -46,35 +46,19 @@ The anon key, or the newer publishable key, is public by design and is the only 
 
 This repository is not connected to a live Supabase project, and preview deployments are not given one. A preview built without the two public variables shows **This deployment is not configured**. It does not invent a signed-in workspace. **Try the demo** at `/demo` still opens, and those edits stay in the browser tab until refresh.
 
-To make a preview or a production deploy actually sign people in, Mike needs:
-
-1. A Supabase project he controls.
-2. Migrations `0001` through `0015` applied in order, in the SQL editor or with the Supabase CLI. `0013` and `0014` add members and Service Owners. `0015` only replaces the invite functions so they can create a token when pgcrypto lives in the `extensions` schema. None of them delete existing rows.
-3. These Vercel environment variables set for Preview and Production, then a redeploy so Next.js can inline them:
-
-```
-NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_ANON_OR_PUBLISHABLE_KEY
-```
-
-4. Auth redirect URLs that include `https://<that-deployment>/auth/callback`.
-
-Nothing in this release changes a hosted Supabase project or Vercel production settings. Those steps stay with Mike.
+To make a preview or a production deploy actually sign people in, follow [INSTALL.md](INSTALL.md): a Supabase project, migrations `0001` through `0018` in filename order, the two public environment variables, and an Auth redirect URL ending in `/auth/callback`. Nothing in this repository changes a hosted Supabase project or Vercel settings on its own.
 
 ## Local setup
+
+Node.js 20.9 or newer. The full steps, including the Supabase project, Auth settings, and `.env.local`, are in [INSTALL.md](INSTALL.md).
 
 ```bash
 npm install
 cp .env.example .env.local
-```
-
-Put the project URL and the anon or publishable key in `.env.local`. Then:
-
-```bash
 npm run dev
 ```
 
-Open the app and create an account. With email confirmation on, use the link in the message. With it off, you land in a workspace named for the company on the form.
+Create an account with a first name, last name, and password. There is no Company box. With email confirmation on, use the link in the message. With it off, the account lands in a workspace named from the first name. Rename that workspace later in Workspace Settings.
 
 ```bash
 npm test
@@ -100,7 +84,7 @@ In the dashboard, create a project and wait until the database is ready. From **
 
 ### 2. Run the migrations
 
-In **SQL Editor → New query**, paste and run each file in this order:
+In **SQL Editor → New query**, paste and run each file in [INSTALL.md](INSTALL.md), in this order:
 
 1. `supabase/migrations/0001_v1_catalog_core.sql`
 2. `supabase/migrations/0002_v1_1_polish.sql`
@@ -114,6 +98,12 @@ In **SQL Editor → New query**, paste and run each file in this order:
 10. `supabase/migrations/0010_v5_function_grants.sql`
 11. `supabase/migrations/0011_v5_rename_workspace.sql`
 12. `supabase/migrations/0012_v6_user_profiles.sql`
+13. `supabase/migrations/0013_v6_phase2_members.sql`
+14. `supabase/migrations/0014_v6_phase2_owners.sql`
+15. `supabase/migrations/0015_v6_invite_token.sql`
+16. `supabase/migrations/0016_v6_export_field_set.sql`
+17. `supabase/migrations/0017_v6_rate_limits.sql`
+18. `supabase/migrations/0018_v6_account_audit_workspace.sql`
 
 With the CLI, `supabase link` and `supabase db push` apply the same files. Do that against the project you intend to use. Skip `supabase/seed.sql`. It inserts fictional workspaces that have no members. **Load sample catalog** on an empty workspace is the supported sample.
 
@@ -157,7 +147,7 @@ Framework preset: Next.js. Build command: `npm run build`. Install command: `npm
 
 ### 5. Create the first Admin
 
-Open the deployment, choose **Create account**, and confirm the email if confirmation is on. The first account lands in a workspace named for the company on that form, with starter dropdowns and an empty catalog. Invite the next person from the workspace switcher. Apply `0012` before relying on profile rows. That migration does not rename an existing workspace and does not fill in names for accounts that already exist.
+Open the deployment, choose **Create account**, and confirm the email if confirmation is on. The form asks for a first name, last name, and password. The first account lands in a workspace named from that first name, with starter dropdowns and an empty catalog. Rename the workspace in Workspace Settings. Invite the next person from the workspace switcher. Apply `0012` before relying on profile rows, and `0018` before relying on the placeholder workspace name. `0012` does not rename an existing workspace and does not fill in names for accounts that already exist.
 
 ## Security notes
 
@@ -191,7 +181,7 @@ Deferred, and not done in this release:
 - `lib/catalog/` — fields, starter lookups, computed values, service IDs, exports, blueprints, artifacts
 - `lib/auth/` — the role matrix, email and password checks, profile names, and safe redirects
 - `lib/data/` — the in-memory catalog model used by unit tests, and the Supabase adapter
-- `supabase/migrations/` — `0001` through `0012`
+- `supabase/migrations/` — `0001` through `0018`
 - `e2e/` — Playwright
 - `docs/byo-supabase-vercel.md` — the short deploy note
 - `docs/nist-csf-2.0-provenance.md` — source, version, and content hash for the CSF core
@@ -212,6 +202,8 @@ Recommended for `main`, and not applied by this change. A solo-friendly GitHub r
 
 Rulesets are in **Settings → Rules → Rulesets**. Create one targeting `main`.
 
-## Later
+## License
 
-A license has not been selected yet. Assisted drafting, if it comes, stays behind a person approving every save.
+Source available under PolyForm Noncommercial 1.0.0. Free for personal, educational, research, and nonprofit use. Commercial use, including use by or for a business or in paid consulting, requires a separate license from the author: contact via https://minwell.app.
+
+The license text is in `LICENSE`, including the required notice. Assisted drafting, if it comes, stays behind a person approving every save.

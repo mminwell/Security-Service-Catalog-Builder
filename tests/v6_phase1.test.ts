@@ -10,11 +10,12 @@ import {
   headerLabel,
   isProfilePromptDismissed,
   normalizeAccountProfile,
+  normalizeSignupProfile,
   profileIsIncomplete,
   signupUserMetadata,
   validateAccountProfile,
-  workspaceNameFromCompany,
 } from "@/lib/auth/profile";
+import { placeholderWorkspaceName } from "@/lib/catalog/workspace-name";
 import { primaryNavFor } from "@/lib/catalog/primary-nav";
 import { TEMPLATES_LABEL } from "@/lib/catalog/shop-label";
 
@@ -66,7 +67,7 @@ describe("password visibility", () => {
 });
 
 describe("signup profile", () => {
-  it("trims names and rejects a blank, short company, or line break", () => {
+  it("trims names and rejects a blank name, a short company, or a line break", () => {
     expect(validateAccountProfile({ firstName: "  Ada ", lastName: " Lovelace ", company: "  Northwind Traders " })).toBeNull();
     expect(normalizeAccountProfile({ firstName: "  Ada ", lastName: " Lovelace ", company: "  Northwind Traders " })).toEqual({
       firstName: "Ada",
@@ -81,7 +82,7 @@ describe("signup profile", () => {
     expect(validatePassword("long-enough")).toBeNull();
   });
 
-  it("keeps signup metadata off the authorization path and names the first workspace from the company", () => {
+  it("keeps signup metadata off the authorization path and names the first workspace from the first name", () => {
     const profile = normalizeAccountProfile({ firstName: "Ada", lastName: "Lovelace", company: "Northwind Traders" });
     expect(signupUserMetadata(profile)).toEqual({
       first_name: "Ada",
@@ -90,20 +91,24 @@ describe("signup profile", () => {
     });
     expect(accountProfileFromMetadata(signupUserMetadata(profile))).toEqual(profile);
     expect(accountProfileFromMetadata({ first_name: "Ada" })).toBeNull();
-    expect(workspaceNameFromCompany("  Northwind Traders ")).toBe("Northwind Traders");
-    expect(workspaceNameFromCompany("")).toBe("Starter Workspace");
-    expect(workspaceNameFromCompany(null)).toBe("Starter Workspace");
+    const signup = normalizeSignupProfile({ firstName: "  Ada ", lastName: " Lovelace " });
+    expect(signup).toEqual({ firstName: "Ada", lastName: "Lovelace", company: "" });
+    expect(signupUserMetadata(signup)).toEqual({ first_name: "Ada", last_name: "Lovelace" });
+    expect(placeholderWorkspaceName("Ada")).toBe("Ada's workspace");
+    expect(placeholderWorkspaceName("  ")).toBe("My workspace");
+    expect(placeholderWorkspaceName(null)).toBe("My workspace");
+    expect(placeholderWorkspaceName("A".repeat(80))).toBe("My workspace");
     const login = readFileSync("components/login-panel.tsx", "utf8");
     const first = login.indexOf('id="first-name"');
     const last = login.indexOf('id="last-name"');
     const email = login.indexOf('id="email"');
-    const company = login.indexOf('id="company"');
     const password = login.indexOf('id="password"');
     expect(first).toBeGreaterThan(-1);
     expect(first).toBeLessThan(last);
     expect(last).toBeLessThan(email);
-    expect(email).toBeLessThan(company);
-    expect(company).toBeLessThan(password);
+    expect(email).toBeLessThan(password);
+    expect(login).not.toContain('id="company"');
+    expect(login).toContain("placeholder name");
   });
 });
 

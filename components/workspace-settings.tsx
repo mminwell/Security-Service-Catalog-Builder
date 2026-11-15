@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   cancelInviteAction,
+  deleteWorkspaceAction,
   removeMemberAction,
   resendInviteAction,
   saveWorkspaceSettingsAction,
   setMemberRoleAction,
+  transferWorkspaceOwnerAction,
 } from "@/app/actions/workspace";
 import { roleLabel } from "@/lib/catalog/access";
 import { distributionWordingForEditor, distributionWordingToStore } from "@/lib/catalog/csv";
@@ -74,7 +77,7 @@ export function WorkspaceSettings() {
         ) : (
           <MembersSection />
         )}
-        {readOnly ? null : <DangerSection />}
+        {api.role === "platform_owner" && !api.demo ? <DangerSection /> : null}
       </div>
     </div>
   );
@@ -549,6 +552,7 @@ function MembersSection() {
             <span className="micro">
               {" "}
               · {roleLabel(invite.role)}
+              {invite.becomes_owner ? " · becomes owner on acceptance" : ""}
               {invite.expires_at ? ` · expires ${invite.expires_at.slice(0, 10)}` : ""}
             </span>
           </span>
@@ -605,18 +609,213 @@ function MembersSection() {
 }
 
 function DangerSection() {
+  const api = useCatalog();
+  const router = useRouter();
+  const toast = useSaveToast();
+  const tenant = api.activeTenant;
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [memberId, setMemberId] = useState("");
+  const [email, setEmail] = useState("");
+  const [confirmName, setConfirmName] = useState("");
+  const [busy, setBusy] = useState(false);
+  if (!tenant) return null;
+
+  const owner = api.members.find((member) => member.user_id === tenant.owner_user_id);
+  const ownerLabel = owner
+    ? owner.first_name && owner.last_name
+      ? `${ownerDisplayName(owner.first_name, owner.last_name)} (${owner.email})`
+      : owner.email
+    : "Not recorded yet";
+  const candidates = api.members.filter((member) => member.user_id !== tenant.owner_user_id && !member.deactivated_at);
+  const pending = api.invitations.filter((invite) => invite.becomes_owner);
+  const nameMatches = confirmName.trim() === tenant.name;
+
   return (
     <section className="panel settings-block danger-zone settings-span">
       <h2>Danger zone</h2>
-      <p className="hint">Transfer and delete are not available in this version.</p>
+      <p className="hint">
+        Site Admin only. The current owner is {ownerLabel}. Transfer keeps that person as owner until the new owner is in
+        place. Delete removes this workspace and its data.
+      </p>
+      {pending.map((invite) => (
+        <div className="member" key={invite.id}>
+          <span>
+            {invite.email}
+            <span className="micro"> · pending ownership invite · becomes owner on acceptance</span>
+          </span>
+          <span className="name-row">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                void resendInviteAction(invite.id).then(async (result) => {
+                  if (!result.ok) {
+                    toast.error(result.error);
+                    return;
+                  }
+                  await api.refresh();
+                  toast.success(result.data.notice);
+                });
+              }}
+            >
+              Resend
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => {
+                void cancelInviteAction(invite.id).then(async (result) => {
+                  if (!result.ok) {
+                    toast.error(result.error);
+                    return;
+                  }
+                  await api.refresh();
+                  toast.success("Invite cancelled");
+                });
+              }}
+            >
+              Cancel
+            </button>
+          </span>
+        </div>
+      ))}
       <div className="name-row">
-        <button type="button" className="btn btn-secondary" disabled>
+        <button type="button" className="btn btn-secondary" onClick={() => setTransferOpen(true)}>
           Transfer ownership
         </button>
-        <button type="button" className="btn btn-secondary" disabled>
+        <button type="button" className="btn btn-secondary" onClick={() => setDeleteOpen(true)}>
           Delete workspace
         </button>
       </div>
+      {transferOpen ? (
+        <div className="modal-backdrop confirm-layer" role="presentation" onMouseDown={() => setTransferOpen(false)}>
+          <div
+            className="modal-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="transfer-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <h2 id="transfer-title">Transfer ownership</h2>
+            <p className="lede">
+              Choose a current member, or enter an email for someone who is not in this workspace. A new email gets an
+              invitation and becomes the owner only after they accept. Until then the current owner stays owner. The
+              previous owner becomes an Admin.
+            </p>
+            <label htmlFor="transfer-member">Existing member</label>
+            <select
+              id="transfer-member"
+              className="select"
+              value={memberId}
+              onChange={(event) => setMemberId(event.target.value)}
+            >
+              <option value="">Choose a member</option>
+              {candidates.map((member) => (
+                <option key={member.user_id} value={member.user_id}>
+                  {member.email}
+                </option>
+              ))}
+            </select>
+            <label htmlFor="transfer-email">Email of someone not in this workspace</label>
+            <input
+              id="transfer-email"
+              className="input"
+              type="email"
+              autoComplete="off"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+            <div className="row-actions" style={{ marginTop: 16 }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setTransferOpen(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={busy}
+                onClick={() => {
+                  if (busy) return;
+                  setBusy(true);
+                  void transferWorkspaceOwnerAction({
+                    tenantId: tenant.id,
+                    userId: memberId || null,
+                    email: email.trim() || null,
+                  }).then(async (result) => {
+                    setBusy(false);
+                    if (!result.ok) {
+                      toast.error(result.error);
+                      return;
+                    }
+                    setTransferOpen(false);
+                    setMemberId("");
+                    setEmail("");
+                    await api.refresh();
+                    toast.success(result.data.notice);
+                  });
+                }}
+              >
+                Transfer ownership
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {deleteOpen ? (
+        <div className="modal-backdrop confirm-layer" role="presentation" onMouseDown={() => setDeleteOpen(false)}>
+          <div
+            className="modal-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-workspace-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <h2 id="delete-workspace-title">Delete workspace</h2>
+            <p className="lede">
+              This deletes {tenant.name} and the data that belongs to it. Type {tenant.name} to confirm.
+            </p>
+            <label htmlFor="delete-workspace-name">Type the name to confirm</label>
+            <input
+              id="delete-workspace-name"
+              className="input"
+              value={confirmName}
+              autoComplete="off"
+              onChange={(event) => setConfirmName(event.target.value)}
+            />
+            <div className="row-actions" style={{ marginTop: 16 }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setDeleteOpen(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                disabled={!nameMatches || busy}
+                onClick={() => {
+                  if (!nameMatches || busy) return;
+                  setBusy(true);
+                  void deleteWorkspaceAction(tenant.id, confirmName.trim()).then(async (result) => {
+                    if (!result.ok) {
+                      setBusy(false);
+                      toast.error(result.error);
+                      return;
+                    }
+                    toast.success("Workspace deleted");
+                    try {
+                      await api.refresh();
+                    } catch {
+                      // The workspace is already gone. Opening the catalog reloads what remains.
+                    }
+                    router.push("/catalog");
+                    router.refresh();
+                  });
+                }}
+              >
+                Delete workspace
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

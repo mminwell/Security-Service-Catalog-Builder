@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Create account no longer asks for a company. The first workspace is named from the first name (`Ada's workspace`) or `My workspace`, and the owner renames it in Workspace Settings (`0018_v6_account_audit_workspace.sql`).
+- Role changes, member removal, invitation send, resend, and cancel, plus site-admin deactivate and delete, write an audit row. A platform owner (Site Admin) can delete a workspace or transfer ownership. The deletion audit row is kept after the workspace is gone.
+- State-changing auth POSTs, including `POST /auth/callback`, refuse a cross-origin Origin or Referer with HTTP 403.
+- CSF Mapping category headings show Full, Partial, None, and Unmapped counts for that category. The blueprint store opens in List when the browser has no saved view.
+- Source available under PolyForm Noncommercial 1.0.0. See `LICENSE` and `INSTALL.md`.
+
 - Per-request nonce Content Security Policy. Production scripts are `'self'`, the nonce, and `'strict-dynamic'`, with no `'unsafe-inline'` or `'unsafe-eval'`. Styles keep `'unsafe-inline'` because style attributes cannot take a nonce. HSTS stays without preload.
 - Postgres rate limits for password sign-in, magic links, sign-up, password reset, invite sending, and invite acceptance (`0017_v6_rate_limits.sql`). The new table stores hashes. Existing catalog rows are not changed. Apply the file before expecting the limits to run.
 
@@ -13,7 +19,7 @@
 - Saves across the app use one centered confirmation. Workspace Settings is a compact two-column page.
 - JSON catalog export. The file is `{slug}-catalog-public.json` or `{slug}-catalog-full.json`, built in the browser with the same audience, field, artifact, and CSF mapping rules as the other formats.
 - Show or hide the password on sign-in, create account, and both new-password fields. The eye control is a button, hidden by default.
-- Create account collects a first name, last name, and company. Those are stored on the person’s own profile row. The company name is the default name of the workspace created for the first account. Existing accounts are not backfilled. After sign-in, a missing first or last name opens a one-time Complete your profile prompt, and Profile in the account menu can edit the same fields. The header shows the first name, or the email until a first name is saved.
+- Create account collects a first name and last name. Company on the profile is optional. The workspace created for a new account uses a placeholder name from the first name (`0018`), which the owner can rename. Existing accounts are not backfilled. After sign-in, a missing first or last name opens a one-time Complete your profile prompt, and Profile in the account menu can edit the same fields. The header shows the first name, or the email until a first name is saved.
 - Primary navigation order is Catalog, Fields, Lookups, Artifacts, CSF Mapping, Templates.
 
 ## 5.0.0

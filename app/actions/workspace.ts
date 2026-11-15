@@ -71,6 +71,85 @@ export async function removeMemberAction(tenantId: string, userId: string): Prom
   }
 }
 
+function migrationMissing(message: string): boolean {
+  return /schema cache|could not find the function/i.test(message);
+}
+
+async function assertSiteAdmin(supabase: Awaited<ReturnType<typeof createAuthedClient>>["supabase"], userId: string): Promise<void> {
+  const rows = await loadOwnMemberships(supabase, userId);
+  if (!rows.some((row) => row.role === "platform_owner")) {
+    throw new Error("Only a platform owner can do that.");
+  }
+}
+
+export async function deleteWorkspaceAction(tenantId: string, name: string): Promise<ActionResult<null>> {
+  try {
+    if (!isUuid(tenantId)) throw new Error("That workspace is not valid.");
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error("Type the workspace name to confirm deletion.");
+    const { supabase, user } = await createAuthedClient();
+    await assertSiteAdmin(supabase, user.id);
+    const { error } = await supabase.rpc("delete_workspace", { p_tenant: tenantId, p_name: trimmed });
+    if (error) {
+      if (migrationMissing(error.message)) {
+        throw new Error("Apply the latest database update before deleting a workspace.");
+      }
+      throw new Error(error.message);
+    }
+    return ok(null);
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+export async function transferWorkspaceOwnerAction(input: {
+  tenantId: string;
+  userId?: string | null;
+  email?: string | null;
+}): Promise<ActionResult<{ notice: string }>> {
+  try {
+    if (!isUuid(input.tenantId)) throw new Error("That workspace is not valid.");
+    const userId = input.userId && isUuid(input.userId) ? input.userId : null;
+    const rawEmail = input.email?.trim() ?? "";
+    if (userId && rawEmail) throw new Error("Choose a member or an email.");
+    if (!userId && !rawEmail) throw new Error("Choose a member or enter an email.");
+    if (rawEmail) {
+      const emailError = validateEmail(rawEmail);
+      if (emailError) throw new Error(emailError);
+    }
+    const { supabase, user } = await createAuthedClient();
+    await assertSiteAdmin(supabase, user.id);
+    const { data, error } = await supabase.rpc("transfer_workspace_owner", {
+      p_tenant: input.tenantId,
+      p_user: userId,
+      p_email: rawEmail ? normalizeEmail(rawEmail) : null,
+    });
+    if (error) {
+      if (migrationMissing(error.message)) {
+        throw new Error("Apply the latest database update before transferring ownership.");
+      }
+      throw new Error(error.message);
+    }
+    const record = data && typeof data === "object" ? (data as Record<string, unknown>) : {};
+    const status = record.status === "invited" ? "invited" : "owner";
+    if (status === "invited") {
+      const mailed = await sendInviteNotice({
+        email: typeof record.email === "string" ? record.email : normalizeEmail(rawEmail),
+        token: typeof record.token === "string" ? record.token : null,
+        workspaceName: typeof record.workspace_name === "string" ? record.workspace_name : "your workspace",
+        role: "tenant_admin",
+        kind: "invited",
+      });
+      return ok({
+        notice: `${mailed.detail} They become the owner when they accept. The current owner stays owner until then.`,
+      });
+    }
+    return ok({ notice: "Ownership transferred. The previous owner is now an Admin." });
+  } catch (error) {
+    return fail(error);
+  }
+}
+
 export async function saveWorkspaceSettingsAction(input: {
   tenantId: string;
   distributionPublic: string;

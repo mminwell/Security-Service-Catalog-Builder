@@ -39,6 +39,8 @@ export type Tenant = {
   default_export_field_set?: "public" | "full" | null;
   owner_reminder_enabled?: boolean;
   owner_reminder_seen_at?: string | null;
+  /** The account that owns this workspace. Site Admin can transfer it. */
+  owner_user_id?: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -64,6 +66,8 @@ export type Invitation = {
   created_at: string;
   expires_at?: string | null;
   cancelled_at?: string | null;
+  /** Accepting this invite makes the person the workspace owner. */
+  becomes_owner?: boolean;
 };
 
 export type ServiceOwner = {
