@@ -13,7 +13,7 @@ import {
 import { isDemoPersistenceKey } from "@/lib/demo/memory-storage";
 import { isDemoPath, stripDemoPrefix, withDemoPrefix } from "@/lib/demo/paths";
 import { applyDemoCommand, initialDemo } from "@/lib/demo/store";
-import { helpForRoute, searchHelp } from "@/lib/help/guide";
+import { helpForRoute, searchHelp, SUPPORT_EMAIL } from "@/lib/help/guide";
 import { loadHelpArticles as readHelpFiles } from "@/lib/help/load";
 import { saveService } from "@/lib/data/model";
 
@@ -88,6 +88,10 @@ describe("help search", () => {
     expect(searchHelp(articles, "too many attempts").some((article) => article.slug === "sign-in")).toBe(true);
     expect(searchHelp(articles, "danger zone").some((article) => article.slug === "workspace")).toBe(true);
     expect(searchHelp(articles, "contact support").some((article) => article.slug === "help")).toBe(true);
+    expect(SUPPORT_EMAIL).toBe("mikeminwell2002@protonmail.com");
+    expect(articles.find((article) => article.slug === "help")?.body).toContain(SUPPORT_EMAIL);
+    expect(readFileSync("components/help-panel.tsx", "utf8")).toContain("mailto:${SUPPORT_EMAIL}");
+    expect(readFileSync("components/help-panel.tsx", "utf8")).not.toContain("support@minwell.app");
     expect(searchHelp(articles, "nothing is written").some((article) => article.slug === "demo")).toBe(true);
     expect(searchHelp(articles, "zzzz-not-in-the-guide")).toEqual([]);
     expect(searchHelp(articles, "").length).toBe(articles.length);

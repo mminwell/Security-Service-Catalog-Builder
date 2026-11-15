@@ -9,4 +9,4 @@ The question mark in the top bar opens this guide. Search looks through these pa
 
 Pages that belong to the screen you are on appear under On this page. The other pages are grouped below that.
 
-Contact support opens an email to support@minwell.app. The catalog does not send that message for you.
+Contact support opens an email to mikeminwell2002@protonmail.com. The catalog does not send that message for you.
