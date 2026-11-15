@@ -41,6 +41,7 @@ import {
   setServiceCodeModeAction,
   setTenantLogoAction,
 } from "@/app/actions/catalog";
+import { readableInviteError } from "@/lib/auth/invites";
 import { friendlyAuthError } from "@/lib/auth/messages";
 import { normalizeEmail, validateEmail, validatePassword } from "@/lib/auth/credentials";
 import {
@@ -51,6 +52,8 @@ import {
   type AccountProfileInput,
 } from "@/lib/auth/profile";
 import { canAdminister, canGrantPlatformOwner, canProvision, canWriteServices, roleLabel } from "@/lib/catalog/access";
+import { serviceHasOwnerGap } from "@/lib/catalog/owner-names";
+import { canEditServiceContent } from "@/lib/catalog/service-edit";
 import { planBlueprintCheckout } from "@/lib/catalog/checkout";
 import type { ExportLogMeta } from "@/lib/catalog/export-plan";
 import type { FieldGroupId } from "@/lib/catalog/fields";
@@ -68,8 +71,10 @@ import type {
   LookupOption,
   Member,
   OutcomeMapping,
+  OwnerHistoryEntry,
   Role,
   ServiceCodeMode,
+  ServiceOwner,
   ServiceRecord,
   Tenant,
 } from "@/lib/catalog/types";
@@ -87,10 +92,11 @@ import {
 } from "@/lib/data/model";
 import { hydrateFromSupabase, isMissingUserProfilesError } from "@/lib/data/remote";
 import { writeActiveTenantId } from "@/lib/data/storage";
+import { useSaveToast } from "@/components/save-toast";
 import { createBrowserSupabase } from "@/lib/supabase/browser";
 import type { ActionResult } from "@/lib/server/result";
 
-type CatalogApi = {
+export type CatalogApi = {
   ready: boolean;
   error: string | null;
   warning: string | null;
@@ -116,6 +122,12 @@ type CatalogApi = {
   audit: AuditEntryLike[];
   members: Member[];
   invitations: Invitation[];
+  owners: ServiceOwner[];
+  ownerHistory: OwnerHistoryEntry[];
+  ownersReady: boolean;
+  ownerReminderDue: boolean;
+  canEditService: (serviceId: string) => boolean;
+  refresh: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (input: AccountProfileInput & { email: string; password: string }) => Promise<string | null>;
   requestPasswordReset: (email: string) => Promise<void>;
@@ -184,9 +196,17 @@ type AuditEntryLike = CatalogDb["audit"][number];
 
 const CatalogContext = createContext<CatalogApi | null>(null);
 
+export function CatalogFixture({ api, children }: { api: CatalogApi; children: ReactNode }) {
+  return <CatalogContext.Provider value={api}>{children}</CatalogContext.Provider>;
+}
+
 export function CatalogProvider({ children }: { children: ReactNode }) {
   const [db, setDb] = useState<CatalogDb | null>(null);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [owners, setOwners] = useState<ServiceOwner[]>([]);
+  const [ownerHistory, setOwnerHistory] = useState<OwnerHistoryEntry[]>([]);
+  const [ownersReady, setOwnersReady] = useState(false);
+  const [loadedAt, setLoadedAt] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
@@ -198,6 +218,10 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     const result = await hydrateFromSupabase(supabase);
     setDb(result.db);
     setInvitations(result.invitations);
+    setOwners(result.owners);
+    setOwnerHistory(result.ownerHistory);
+    setOwnersReady(result.ownersReady);
+    setLoadedAt(Date.now());
     setWarning(result.warning);
   }, []);
 
@@ -211,6 +235,10 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         if (!cancelled) {
           setDb(result.db);
           setInvitations(result.invitations);
+          setOwners(result.owners);
+          setOwnerHistory(result.ownerHistory);
+          setOwnersReady(result.ownersReady);
+          setLoadedAt(Date.now());
           setWarning(result.warning);
         }
       } catch (err) {
@@ -229,6 +257,8 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     setDb(next);
   }, []);
 
+  const toast = useSaveToast();
+
   const guard = useCallback(async <T,>(action: () => Promise<T>): Promise<T> => {
     try {
       setError(null);
@@ -240,6 +270,19 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const guardSave = useCallback(async <T,>(label: string, action: () => Promise<T>): Promise<T> => {
+    try {
+      setError(null);
+      const value = await action();
+      toast.success(label);
+      return value;
+    } catch (err) {
+      const message = messageOf(err);
+      toast.error(message);
+      throw new Error(message);
+    }
+  }, [toast]);
+
   const api = useMemo<CatalogApi>(() => {
     const session = db?.session ?? null;
     const tenants = db?.tenants ?? [];
@@ -248,7 +291,16 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     const role = db && session ? roleFor(db, tenantId, session.userId) : null;
     const fields = db?.fields.filter((field) => field.tenant_id === tenantId) ?? [];
     const lookups = db?.lookups.filter((option) => option.tenant_id === tenantId) ?? [];
-    const services = db?.services.filter((service) => service.tenant_id === tenantId) ?? [];
+    const services = (db?.services.filter((service) => service.tenant_id === tenantId) ?? []).map((service) => ({
+      ...service,
+      owner_gap: serviceHasOwnerGap(
+        service,
+        owners
+          .filter((owner) => owner.tenant_id === tenantId)
+          .map((owner) => ({ id: owner.id, isActive: owner.is_active, deactivatedUser: owner.deactivated_user })),
+        ownersReady,
+      ),
+    }));
     const artifacts = db?.artifacts.filter((artifact) => artifact.tenant_id === tenantId) ?? [];
     const artifactLinks = db?.artifactLinks.filter((link) => link.tenant_id === tenantId) ?? [];
     const mappings = db?.mappings.filter((mapping) => mapping.tenant_id === tenantId) ?? [];
@@ -256,6 +308,15 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     const audit = db?.audit.filter((entry) => entry.tenant_id === tenantId) ?? [];
     const members = db?.members.filter((member) => member.tenant_id === tenantId) ?? [];
     const pendingInvites = invitations.filter((invite) => invite.tenant_id === tenantId);
+    const tenantOwners = owners.filter((owner) => owner.tenant_id === tenantId);
+    const seenAt = activeTenant?.owner_reminder_seen_at ? Date.parse(activeTenant.owner_reminder_seen_at) : Number.NaN;
+    const reminderDue = Boolean(
+      loadedAt != null &&
+        ownersReady &&
+        activeTenant?.owner_reminder_enabled &&
+        (role === "tenant_admin" || role === "platform_owner") &&
+        (Number.isNaN(seenAt) || loadedAt - seenAt > 30 * 24 * 60 * 60 * 1000),
+    );
 
     return {
       ready,
@@ -283,6 +344,24 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       audit,
       members,
       invitations: pendingInvites,
+      owners: tenantOwners,
+      ownerHistory: ownerHistory.filter((entry) => entry.tenant_id === tenantId),
+      ownersReady,
+      ownerReminderDue: reminderDue,
+      canEditService: (serviceId: string) => {
+        const service = services.find((item) => item.id === serviceId);
+        const owner = tenantOwners.find((item) => item.id === service?.owner_id);
+        return canEditServiceContent({
+          role,
+          userId: session?.userId ?? null,
+          ownerUserId: owner?.user_id ?? null,
+          ownerActive: Boolean(owner?.is_active),
+          ownerDeactivated: Boolean(owner?.deactivated_user),
+        });
+      },
+      refresh: () => guard(async () => {
+        await reload();
+      }),
       signIn: (email, password) =>
         guard(async () => {
           const emailError = validateEmail(email);
@@ -330,7 +409,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           return null;
         }),
       saveProfile: (input) =>
-        guard(async () => {
+        guardSave("Profile saved", async () => {
           await unwrap(saveProfileAction(input));
           await reload();
         }),
@@ -369,37 +448,37 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         commit(switchTenantRow(db, nextId));
       },
       createTenant: (name: string) =>
-        guard(async () => {
+        guardSave("Workspace created", async () => {
           const created = await unwrap(createWorkspaceAction(name));
           writeActiveTenantId(created.id);
           await reload();
         }),
       setServiceCodeMode: (nextMode: ServiceCodeMode) =>
-        guard(async () => {
+        guardSave("Service IDs saved", async () => {
           if (!tenantId) return;
           await unwrap(setServiceCodeModeAction(tenantId, nextMode));
           await reload();
         }),
       loadSampleServices: () =>
-        guard(async () => {
+        guardSave("Sample catalog loaded", async () => {
           if (!tenantId) throw new Error("Choose a workspace first.");
           await unwrap(loadSampleCatalogAction(tenantId));
           await reload();
         }),
       saveService: (service: ServiceRecord) =>
-        guard(async () => {
+        guardSave("Service saved", async () => {
           if (!db) throw new Error("The catalog is still loading.");
           await unwrap(saveServiceAction(service));
           await reload();
           return service.id;
         }),
       saveLookup: (option: LookupOption) =>
-        guard(async () => {
+        guardSave("Lookup saved", async () => {
           await unwrap(saveLookupAction(option));
           await reload();
         }),
       addLookup: (input) =>
-        guard(async () => {
+        guardSave("Lookup saved", async () => {
           if (!tenantId) return;
           const option: LookupOption = {
             id: crypto.randomUUID(),
@@ -416,7 +495,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           await reload();
         }),
       setFieldLookup: (fieldId, enabled) =>
-        guard(async () => {
+        guardSave("Field saved", async () => {
           if (!db) throw new Error("The catalog is still loading.");
           const next = setFieldLookupRow(db, fieldId, enabled);
           const saved = next.fields.find((field) => field.id === fieldId);
@@ -425,7 +504,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           await reload();
         }),
       saveField: (field: FieldDefinition) =>
-        guard(async () => {
+        guardSave("Field saved", async () => {
           if (isIdentityField(field.field_key) && field.is_active === false) {
             throw new Error("Service code and name stay active so every service remains identifiable.");
           }
@@ -433,29 +512,39 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           await reload();
         }),
       addMember: (email: string, memberRole: Role) =>
-        guard(async () => {
-          if (!tenantId) throw new Error("Choose a workspace.");
-          const result = await unwrap(inviteMemberAction(tenantId, email, memberRole));
-          await reload();
-          if (result.status === "invited") {
-            return `Invitation saved. They join this workspace when they sign up with that email.`;
+        (async () => {
+          try {
+            if (!tenantId) throw new Error("Choose a workspace.");
+            const result = await unwrap(inviteMemberAction(tenantId, email, memberRole));
+            await reload();
+            const notice =
+              result.notice ||
+              (result.status === "invited"
+                ? `Invitation saved as ${roleLabel(memberRole)}.`
+                : `Added as ${roleLabel(memberRole)}.`);
+            if (/was not sent|could not be saved|not saved/i.test(notice)) toast.error(notice);
+            else toast.success(notice);
+            return notice;
+          } catch (err) {
+            const message = readableInviteError(messageOf(err));
+            toast.error(message);
+            throw new Error(message);
           }
-          return `Added as ${roleLabel(memberRole)}.`;
-        }),
+        })(),
       setTenantLogo: (logoUrl: string | null) =>
-        guard(async () => {
+        guardSave("Logo saved", async () => {
           if (!tenantId) throw new Error("Choose a workspace.");
           await unwrap(setTenantLogoAction(tenantId, logoUrl));
           await reload();
         }),
       renameWorkspace: (name: string) =>
-        guard(async () => {
+        guardSave("Workspace renamed", async () => {
           if (!tenantId) throw new Error("Choose a workspace.");
           await unwrap(renameWorkspaceAction(tenantId, name));
           await reload();
         }),
       archiveService: (serviceId: string, archived: boolean) =>
-        guard(async () => {
+        guardSave(archived ? "Service archived" : "Service restored", async () => {
           if (!db) throw new Error("The catalog is still loading.");
           const now = new Date().toISOString();
           await unwrap(archiveServiceAction(serviceId, archived ? now : null));
@@ -465,21 +554,21 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           return { ...current, archived_at: archived ? now : null, updated_at: now };
         }),
       deleteService: (serviceId: string) =>
-        guard(async () => {
+        guardSave("Service deleted", async () => {
           if (!db) throw new Error("The catalog is still loading.");
           if (!canAdminister(role)) throw new Error("Only an Admin can permanently delete a service.");
           await unwrap(deleteServiceAction(serviceId));
           await reload();
         }),
       importLookups: (fieldKey, rows) =>
-        guard(async () => {
+        guardSave("Lookups saved", async () => {
           if (!tenantId) throw new Error("Choose a workspace.");
           const result = await unwrap(importLookupsAction(tenantId, fieldKey, rows));
           await reload();
           return result;
         }),
       checkoutBlueprints: (input) =>
-        guard(async () => {
+        guardSave("Services added", async () => {
           if (!db || !tenantId || !activeTenant) throw new Error("Choose a workspace.");
           const tenantLookups = db.lookups.filter((option) => option.tenant_id === tenantId);
           const planned = planBlueprintCheckout({
@@ -499,7 +588,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           await reload();
         }),
       saveOutcomeMapping: (input) =>
-        guard(async () => {
+        guardSave("Assessment saved", async () => {
           if (!db) throw new Error("The catalog is still loading.");
           const next = saveOutcomeMappingRow(db, input);
           const mapping = next.mappings.find(
@@ -510,12 +599,12 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           await reload();
         }),
       removeOutcomeMapping: (mappingId: string) =>
-        guard(async () => {
+        guardSave("Assessment removed", async () => {
           await unwrap(removeOutcomeMappingAction(mappingId));
           await reload();
         }),
       setFieldGroup: (group, active) =>
-        guard(async () => {
+        guardSave("Fields saved", async () => {
           if (!db || !tenantId) throw new Error("The catalog is still loading.");
           const next = setFieldGroupRow(db, group, active);
           const changed = next.fields.filter((field) => field.tenant_id === tenantId && field.field_group === group);
@@ -523,7 +612,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           await reload();
         }),
       saveExportProfile: (input) =>
-        guard(async () => {
+        guardSave("Export profile saved", async () => {
           if (!db || !tenantId) throw new Error("The catalog is still loading.");
           const next = saveExportProfileRow(db, input);
           const saved = next.exportProfiles.find(
@@ -543,12 +632,12 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           await reload();
         }),
       deleteExportProfile: (profileId) =>
-        guard(async () => {
+        guardSave("Export profile deleted", async () => {
           await unwrap(deleteExportProfileAction(profileId));
           await reload();
         }),
       importFramework: (frameworkId, planned) =>
-        guard(async () => {
+        guardSave("Framework saved", async () => {
           if (!db || !tenantId) throw new Error("The catalog is still loading.");
           const framework = db.frameworks.find((item) => item.id === frameworkId);
           if (!framework) throw new Error("That framework is not available.");
@@ -562,13 +651,13 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           await reload();
         }),
       saveCatalogColumns: (keys) =>
-        guard(async () => {
+        guardSave("Columns saved", async () => {
           if (!tenantId) throw new Error("Choose a workspace.");
           await unwrap(saveCatalogColumnsAction(tenantId, keys));
           await reload();
         }),
       saveArtifact: (artifact) =>
-        guard(async () => {
+        guardSave("Artifact saved", async () => {
           if (!db) throw new Error("The catalog is still loading.");
           const next = saveArtifactRow(db, artifact);
           const saved = next.artifacts.find((row) => row.id === artifact.id);
@@ -578,12 +667,12 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           return artifact.id;
         }),
       deleteArtifact: (artifactId) =>
-        guard(async () => {
+        guardSave("Artifact deleted", async () => {
           await unwrap(deleteArtifactAction(artifactId));
           await reload();
         }),
       saveArtifactLink: (input) =>
-        guard(async () => {
+        guardSave("Artifact link saved", async () => {
           if (!db) return;
           const next = saveArtifactLinkRow(db, input);
           const saved = next.artifactLinks.find(
@@ -594,12 +683,12 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           await reload();
         }),
       deleteArtifactLink: (linkId) =>
-        guard(async () => {
+        guardSave("Artifact link removed", async () => {
           await unwrap(deleteArtifactLinkAction(linkId));
           await reload();
         }),
       importArtifacts: (rows) =>
-        guard(async () => {
+        guardSave("Artifacts saved", async () => {
           if (!db || !tenantId) throw new Error("The catalog is still loading.");
           const result = importArtifactRows(db, rows);
           const saved = rows.flatMap((row) => {
@@ -613,7 +702,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           return { created: result.created, updated: result.updated };
         }),
     };
-  }, [db, invitations, ready, error, warning, commit, guard, reload]);
+  }, [db, invitations, owners, ownerHistory, ownersReady, loadedAt, ready, error, warning, commit, guard, guardSave, reload, toast]);
 
   return <CatalogContext.Provider value={api}>{children}</CatalogContext.Provider>;
 }

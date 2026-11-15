@@ -14,7 +14,7 @@ export type InputType =
 
 export type ServiceCodeMode = "sequential" | "category_prefix";
 
-export type Role = "platform_owner" | "tenant_admin" | "editor" | "viewer";
+export type Role = "platform_owner" | "tenant_admin" | "editor" | "viewer" | "service_manager";
 
 /** Ordered catalog table columns. `completeness` is the computed column. */
 export type CatalogColumnConfig = {
@@ -29,6 +29,14 @@ export type Tenant = {
   logo_url: string | null;
   /** Workspace default. Null uses the built-in column set. Viewers may override locally. */
   catalog_columns: CatalogColumnConfig | null;
+  /** Null uses the built-in public distribution line. */
+  distribution_public?: string | null;
+  /** Null uses the built-in full-catalog distribution line. */
+  distribution_internal?: string | null;
+  default_export_format?: "csv" | "xlsx" | "docx" | "pdf" | "json" | null;
+  default_export_profile_id?: string | null;
+  owner_reminder_enabled?: boolean;
+  owner_reminder_seen_at?: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -41,6 +49,9 @@ export type Member = {
   email: string;
   role: Role;
   created_at: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  deactivated_at?: string | null;
 };
 
 export type Invitation = {
@@ -49,6 +60,44 @@ export type Invitation = {
   email: string;
   role: Role;
   created_at: string;
+  expires_at?: string | null;
+  cancelled_at?: string | null;
+};
+
+export type ServiceOwner = {
+  id: string;
+  tenant_id: string;
+  first_name: string;
+  last_name: string;
+  email: string | null;
+  title: string | null;
+  team_code: string | null;
+  is_active: boolean;
+  user_id: string | null;
+  deactivated_user: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type OwnerHistoryEntry = {
+  id: string;
+  tenant_id: string;
+  service_id: string | null;
+  actor_user_id: string | null;
+  old_owner_id: string | null;
+  new_owner_id: string | null;
+  reason: "archive" | "reassign" | "import" | "edit" | "reconcile";
+  note: string | null;
+  created_at: string;
+};
+
+export type SiteAccount = {
+  user_id: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  deactivated_at: string | null;
+  memberships: Array<{ tenant_id: string; name: string; role: Role }>;
 };
 
 export type FieldDefinition = {
@@ -106,6 +155,11 @@ export type ServiceRecord = {
   delivery_team: string | null;
   business_unit: string | null;
   service_owner: string | null;
+  owner_id?: string | null;
+  owner_needed?: boolean;
+  owner_review?: string | null;
+  /** Client-only. True when the directory has no active owner for this service. */
+  owner_gap?: boolean;
   delivery_model: string | null;
   target_audience: string[];
   intake_method: string | null;
@@ -241,6 +295,8 @@ export type CatalogFilters = {
   query: string;
   scope: CatalogScope;
   rules: FilterRule[];
+  /** Services with an archived, deactivated, or missing owner. */
+  ownerGap?: boolean;
 };
 
 export const EMPTY_FILTERS: CatalogFilters = {

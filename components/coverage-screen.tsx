@@ -335,7 +335,6 @@ function OutcomeRow({
   const [coverage, setCoverage] = useState<string>(outcome.contributions[0]?.coverage ?? "");
   const [rationale, setRationale] = useState("");
   const [notes, setNotes] = useState("");
-  const [message, setMessage] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const choices = api.services
@@ -344,7 +343,6 @@ function OutcomeRow({
 
   async function save() {
     setSaving(true);
-    setMessage(null);
     setLocalError(null);
     try {
       await api.saveOutcomeMapping({
@@ -354,7 +352,6 @@ function OutcomeRow({
         rationale,
         notes,
       });
-      setMessage("Assessment saved.");
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : "The assessment could not be saved.");
     } finally {
@@ -421,11 +418,6 @@ function OutcomeRow({
           {localError ? (
             <p className="field-error" role="alert">
               {localError}
-            </p>
-          ) : null}
-          {message ? (
-            <p className="saved-banner" role="status">
-              {message}
             </p>
           ) : null}
           {choices.length > 0 ? (

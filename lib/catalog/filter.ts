@@ -23,7 +23,7 @@ const OP_WORD: Record<FilterOp, string> = {
 };
 
 export function activeFilterCount(filters: CatalogFilters): number {
-  return filters.rules.length + (filters.scope === "archived" ? 1 : 0);
+  return filters.rules.length + (filters.scope === "archived" ? 1 : 0) + (filters.ownerGap ? 1 : 0);
 }
 
 export type FilterComposer = {
@@ -155,6 +155,7 @@ export function filterServices(
   return services.filter((service) => {
     const archived = Boolean(service.archived_at);
     if ((filters.scope === "archived") !== archived) return false;
+    if (filters.ownerGap && !service.owner_gap) return false;
     const shown = withComputed(service);
     for (const rule of filters.rules) {
       const field = byKey.get(rule.fieldKey);

@@ -14,6 +14,8 @@ import type {
   LookupOption,
   Member,
   OutcomeMapping,
+  OwnerHistoryEntry,
+  ServiceOwner,
   Role,
   ServiceCodeMode,
   ServiceRecord,
@@ -28,6 +30,9 @@ import { readActiveTenantId } from "@/lib/data/storage";
 export type Hydration = {
   db: CatalogDb;
   invitations: Invitation[];
+  owners: ServiceOwner[];
+  ownerHistory: OwnerHistoryEntry[];
+  ownersReady: boolean;
   warning: string | null;
 };
 
@@ -35,7 +40,7 @@ export async function hydrateFromSupabase(supabase: SupabaseClient): Promise<Hyd
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError) throw new Error(userError.message);
   const user = userData.user;
-  if (!user) return { db: emptyDb(), invitations: [], warning: null };
+  if (!user) return { db: emptyDb(), invitations: [], owners: [], ownerHistory: [], ownersReady: false, warning: null };
 
   const profile = await loadSessionProfile(supabase, user);
   const session = {
@@ -47,7 +52,7 @@ export async function hydrateFromSupabase(supabase: SupabaseClient): Promise<Hyd
   };
   const ensured = await supabase.rpc("ensure_practitioner_access");
   if (ensured.error) {
-    return { db: { ...emptyDb(), session }, invitations: [], warning: ensured.error.message };
+    return { db: { ...emptyDb(), session }, invitations: [], owners: [], ownerHistory: [], ownersReady: false, warning: ensured.error.message };
   }
 
   const tenantQuery = await supabase.from("tenants").select("*").eq("is_active", true).order("name");
@@ -55,10 +60,10 @@ export async function hydrateFromSupabase(supabase: SupabaseClient): Promise<Hyd
   const tenants = (tenantQuery.data ?? []).map(asTenant);
   const ids = tenants.map((tenant) => tenant.id);
   if (ids.length === 0) {
-    return { db: { ...emptyDb(), session }, invitations: [], warning: null };
+    return { db: { ...emptyDb(), session }, invitations: [], owners: [], ownerHistory: [], ownersReady: false, warning: null };
   }
 
-  const [fields, lookups, services, members, audit, frameworks, elements, mappings, profiles, artifacts, artifactLinks, invitationsQuery] = await Promise.all([
+  const [fields, lookups, services, members, audit, frameworks, elements, mappings, profiles, artifacts, artifactLinks, invitationsQuery, ownersQuery, historyQuery] = await Promise.all([
     supabase.from("field_definitions").select("*").in("tenant_id", ids),
     supabase.from("lookup_options").select("*").in("tenant_id", ids),
     supabase.from("services").select("*").in("tenant_id", ids),
@@ -70,19 +75,46 @@ export async function hydrateFromSupabase(supabase: SupabaseClient): Promise<Hyd
     supabase.from("export_profiles").select("*").in("tenant_id", ids),
     supabase.from("artifacts").select("*").in("tenant_id", ids).order("name"),
     supabase.from("artifact_service_links").select("*").in("tenant_id", ids),
-    supabase.from("workspace_invitations").select("id, tenant_id, email, role, created_at").is("accepted_at", null).in("tenant_id", ids),
+    supabase
+      .from("workspace_invitations")
+      .select("id, tenant_id, email, role, created_at, expires_at, cancelled_at")
+      .is("accepted_at", null)
+      .is("cancelled_at", null)
+      .in("tenant_id", ids),
+    supabase.from("service_owners").select("*").in("tenant_id", ids),
+    supabase.from("service_owner_history").select("*").in("tenant_id", ids).order("created_at", { ascending: false }).limit(400),
   ]);
   for (const result of [fields, lookups, services, frameworks, elements, mappings, profiles, artifacts, artifactLinks]) {
     if (result.error) throw new Error(result.error.message);
   }
   if (members.error) throw new Error(members.error.message);
   if (audit.error) throw new Error(audit.error.message);
+  let invitationRows: { data: InvitationRow[] | null; error: { message: string } | null } = invitationsQuery;
+  if (invitationRows.error && /expires_at|cancelled_at|schema cache|column/i.test(invitationRows.error.message)) {
+    invitationRows = await supabase
+      .from("workspace_invitations")
+      .select("id, tenant_id, email, role, created_at")
+      .is("accepted_at", null)
+      .in("tenant_id", ids);
+  }
   const invitations =
-    invitationsQuery.error && /workspace_invitations|schema cache|does not exist/i.test(invitationsQuery.error.message)
+    invitationRows.error && /workspace_invitations|schema cache|does not exist/i.test(invitationRows.error.message)
       ? []
-      : ((invitationsQuery.data ?? []) as InvitationRow[]).map(asInvitation);
-  if (invitationsQuery.error && invitations.length === 0 && !/workspace_invitations|schema cache|does not exist/i.test(invitationsQuery.error.message)) {
-    throw new Error(invitationsQuery.error.message);
+      : ((invitationRows.data ?? []) as InvitationRow[]).map(asInvitation);
+  if (invitationRows.error && invitations.length === 0 && !/workspace_invitations|schema cache|does not exist/i.test(invitationRows.error.message)) {
+    throw new Error(invitationRows.error.message);
+  }
+  const ownersReady = !ownersQuery.error;
+  const owners = ownersReady ? ((ownersQuery.data ?? []) as Record<string, unknown>[]).map(asOwner) : [];
+  const ownerHistory =
+    historyQuery.error && /service_owner_history|schema cache|does not exist/i.test(historyQuery.error.message)
+      ? []
+      : ((historyQuery.data ?? []) as Record<string, unknown>[]).map(asOwnerHistory);
+  if (ownersQuery.error && !/service_owners|schema cache|does not exist/i.test(ownersQuery.error.message)) {
+    throw new Error(ownersQuery.error.message);
+  }
+  if (historyQuery.error && ownerHistory.length === 0 && !/service_owner_history|schema cache|does not exist/i.test(historyQuery.error.message)) {
+    throw new Error(historyQuery.error.message);
   }
 
   const preferred = readActiveTenantId();
@@ -106,7 +138,10 @@ export async function hydrateFromSupabase(supabase: SupabaseClient): Promise<Hyd
       audit: (audit.data ?? []).map(asAudit),
     },
     invitations,
-    warning: null,
+    owners,
+    ownerHistory,
+    ownersReady,
+    warning: ownersReady ? null : "Service Owner directory is waiting for the database update. Free-text owners stay as they are until that migration is applied.",
   };
 }
 
@@ -208,12 +243,24 @@ export async function persistService(supabase: SupabaseClient, service: ServiceR
     review_cadence: service.review_cadence,
     last_reviewed_date: service.last_reviewed_date,
     archived_at: service.archived_at,
+    owner_id: service.owner_id ?? null,
+    owner_needed: Boolean(service.owner_needed),
+    owner_review: service.owner_review ?? null,
     custom_fields: service.custom_fields ?? {},
     created_at: service.created_at,
     created_by: service.created_by,
     updated_by: service.updated_by,
   };
   const { error } = await supabase.from("services").upsert(row);
+  if (error && /owner_id|owner_needed|owner_review|schema cache/i.test(error.message)) {
+    const { owner_id, owner_needed, owner_review, ...legacy } = row;
+    void owner_id;
+    void owner_needed;
+    void owner_review;
+    const retry = await supabase.from("services").upsert(legacy);
+    if (retry.error) throw new Error(retry.error.message);
+    return;
+  }
   if (error) throw new Error(error.message);
 }
 
@@ -562,6 +609,12 @@ function asTenant(row: Record<string, unknown>): Tenant {
     service_code_mode: row.service_code_mode === "category_prefix" ? "category_prefix" : "sequential",
     logo_url: typeof row.logo_url === "string" && row.logo_url.trim() ? row.logo_url : null,
     catalog_columns: parseColumnConfig(row.catalog_columns),
+    distribution_public: textOrNull(row.distribution_public),
+    distribution_internal: textOrNull(row.distribution_internal),
+    default_export_format: exportFormat(row.default_export_format),
+    default_export_profile_id: textOrNull(row.default_export_profile_id),
+    owner_reminder_enabled: row.owner_reminder_enabled === true,
+    owner_reminder_seen_at: textOrNull(row.owner_reminder_seen_at),
     is_active: Boolean(row.is_active),
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
@@ -639,6 +692,9 @@ function asService(row: Record<string, unknown>): ServiceRecord {
     delivery_team: textOrNull(row.delivery_team),
     business_unit: textOrNull(row.business_unit),
     service_owner: textOrNull(row.service_owner),
+    owner_id: textOrNull(row.owner_id),
+    owner_needed: row.owner_needed === true,
+    owner_review: textOrNull(row.owner_review),
     delivery_model: textOrNull(row.delivery_model),
     target_audience: audience,
     intake_method: textOrNull(row.intake_method),
@@ -731,9 +787,13 @@ type InvitationRow = {
   created_at: string;
 };
 
-function asInvitation(row: InvitationRow): Invitation {
+function asInvitation(row: InvitationRow & { expires_at?: string | null; cancelled_at?: string | null }): Invitation {
   const role: Role =
-    row.role === "platform_owner" || row.role === "tenant_admin" || row.role === "editor" || row.role === "viewer"
+    row.role === "platform_owner" ||
+    row.role === "tenant_admin" ||
+    row.role === "editor" ||
+    row.role === "viewer" ||
+    row.role === "service_manager"
       ? row.role
       : "viewer";
   return {
@@ -742,18 +802,69 @@ function asInvitation(row: InvitationRow): Invitation {
     email: row.email,
     role,
     created_at: row.created_at,
+    expires_at: row.expires_at ?? null,
+    cancelled_at: row.cancelled_at ?? null,
   };
 }
 
-function asMember(row: MemberRow): Member {
+function asMember(row: MemberRow & { first_name?: string | null; last_name?: string | null; deactivated_at?: string | null }): Member {
+  const role: Role =
+    row.role === "platform_owner" ||
+    row.role === "tenant_admin" ||
+    row.role === "editor" ||
+    row.role === "viewer" ||
+    row.role === "service_manager"
+      ? row.role
+      : "viewer";
   return {
     id: row.id,
     tenant_id: row.tenant_id,
     user_id: row.user_id,
     email: row.email ?? row.user_id,
-    role: row.role,
+    role,
     created_at: row.created_at,
+    first_name: row.first_name ?? null,
+    last_name: row.last_name ?? null,
+    deactivated_at: row.deactivated_at ?? null,
   };
+}
+
+function asOwner(row: Record<string, unknown>): ServiceOwner {
+  return {
+    id: String(row.id),
+    tenant_id: String(row.tenant_id),
+    first_name: String(row.first_name ?? ""),
+    last_name: String(row.last_name ?? ""),
+    email: textOrNull(row.email),
+    title: textOrNull(row.title),
+    team_code: textOrNull(row.team_code),
+    is_active: row.is_active !== false,
+    user_id: textOrNull(row.user_id),
+    deactivated_user: row.deactivated_user === true,
+    created_at: String(row.created_at ?? ""),
+    updated_at: String(row.updated_at ?? ""),
+  };
+}
+
+function asOwnerHistory(row: Record<string, unknown>): OwnerHistoryEntry {
+  const reason = row.reason;
+  const known = reason === "archive" || reason === "reassign" || reason === "import" || reason === "edit" || reason === "reconcile";
+  return {
+    id: String(row.id),
+    tenant_id: String(row.tenant_id),
+    service_id: textOrNull(row.service_id),
+    actor_user_id: textOrNull(row.actor_user_id),
+    old_owner_id: textOrNull(row.old_owner_id),
+    new_owner_id: textOrNull(row.new_owner_id),
+    reason: known ? reason : "edit",
+    note: textOrNull(row.note),
+    created_at: String(row.created_at ?? ""),
+  };
+}
+
+function exportFormat(value: unknown): Tenant["default_export_format"] {
+  if (value === "csv" || value === "xlsx" || value === "docx" || value === "pdf" || value === "json") return value;
+  return null;
 }
 
 function asAudit(row: Record<string, unknown>): AuditEntry {

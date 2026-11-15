@@ -17,7 +17,9 @@ import {
   writeField,
 } from "@/lib/catalog/service";
 import { DEPTH_META, type DepthLevel, type FieldDefinition, type ServiceRecord } from "@/lib/catalog/types";
+import { ownerDisplayName } from "@/lib/catalog/owner-names";
 import { useCatalog } from "@/components/catalog-provider";
+import { OwnerSelect } from "@/components/owner-select";
 import { ServiceArtifacts } from "@/components/service-artifacts";
 import { ServiceMappingSection } from "@/components/outcome-mapping";
 import { AuditDrawer, Badge, ConfirmDialog, DepthToggle, FieldHelp, InfoTip, LookupSelect } from "@/components/widgets";
@@ -34,7 +36,6 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
   });
   const [codeTouched, setCodeTouched] = useState(serviceId !== "new");
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [saved, setSaved] = useState(false);
   const [history, setHistory] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -68,8 +69,8 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
     service_code: codeTouched ? draft.service_code : suggestion || draft.service_code,
   });
   const percent = completenessPercent(shown, api.fields);
-  const readOnly = !api.canWrite;
   const isNew = serviceId === "new";
+  const readOnly = isNew ? !api.canWrite : !api.canEditService(draft.id);
   const historyEntries = api.audit.filter((entry) => entry.row_id === draft.id);
 
   function requestCancel() {
@@ -87,7 +88,6 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
       const savedRecord = await api.archiveService(existing.id, archived);
       setDraft(savedRecord);
       setDirty(false);
-      setSaved(false);
       setPrompt(null);
     } catch {
       setPrompt(null);
@@ -150,7 +150,6 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
   }
 
   function update(field: FieldDefinition, value: unknown) {
-    setSaved(false);
     setDirty(true);
     setDraft((current) => (current ? writeField(current, field.field_key, value) : current));
     if (field.field_key === "service_code") setCodeTouched(true);
@@ -165,12 +164,11 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
     setSaving(true);
     try {
       await api.saveService(normalized);
-      setSaved(true);
       setDirty(false);
       setDraft(normalized);
       if (serviceId === "new") router.replace(`/services/${normalized.id}`);
     } catch {
-      setSaved(false);
+      setDirty(true);
     } finally {
       setSaving(false);
     }
@@ -225,8 +223,6 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
           ) : null}
         </div>
       ) : null}
-      {saved ? <div className="saved-banner">Saved. Deeper fields you cannot see right now were kept.</div> : null}
-
       <DepthToggle value={depth} onChange={setDepth} />
 
       {groups.map((group) => (
@@ -243,6 +239,17 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
                 error={errors[field.field_key]}
                 disabled={readOnly || field.input_type === "computed"}
                 onChange={(value) => update(field, value)}
+                onOwner={(ownerId) => {
+                  const owner = api.owners.find((item) => item.id === ownerId);
+                  setDraft({
+                    ...shown,
+                    owner_id: ownerId,
+                    owner_needed: ownerId == null,
+                    owner_review: null,
+                    service_owner: owner ? ownerDisplayName(owner.first_name, owner.last_name) : null,
+                  });
+                  setDirty(true);
+                }}
                 showSuggestion={!codeTouched}
                 onUseSuggestion={() => {
                   setDirty(true);
@@ -275,7 +282,10 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
           <p className="lede">Save the service before linking a policy, standard, procedure, or tool.</p>
         </section>
       ) : (
-        <ServiceArtifacts serviceId={draft.id} />
+        <>
+          <OwnerChangeHistory serviceId={draft.id} />
+          <ServiceArtifacts serviceId={draft.id} />
+        </>
       )}
 
       {history && !isNew ? (
@@ -340,6 +350,7 @@ function FieldControl({
   disabled,
   showSuggestion,
   onChange,
+  onOwner,
   onUseSuggestion,
 }: {
   field: FieldDefinition;
@@ -349,6 +360,7 @@ function FieldControl({
   disabled: boolean;
   showSuggestion: boolean;
   onChange: (value: unknown) => void;
+  onOwner: (ownerId: string | null) => void;
   onUseSuggestion: () => void;
 }) {
   const api = useCatalog();
@@ -366,6 +378,15 @@ function FieldControl({
           <FieldHelp field={field} lookups={api.lookups} selectedCode={selectedCode} />
         </InfoTip>
       </div>
+      {field.field_key === "service_owner" && api.ownersReady ? (
+        <OwnerSelect
+          id={inputId}
+          owners={api.owners}
+          value={draft.owner_id ?? null}
+          disabled={disabled || api.role === "service_manager"}
+          onChange={onOwner}
+        />
+      ) : null}
       {field.input_type === "computed" ? (
         <div className="computed" id={inputId}>
           <span>
@@ -385,7 +406,7 @@ function FieldControl({
           onChange={onChange}
         />
       ) : null}
-      {(field.input_type === "text" || field.input_type === "url") && !fieldUsesLookup(field) ? (
+      {(field.input_type === "text" || field.input_type === "url") && !fieldUsesLookup(field) && !(field.field_key === "service_owner" && api.ownersReady) ? (
         <input
           id={inputId}
           className="input"
@@ -471,5 +492,30 @@ function FieldControl({
       ) : null}
       {error ? <p className="field-error">{error}</p> : null}
     </div>
+  );
+}
+
+function OwnerChangeHistory({ serviceId }: { serviceId: string }) {
+  const api = useCatalog();
+  const entries = api.ownerHistory.filter((entry) => entry.service_id === serviceId);
+  if (!api.ownersReady || entries.length === 0) return null;
+  return (
+    <section className="form-section">
+      <h2>Owner history</h2>
+      <ul>
+        {entries.map((entry) => {
+          const previous = api.owners.find((owner) => owner.id === entry.old_owner_id);
+          const next = api.owners.find((owner) => owner.id === entry.new_owner_id);
+          const from = previous ? ownerDisplayName(previous.first_name, previous.last_name) : "None";
+          const to = next ? ownerDisplayName(next.first_name, next.last_name) : "None";
+          return (
+            <li key={entry.id}>
+              {entry.created_at.slice(0, 16).replace("T", " ")} · {entry.reason} · {from} → {to}
+              {entry.note ? ` · ${entry.note}` : ""}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }

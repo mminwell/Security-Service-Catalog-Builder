@@ -9,7 +9,6 @@ import { useCatalog } from "@/components/catalog-provider";
 export function FrameworkImportPanel({ framework }: { framework: FrameworkRelease }) {
   const api = useCatalog();
   const [csv, setCsv] = useState("");
-  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const existing = new Set(
     elementsInScope(api.elements, framework, api.activeTenant?.id ?? "").map((element) => element.code),
@@ -32,7 +31,6 @@ export function FrameworkImportPanel({ framework }: { framework: FrameworkReleas
     setError(null);
     try {
       await api.importFramework(framework.id, plan.rows);
-      setMessage(`Imported ${plan.creates} new and updated ${plan.updates}. Importing the same file again updates those rows.`);
       setCsv("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "The import did not save.");
@@ -58,7 +56,6 @@ export function FrameworkImportPanel({ framework }: { framework: FrameworkReleas
         value={csv}
         onChange={(event) => {
           setCsv(event.target.value);
-          setMessage(null);
           setError(null);
         }}
       />
@@ -73,7 +70,6 @@ export function FrameworkImportPanel({ framework }: { framework: FrameworkReleas
             if (!file) return;
             void file.text().then((text) => {
               setCsv(text);
-              setMessage(null);
               setError(null);
             });
           }}
@@ -103,7 +99,6 @@ export function FrameworkImportPanel({ framework }: { framework: FrameworkReleas
           </button>
         </>
       ) : null}
-      {message ? <p className="saved-banner">{message}</p> : null}
       {error ? <p className="field-error">{error}</p> : null}
     </div>
   );

@@ -49,6 +49,12 @@ export function CatalogScreen() {
             <h1>{tenant?.name}</h1>
           </div>
           <p className="lede">Search and filter the services in this workspace. Completeness counts every active field.</p>
+          {api.services.some((service) => service.owner_gap && !service.archived_at) ? (
+            <p className="hint">
+              Owner needed: {api.services.filter((service) => service.owner_gap && !service.archived_at).length} active
+              services have an archived, deactivated, or missing owner.
+            </p>
+          ) : null}
         </div>
         <div className="row-actions">
           <button type="button" className="btn btn-secondary" onClick={() => setHistory(true)}>
@@ -100,6 +106,14 @@ export function CatalogScreen() {
         />
         <button type="button" className="btn btn-secondary" data-control="export" onClick={() => setExportOpen(true)} disabled={filtered.length === 0}>
           Export
+        </button>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          aria-pressed={filters.ownerGap === true}
+          onClick={() => setFilters((current) => ({ ...current, ownerGap: !current.ownerGap }))}
+        >
+          Archived or missing owner
         </button>
       </div>
       <FilterChipRow
@@ -200,6 +214,10 @@ export function CatalogScreen() {
           onSaveProfile={(input) => api.saveExportProfile(input)}
           onDeleteProfile={(profileId) => api.deleteExportProfile(profileId)}
           onRecordExport={(meta) => api.recordExport(meta)}
+          defaultFormat={tenant.default_export_format ?? null}
+          defaultProfileId={tenant.default_export_profile_id ?? null}
+          distributionPublic={tenant.distribution_public ?? null}
+          distributionInternal={tenant.distribution_internal ?? null}
         />
       ) : null}
 
@@ -217,6 +235,7 @@ function CatalogCell({ fieldKey, service }: { fieldKey: string; service: import(
           {service.name}
         </Link>
         {service.archived_at ? <Badge tone="neutral">Archived</Badge> : null}
+        {service.owner_gap ? <Badge tone="warning">Owner needed</Badge> : null}
       </span>
     );
   }

@@ -36,7 +36,7 @@ export function ServiceMappingSection({ serviceId }: { serviceId: string }) {
 
   if (!service) return null;
   const record = service;
-  const readOnly = !api.canWrite;
+  const readOnly = !api.canEditService(serviceId);
 
   function openCreate() {
     const first = groups[0]?.outcomes[0]?.id ?? "";
