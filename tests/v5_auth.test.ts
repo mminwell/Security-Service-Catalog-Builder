@@ -39,6 +39,11 @@ describe("auth credentials and redirects", () => {
     expect(isPublicPath("/login")).toBe(true);
     expect(isPublicPath("/auth/callback")).toBe(true);
     expect(isPublicPath("/auth/reset")).toBe(true);
+    expect(isPublicPath("/api/auth/sign-in")).toBe(true);
+    expect(isPublicPath("/api/auth/sign-up")).toBe(true);
+    expect(isPublicPath("/api/auth/magic-link")).toBe(true);
+    expect(isPublicPath("/api/auth/password-reset")).toBe(true);
+    expect(isPublicPath("/api/catalog")).toBe(false);
     expect(isPublicPath("/catalog")).toBe(false);
     expect(isPublicPath("/demo")).toBe(true);
     expect(isPublicPath("/demo/services/example")).toBe(true);
@@ -48,6 +53,8 @@ describe("auth credentials and redirects", () => {
     expect(friendlyAuthError("Request rate limit reached")).toMatch(/too many attempts/i);
     expect(friendlyAuthError("User already registered")).toMatch(/already have an account/i);
     expect(friendlyAuthError("Invalid login credentials")).toMatch(/do not match/i);
+    expect(friendlyAuthError("Auth session missing!")).toBe("Sign-in did not start a session. Try again.");
+    expect(friendlyAuthError("Auth session missing!")).not.toMatch(/auth session missing/i);
   });
 });
 

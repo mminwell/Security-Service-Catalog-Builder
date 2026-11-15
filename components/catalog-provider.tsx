@@ -390,6 +390,9 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           const passwordError = validatePassword(password);
           if (passwordError) throw new Error(passwordError);
           const result = await postAuthAttempt("/api/auth/sign-in", { email, password });
+          if (!result.accessToken || !result.refreshToken) {
+            throw new Error("Sign-in did not start a session. Try again.");
+          }
           await adoptSession(supabaseRef, result.accessToken, result.refreshToken);
           const outcome = await reload();
           if (outcome === "deactivated") throw new Error(DEACTIVATED_MESSAGE);
