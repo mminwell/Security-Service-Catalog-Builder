@@ -87,6 +87,7 @@ export type DemoCommand =
       distributionInternal: string;
       exportFormat: string;
       exportProfileId: string;
+      exportFieldSet?: string;
       reminderEnabled: boolean;
       markReminderSeen?: boolean;
     }
@@ -186,6 +187,14 @@ export function applyDemoCommand(state: DemoSnapshot, command: DemoCommand, now 
                     distribution_internal: blank(command.distributionInternal),
                     default_export_format: exportFormat(command.exportFormat),
                     default_export_profile_id: blank(command.exportProfileId),
+                    default_export_field_set:
+                      command.exportFieldSet === "full"
+                        ? "full"
+                        : command.exportFieldSet === "public"
+                          ? "public"
+                          : command.exportFieldSet === undefined
+                            ? tenant.default_export_field_set ?? null
+                            : null,
                     owner_reminder_enabled: command.reminderEnabled,
                     owner_reminder_seen_at: command.markReminderSeen ? now : tenant.owner_reminder_seen_at,
                     updated_at: now,

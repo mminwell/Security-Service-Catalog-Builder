@@ -75,14 +75,17 @@ export async function saveWorkspaceSettingsAction(input: {
   distributionInternal: string;
   exportFormat: string;
   exportProfileId: string;
+  /** `public`, `full`, or blank when a saved profile is the default. */
+  exportFieldSet?: string;
   reminderEnabled: boolean;
   markReminderSeen?: boolean;
 }): Promise<ActionResult<null>> {
   try {
     if (!isUuid(input.tenantId)) throw new Error("That workspace is not valid.");
     if (input.exportProfileId && !isUuid(input.exportProfileId)) throw new Error("That export profile is not valid.");
+    const fieldSet = input.exportFieldSet === "full" ? "full" : input.exportFieldSet === "public" ? "public" : null;
     const { supabase } = await createAuthedClient();
-    const { error } = await supabase.rpc("save_workspace_settings", {
+    const args = {
       p_tenant: input.tenantId,
       p_distribution_public: input.distributionPublic,
       p_distribution_internal: input.distributionInternal,
@@ -90,8 +93,17 @@ export async function saveWorkspaceSettingsAction(input: {
       p_profile: input.exportProfileId || null,
       p_reminder: input.reminderEnabled,
       p_mark_reminder_seen: Boolean(input.markReminderSeen),
-    });
-    if (error) throw new Error(error.message);
+    };
+    const saved = await supabase.rpc("save_workspace_settings", { ...args, p_field_set: fieldSet });
+    if (saved.error && /schema cache|could not find the function|save_workspace_settings/i.test(saved.error.message)) {
+      if (fieldSet === "full") {
+        throw new Error("Apply the latest database update before saving Full catalog as the default.");
+      }
+      const retry = await supabase.rpc("save_workspace_settings", args);
+      if (retry.error) throw new Error(retry.error.message);
+      return ok(null);
+    }
+    if (saved.error) throw new Error(saved.error.message);
     return ok(null);
   } catch (error) {
     return fail(error);
@@ -338,6 +350,53 @@ export async function previewInviteAction(token: string): Promise<
       workspaceName,
       company,
     });
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+export async function acceptInviteAction(token: string): Promise<ActionResult<{ tenantId: string }>> {
+  try {
+    if (!/^[a-f0-9]{32,128}$/i.test(token)) throw new Error("That invite link is not valid.");
+    const { supabase } = await createAuthedClient();
+    const accepted = await supabase.rpc("accept_invitation", { p_token: token });
+    if (accepted.error) throw new Error(accepted.error.message);
+    if (typeof accepted.data !== "string") throw new Error("The invite could not be accepted.");
+    return ok({ tenantId: accepted.data });
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+export async function completeInvitedAccountAction(input: {
+  firstName: string;
+  lastName: string;
+  company: string;
+  password: string;
+}): Promise<ActionResult<null>> {
+  try {
+    const passwordError = validatePassword(input.password);
+    if (passwordError) throw new Error(passwordError);
+    const { supabase, user } = await createAuthedClient();
+    const ensured = await supabase.rpc("ensure_practitioner_access");
+    if (ensured.error && !/no workspace membership/i.test(ensured.error.message)) {
+      throw new Error(ensured.error.message);
+    }
+    let company = input.company.trim();
+    if (!company) {
+      const tenant = await supabase.from("tenants").select("name").limit(1).maybeSingle();
+      company = typeof tenant.data?.name === "string" ? tenant.data.name.trim() : "";
+    }
+    if (!company) throw new Error("Enter a company name.");
+    const profile = normalizeAccountProfile({
+      firstName: input.firstName,
+      lastName: input.lastName,
+      company,
+    });
+    const password = await supabase.auth.updateUser({ password: input.password });
+    if (password.error) throw new Error(password.error.message);
+    await persistUserProfile(supabase, user.id, profile);
+    return ok(null);
   } catch (error) {
     return fail(error);
   }

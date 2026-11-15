@@ -23,7 +23,7 @@ test("demo is interactive and does not call Supabase", async ({ page }) => {
   const name = page.getByRole("textbox", { name: "Service Name" });
   await expect(name).toHaveValue("Enterprise Security Monitoring");
   await name.fill("Browser only change");
-  await page.getByRole("button", { name: "Save service" }).first().click();
+  await page.getByRole("button", { name: "Save", exact: true }).first().click();
   await expect(page.getByText("Service saved")).toBeVisible();
   await page.reload();
   await expect(page.getByRole("textbox", { name: "Service Name" })).toHaveValue("Enterprise Security Monitoring");

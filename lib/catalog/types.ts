@@ -35,6 +35,8 @@ export type Tenant = {
   distribution_internal?: string | null;
   default_export_format?: "csv" | "xlsx" | "docx" | "pdf" | "json" | null;
   default_export_profile_id?: string | null;
+  /** Built-in field set used when no saved profile is the default. Null means the public catalog. */
+  default_export_field_set?: "public" | "full" | null;
   owner_reminder_enabled?: boolean;
   owner_reminder_seen_at?: string | null;
   is_active: boolean;

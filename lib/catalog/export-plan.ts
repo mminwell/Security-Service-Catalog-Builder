@@ -91,6 +91,25 @@ export function publicPreset(fields: FieldDefinition[]): ResolvedExport {
   });
 }
 
+/**
+ * The workspace default is one choice: a built-in field set, or one saved profile.
+ * A saved profile id wins. Otherwise `full` selects the full catalog, and anything else is the public catalog.
+ */
+export function workspaceFieldSetChoice(input: {
+  profileId?: string | null;
+  fieldSet?: string | null;
+  profileIds?: readonly string[];
+}): "public" | "full" | string {
+  if (input.profileId && (!input.profileIds || input.profileIds.includes(input.profileId))) return input.profileId;
+  if (input.fieldSet === "full") return "full";
+  return "public";
+}
+
+export function exportChoiceFromFieldSet(choice: "public" | "full" | string): "public" | "full" | `profile:${string}` {
+  if (choice === "public" || choice === "full") return choice;
+  return `profile:${choice}`;
+}
+
 export function fullPreset(fields: FieldDefinition[]): ResolvedExport {
   return resolveExportSelection({
     fields,

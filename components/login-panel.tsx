@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { DEACTIVATED_MESSAGE } from "@/lib/auth/account-status";
+import { authCallbackRequestBody } from "@/lib/auth/callback-link";
 import { MAGIC_LINK_NOTICE } from "@/lib/auth/magic-link";
 import { safeNextPath } from "@/lib/auth/redirect";
 import { useCatalog } from "@/components/catalog-provider";
@@ -32,12 +33,49 @@ export function LoginPanel() {
   const [password, setPassword] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [openingLink, setOpeningLink] = useState(false);
 
   useEffect(() => {
-    if (api.ready && api.session) router.replace(nextPath);
-  }, [api.ready, api.session, nextPath, router]);
+    const hash = window.location.hash;
+    if (!hash.includes("access_token=")) return;
+    const payload = authCallbackRequestBody({
+      hash,
+      next: search.get("next"),
+      queryError: search.get("error"),
+    });
+    if (!payload.accessToken || !payload.refreshToken) return;
+    let cancelled = false;
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+      setOpeningLink(true);
+    });
+    void fetch("/auth/callback", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify(payload),
+    })
+      .then((response) => response.json())
+      .then((data: { path?: unknown }) => {
+        const path = typeof data.path === "string" ? data.path : "";
+        window.location.replace(path.startsWith("/") && !path.startsWith("//") ? path : "/login?error=auth");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setOpeningLink(false);
+        setLocalError("That link expired or could not be verified. Request a new one.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [search]);
 
-  if (!api.ready) return <Loading label="Loading…" />;
+  useEffect(() => {
+    if (openingLink) return;
+    if (api.ready && api.session) router.replace(nextPath);
+  }, [api.ready, api.session, nextPath, openingLink, router]);
+
+  if (!api.ready || openingLink) return <Loading label={openingLink ? "Opening your invite…" : "Loading…"} />;
   if (api.session) return <Loading label="Opening the catalog…" />;
 
   const title = mode === "create" ? "Create account" : mode === "reset" ? "Reset password" : "Sign in";

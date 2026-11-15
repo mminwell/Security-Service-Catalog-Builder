@@ -29,6 +29,38 @@ export function distributionMarking(companyName: string, visibility: CsvVisibili
   return `${name} \u2014 ${suffix}`;
 }
 
+export type DistributionAudience = "public" | "internal";
+
+/** The wording exports use when the workspace has not saved a custom line. */
+export function builtinDistributionWording(companyName: string, audience: DistributionAudience): string {
+  return distributionMarking(companyName, audience === "public" ? "public" : "all");
+}
+
+/** Prefill the settings box. A saved custom line wins; otherwise show the built-in text. */
+export function distributionWordingForEditor(
+  companyName: string,
+  audience: DistributionAudience,
+  stored: string | null | undefined,
+): string {
+  const custom = stored?.replace(/\s+/g, " ").trim();
+  if (custom) return custom;
+  return builtinDistributionWording(companyName, audience);
+}
+
+/**
+ * Persist a custom line. An empty box, or text that still matches the built-in line,
+ * is stored as blank so a later company rename keeps updating the export marking.
+ */
+export function distributionWordingToStore(
+  companyName: string,
+  audience: DistributionAudience,
+  editorText: string,
+): string {
+  const custom = editorText.replace(/\s+/g, " ").trim();
+  if (!custom || custom === builtinDistributionWording(companyName, audience)) return "";
+  return custom;
+}
+
 export function servicesToCsv(
   services: ServiceRecord[],
   fields: FieldDefinition[],

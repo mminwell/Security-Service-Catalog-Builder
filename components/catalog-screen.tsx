@@ -217,6 +217,7 @@ export function CatalogScreen() {
           onRecordExport={(meta) => api.recordExport(meta)}
           defaultFormat={tenant.default_export_format ?? null}
           defaultProfileId={tenant.default_export_profile_id ?? null}
+          defaultFieldSet={tenant.default_export_field_set ?? null}
           distributionPublic={tenant.distribution_public ?? null}
           distributionInternal={tenant.distribution_internal ?? null}
         />

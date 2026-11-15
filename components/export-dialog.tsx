@@ -7,12 +7,14 @@ import { buildCatalogWorkbook } from "@/lib/catalog/catalog-workbook";
 import { distributionMarking, servicesToCsv, type CsvVisibility } from "@/lib/catalog/csv";
 import { buildDocx } from "@/lib/catalog/docx";
 import {
+  exportChoiceFromFieldSet,
   exportFileName,
   fullPreset,
   INTERNAL_EXPORT_CONFIRMATION,
   publicPreset,
   resolveExportSelection,
   sanitizeExportLog,
+  workspaceFieldSetChoice,
   type ExportFormat,
   type ResolvedExport,
 } from "@/lib/catalog/export-plan";
@@ -77,6 +79,7 @@ export function ExportDialog({
   onRecordExport,
   defaultFormat = null,
   defaultProfileId = null,
+  defaultFieldSet = null,
   distributionPublic = null,
   distributionInternal = null,
 }: {
@@ -107,12 +110,18 @@ export function ExportDialog({
   onRecordExport: (meta: ReturnType<typeof sanitizeExportLog>) => Promise<void>;
   defaultFormat?: "csv" | "xlsx" | "docx" | "pdf" | "json" | null;
   defaultProfileId?: string | null;
+  defaultFieldSet?: "public" | "full" | null;
   distributionPublic?: string | null;
   distributionInternal?: string | null;
 }) {
-  const preferredProfile = profiles.find((profile) => profile.id === defaultProfileId) ?? profiles.find((profile) => profile.is_default);
-  const initial = preferredProfile;
-  const [choice, setChoice] = useState(initial ? `profile:${initial.id}` : "public");
+  const initialChoice = exportChoiceFromFieldSet(
+    workspaceFieldSetChoice({
+      profileId: defaultProfileId,
+      fieldSet: defaultFieldSet,
+      profileIds: profiles.map((profile) => profile.id),
+    }),
+  );
+  const [choice, setChoice] = useState<string>(initialChoice);
   const [customKeys, setCustomKeys] = useState<string[]>(() => publicPreset(fields).fields.map((field) => field.field_key));
   const [format, setFormat] = useState<ExportFormat>(defaultFormat ?? "csv");
   const [includeMarking, setIncludeMarking] = useState(true);
@@ -120,7 +129,6 @@ export function ExportDialog({
   const [jiraMap, setJiraMap] = useState<TargetMapping[]>(() => mappingFromPreset(JIRA_PRESET));
   const [snowMap, setSnowMap] = useState<TargetMapping[]>(() => mappingFromPreset(SERVICENOW_PRESET));
   const [profileName, setProfileName] = useState("");
-  const [makeDefault, setMakeDefault] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -304,7 +312,7 @@ export function ExportDialog({
         name: profileName,
         audience: audienceForSave,
         fieldKeys: resolved.fields.map((field) => field.field_key),
-        isDefault: makeDefault,
+        isDefault: false,
       });
       setNotice(null);
       setProfileName("");
@@ -347,7 +355,7 @@ export function ExportDialog({
             <ProfileChoice
               key={profile.id}
               name={profile.name}
-              hint={`${profile.audience === "internal" ? "Internal" : "Public"} · ${profile.field_keys.length} fields${profile.is_default ? " · workspace default" : ""}`}
+              hint={`${profile.audience === "internal" ? "Internal" : "Public"} · ${profile.field_keys.length} fields${defaultProfileId === profile.id ? " · workspace default" : ""}`}
               checked={choice === `profile:${profile.id}`}
               onChange={() => setChoice(`profile:${profile.id}`)}
               onDelete={
@@ -458,10 +466,6 @@ export function ExportDialog({
                 Save profile
               </button>
             </div>
-            <label className="check">
-              <input type="checkbox" checked={makeDefault} onChange={(event) => setMakeDefault(event.target.checked)} />
-              Use as the workspace default
-            </label>
             <p className="hint">
               Saved as {resolved.audience === "internal" ? "internal" : "public"}. A public profile cannot keep internal fields.
             </p>

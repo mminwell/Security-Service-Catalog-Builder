@@ -9,8 +9,11 @@ import {
   setMemberRoleAction,
 } from "@/app/actions/workspace";
 import { roleLabel } from "@/lib/catalog/access";
+import { distributionWordingForEditor, distributionWordingToStore } from "@/lib/catalog/csv";
+import { FULL_PRESET_NAME, PUBLIC_PRESET_NAME, workspaceFieldSetChoice } from "@/lib/catalog/export-plan";
 import { ownerDisplayName } from "@/lib/catalog/owner-names";
 import { MAX_LOGO_FILE_BYTES } from "@/lib/catalog/logos";
+import { SERVICE_ID_STYLES } from "@/lib/catalog/service-code";
 import type { Role } from "@/lib/catalog/types";
 import { useCatalog } from "@/components/catalog-provider";
 import { useSaveToast } from "@/components/save-toast";
@@ -20,6 +23,7 @@ const ASSIGNABLE: Role[] = ["tenant_admin", "editor", "service_manager", "viewer
 
 export function WorkspaceSettings() {
   const api = useCatalog();
+  const persist = usePersistSettings();
   const tenant = api.activeTenant;
   if (!tenant) return null;
   const readOnly = !api.canAdmin;
@@ -39,29 +43,17 @@ export function WorkspaceSettings() {
           <button
             type="button"
             className="btn btn-ghost"
-            onClick={() => {
-              if (api.demo) {
-                api.demoDispatch({
-                  type: "settings",
-                  distributionPublic: tenant.distribution_public ?? "",
-                  distributionInternal: tenant.distribution_internal ?? "",
-                  exportFormat: tenant.default_export_format ?? "",
-                  exportProfileId: tenant.default_export_profile_id ?? "",
-                  reminderEnabled: true,
-                  markReminderSeen: true,
-                });
-                return;
-              }
-              void saveWorkspaceSettingsAction({
-                tenantId: tenant.id,
+            onClick={() =>
+              persist({
                 distributionPublic: tenant.distribution_public ?? "",
                 distributionInternal: tenant.distribution_internal ?? "",
                 exportFormat: tenant.default_export_format ?? "",
                 exportProfileId: tenant.default_export_profile_id ?? "",
+                exportFieldSet: storedFieldSet(tenant),
                 reminderEnabled: true,
                 markReminderSeen: true,
-              }).then(() => api.refresh());
-            }}
+              })
+            }
           >
             Dismiss for 30 days
           </button>
@@ -69,9 +61,11 @@ export function WorkspaceSettings() {
       ) : null}
       <div className="settings-grid">
         <GeneralSection readOnly={readOnly} />
-        <DistributionSection readOnly={readOnly} />
+        <DistributionSection
+          key={`${tenant.id}:${tenant.name}:${tenant.distribution_public ?? ""}:${tenant.distribution_internal ?? ""}`}
+          readOnly={readOnly}
+        />
         <ExportSection readOnly={readOnly} />
-        <ReminderSection readOnly={readOnly} />
         {readOnly ? (
           <section className="panel settings-block settings-span">
             <h2>Members and invites</h2>
@@ -89,16 +83,19 @@ export function WorkspaceSettings() {
 function GeneralSection({ readOnly }: { readOnly: boolean }) {
   const api = useCatalog();
   const toast = useSaveToast();
+  const persist = usePersistSettings();
   const tenant = api.activeTenant;
   const [name, setName] = useState(tenant?.name ?? "");
   const [logoUrl, setLogoUrl] = useState("");
+  const [reminder, setReminder] = useState(Boolean(tenant?.owner_reminder_enabled));
   if (!tenant) return null;
+  const selectedStyle = SERVICE_ID_STYLES.find((item) => item.mode === tenant.service_code_mode) ?? SERVICE_ID_STYLES[0];
 
   return (
     <section className="panel settings-block">
       <h2>General</h2>
       <div className="stack">
-        <label htmlFor="settings-name">Workspace name</label>
+        <label htmlFor="settings-name">Company</label>
         <div className="name-row">
           <input
             id="settings-name"
@@ -159,25 +156,44 @@ function GeneralSection({ readOnly }: { readOnly: boolean }) {
             </>
           )}
         </div>
-        <div className="segmented" role="radiogroup" aria-label="Service ID style">
-          {(
-            [
-              ["sequential", "SVC-001"],
-              ["category_prefix", "SEC-SOC-001"],
-            ] as const
-          ).map(([mode, label]) => (
-            <button
-              key={mode}
-              type="button"
-              role="radio"
-              aria-checked={tenant.service_code_mode === mode}
-              disabled={readOnly}
-              onClick={() => void api.setServiceCodeMode(mode)}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="id-style-row">
+          <div className="segmented" role="radiogroup" aria-label="Service ID style">
+            {SERVICE_ID_STYLES.map((item) => (
+              <button
+                key={item.mode}
+                type="button"
+                role="radio"
+                aria-checked={tenant.service_code_mode === item.mode}
+                disabled={readOnly}
+                onClick={() => void api.setServiceCodeMode(item.mode)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <p className="id-style-copy">{selectedStyle?.description}</p>
         </div>
+        <label className="settings-check">
+          <input
+            type="checkbox"
+            disabled={readOnly}
+            checked={reminder}
+            onChange={(event) => {
+              const enabled = event.target.checked;
+              setReminder(enabled);
+              if (readOnly) return;
+              persist({
+                distributionPublic: tenant.distribution_public ?? "",
+                distributionInternal: tenant.distribution_internal ?? "",
+                exportFormat: tenant.default_export_format ?? "",
+                exportProfileId: tenant.default_export_profile_id ?? "",
+                exportFieldSet: storedFieldSet(tenant),
+                reminderEnabled: enabled,
+              });
+            }}
+          />
+          Remind Admins about once a month to reconcile owners
+        </label>
       </div>
     </section>
   );
@@ -186,28 +202,42 @@ function GeneralSection({ readOnly }: { readOnly: boolean }) {
 function DistributionSection({ readOnly }: { readOnly: boolean }) {
   const api = useCatalog();
   const tenant = api.activeTenant;
-  const [publicMark, setPublicMark] = useState(tenant?.distribution_public ?? "");
-  const [internalMark, setInternalMark] = useState(tenant?.distribution_internal ?? "");
+  const company = tenant?.name ?? "";
+  const [publicMark, setPublicMark] = useState(() =>
+    distributionWordingForEditor(company, "public", tenant?.distribution_public),
+  );
+  const [internalMark, setInternalMark] = useState(() =>
+    distributionWordingForEditor(company, "internal", tenant?.distribution_internal),
+  );
   if (!tenant) return null;
+  const builtinPublic = distributionWordingForEditor(tenant.name, "public", null);
+  const builtinInternal = distributionWordingForEditor(tenant.name, "internal", null);
   return (
-    <section className="panel settings-block">
+    <section className="panel settings-block distribution-card">
       <h2>Distribution wording</h2>
       <div className="stack">
         <label htmlFor="dist-public">Public</label>
         <textarea id="dist-public" className="textarea" rows={2} disabled={readOnly} value={publicMark} onChange={(event) => setPublicMark(event.target.value)} />
         <label htmlFor="dist-internal">Internal</label>
         <textarea id="dist-internal" className="textarea" rows={2} disabled={readOnly} value={internalMark} onChange={(event) => setInternalMark(event.target.value)} />
-        <p className="hint">Blank uses the built-in wording.</p>
         {readOnly ? null : (
           <div className="name-row">
-            <button type="button" className="btn btn-ghost" onClick={() => { setPublicMark(""); setInternalMark(""); }}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => {
+                setPublicMark(builtinPublic);
+                setInternalMark(builtinInternal);
+              }}
+            >
               Revert to built-in
             </button>
             <SaveDefaults
-              publicMark={publicMark}
-              internalMark={internalMark}
+              publicMark={distributionWordingToStore(tenant.name, "public", publicMark)}
+              internalMark={distributionWordingToStore(tenant.name, "internal", internalMark)}
               format={tenant.default_export_format ?? ""}
               profileId={tenant.default_export_profile_id ?? ""}
+              fieldSet={storedFieldSet(tenant)}
               reminder={Boolean(tenant.owner_reminder_enabled)}
               label="Save wording"
             />
@@ -218,73 +248,81 @@ function DistributionSection({ readOnly }: { readOnly: boolean }) {
   );
 }
 
+const EXPORT_FORMATS = [
+  ["csv", "CSV"],
+  ["xlsx", "Excel"],
+  ["docx", "Word"],
+  ["pdf", "PDF"],
+  ["json", "JSON"],
+] as const;
+
 function ExportSection({ readOnly }: { readOnly: boolean }) {
   const api = useCatalog();
   const tenant = api.activeTenant;
-  const [format, setFormat] = useState(tenant?.default_export_format ?? "");
-  const [profileId, setProfileId] = useState(tenant?.default_export_profile_id ?? "");
+  const profileIds = api.exportProfiles.map((profile) => profile.id);
+  const [format, setFormat] = useState<string>(tenant?.default_export_format || "csv");
+  const [fieldChoice, setFieldChoice] = useState(() =>
+    workspaceFieldSetChoice({
+      profileId: tenant?.default_export_profile_id,
+      fieldSet: tenant?.default_export_field_set,
+      profileIds,
+    }),
+  );
   if (!tenant) return null;
+  const savedProfileId = fieldChoice === "public" || fieldChoice === "full" ? "" : fieldChoice;
+  const savedFieldSet = fieldChoice === "full" ? "full" : savedProfileId ? "" : "public";
   return (
-    <section className="panel settings-block">
+    <section className="panel settings-block settings-span">
       <h2>Export defaults</h2>
-      <div className="stack">
-        <label htmlFor="export-format">Format</label>
-        <select id="export-format" className="select" disabled={readOnly} value={format} onChange={(event) => setFormat(event.target.value)}>
-          <option value="">CSV</option>
-          <option value="csv">CSV</option>
-          <option value="xlsx">Excel</option>
-          <option value="docx">Word</option>
-          <option value="pdf">PDF</option>
-          <option value="json">JSON</option>
-        </select>
-        <label htmlFor="export-profile">Profile</label>
-        <select id="export-profile" className="select" disabled={readOnly} value={profileId} onChange={(event) => setProfileId(event.target.value)}>
-          <option value="">Marked default</option>
-          {api.exportProfiles.map((profile) => (
-            <option key={profile.id} value={profile.id}>
-              {profile.name}
-            </option>
-          ))}
-        </select>
+      <div className="export-defaults-row">
+        <div>
+          <label htmlFor="export-format">Default format</label>
+          <select id="export-format" className="select" disabled={readOnly} value={format || "csv"} onChange={(event) => setFormat(event.target.value)}>
+            {EXPORT_FORMATS.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="export-field-set">Default field set</label>
+          <select
+            id="export-field-set"
+            className="select"
+            disabled={readOnly}
+            value={fieldChoice}
+            onChange={(event) => setFieldChoice(event.target.value)}
+          >
+            <option value="public">{PUBLIC_PRESET_NAME}</option>
+            <option value="full">{FULL_PRESET_NAME}</option>
+            {api.exportProfiles.map((profile) => (
+              <option key={profile.id} value={profile.id}>
+                {profile.name}
+              </option>
+            ))}
+          </select>
+        </div>
         {readOnly ? null : (
           <SaveDefaults
             publicMark={tenant.distribution_public ?? ""}
             internalMark={tenant.distribution_internal ?? ""}
-            format={format}
-            profileId={profileId}
+            format={format || "csv"}
+            profileId={savedProfileId}
+            fieldSet={savedFieldSet}
             reminder={Boolean(tenant.owner_reminder_enabled)}
             label="Save export defaults"
           />
         )}
       </div>
+      <p className="hint export-defaults-note">Field sets are saved from the Export dialog.</p>
     </section>
   );
 }
 
-function ReminderSection({ readOnly }: { readOnly: boolean }) {
-  const api = useCatalog();
-  const tenant = api.activeTenant;
-  const [reminder, setReminder] = useState(Boolean(tenant?.owner_reminder_enabled));
-  if (!tenant) return null;
-  return (
-    <section className="panel settings-block">
-      <h2>Owner reminders</h2>
-      <label className="settings-check">
-        <input type="checkbox" disabled={readOnly} checked={reminder} onChange={(event) => setReminder(event.target.checked)} />
-        Remind Admins about once a month to reconcile owners
-      </label>
-      {readOnly ? null : (
-        <SaveDefaults
-          publicMark={tenant.distribution_public ?? ""}
-          internalMark={tenant.distribution_internal ?? ""}
-          format={tenant.default_export_format ?? ""}
-          profileId={tenant.default_export_profile_id ?? ""}
-          reminder={reminder}
-          label="Save reminder"
-        />
-      )}
-    </section>
-  );
+function storedFieldSet(tenant: { default_export_profile_id?: string | null; default_export_field_set?: string | null }): string {
+  if (tenant.default_export_profile_id) return "";
+  return tenant.default_export_field_set === "full" ? "full" : "public";
 }
 
 function SaveDefaults({
@@ -292,6 +330,7 @@ function SaveDefaults({
   internalMark,
   format,
   profileId,
+  fieldSet,
   reminder,
   label,
 }: {
@@ -299,51 +338,78 @@ function SaveDefaults({
   internalMark: string;
   format: string;
   profileId: string;
+  fieldSet: string;
   reminder: boolean;
   label: string;
 }) {
-  const api = useCatalog();
-  const toast = useSaveToast();
-  const tenant = api.activeTenant;
-  if (!tenant) return null;
+  const persist = usePersistSettings();
   return (
     <button
       type="button"
       className="btn btn-primary"
-      onClick={() => {
-        if (api.demo) {
-          const result = api.demoDispatch({
-            type: "settings",
-            distributionPublic: publicMark,
-            distributionInternal: internalMark,
-            exportFormat: format,
-            exportProfileId: profileId,
-            reminderEnabled: reminder,
-          });
-          if (!result.ok) toast.error(result.error);
-          else toast.success("Settings saved");
-          return;
-        }
-        void saveWorkspaceSettingsAction({
-          tenantId: tenant.id,
+      onClick={() =>
+        persist({
           distributionPublic: publicMark,
           distributionInternal: internalMark,
           exportFormat: format,
           exportProfileId: profileId,
+          exportFieldSet: fieldSet,
           reminderEnabled: reminder,
-        }).then(async (result) => {
-          if (!result.ok) {
-            toast.error(result.error);
-            return;
-          }
-          await api.refresh();
-          toast.success("Settings saved");
-        });
-      }}
+        })
+      }
     >
       {label}
     </button>
   );
+}
+
+function usePersistSettings() {
+  const api = useCatalog();
+  const toast = useSaveToast();
+  return (input: {
+    distributionPublic: string;
+    distributionInternal: string;
+    exportFormat: string;
+    exportProfileId: string;
+    exportFieldSet: string;
+    reminderEnabled: boolean;
+    markReminderSeen?: boolean;
+  }) => {
+    const tenant = api.activeTenant;
+    if (!tenant) return;
+    if (api.demo) {
+      const result = api.demoDispatch({
+        type: "settings",
+        distributionPublic: input.distributionPublic,
+        distributionInternal: input.distributionInternal,
+        exportFormat: input.exportFormat,
+        exportProfileId: input.exportProfileId,
+        exportFieldSet: input.exportFieldSet,
+        reminderEnabled: input.reminderEnabled,
+        markReminderSeen: input.markReminderSeen,
+      });
+      if (!result.ok) toast.error(result.error);
+      else if (!input.markReminderSeen) toast.success("Settings saved");
+      return;
+    }
+    void saveWorkspaceSettingsAction({
+      tenantId: tenant.id,
+      distributionPublic: input.distributionPublic,
+      distributionInternal: input.distributionInternal,
+      exportFormat: input.exportFormat,
+      exportProfileId: input.exportProfileId,
+      exportFieldSet: input.exportFieldSet,
+      reminderEnabled: input.reminderEnabled,
+      markReminderSeen: input.markReminderSeen,
+    }).then(async (result) => {
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      await api.refresh();
+      if (!input.markReminderSeen) toast.success("Settings saved");
+    });
+  };
 }
 
 function MembersSection() {

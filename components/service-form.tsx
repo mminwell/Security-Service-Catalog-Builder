@@ -8,6 +8,11 @@ import { activeOptions, optionByCode } from "@/lib/catalog/lookups";
 import { completenessTone, formatDate, gapText } from "@/lib/catalog/present";
 import { suggestServiceCode } from "@/lib/catalog/service-code";
 import {
+  ARCHIVE_SERVICE_CONFIRMATION,
+  DELETE_SERVICE_CONFIRMATION,
+  serviceSaveButtonLabel,
+} from "@/lib/catalog/service-edit";
+import {
   blankService,
   completenessPercent,
   normalizeService,
@@ -143,7 +148,7 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
         ) : null}
         {readOnly ? null : (
           <button type="button" className="btn btn-primary" onClick={() => void save()} disabled={saving}>
-            {saving ? "Saving…" : "Save service"}
+            {serviceSaveButtonLabel(isNew, saving)}
           </button>
         )}
       </div>
@@ -309,11 +314,11 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
       ) : null}
       {prompt === "archive" ? (
         <ConfirmDialog
-          title="Archive service?"
+          title="Archive this service?"
           message={
             dirty
-              ? `Archive ${shown.service_code} — ${shown.name}? Unsaved edits will be discarded. It leaves the active catalog until you restore it.`
-              : `Archive ${shown.service_code} — ${shown.name}? It leaves the active catalog until you restore it.`
+              ? `${ARCHIVE_SERVICE_CONFIRMATION} Unsaved edits will be discarded.`
+              : ARCHIVE_SERVICE_CONFIRMATION
           }
           confirmLabel="Archive"
           onConfirm={() => void commitArchive(true)}
@@ -331,8 +336,8 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
       ) : null}
       {prompt === "delete" ? (
         <ConfirmDialog
-          title="Delete service?"
-          message={`Permanently delete ${shown.service_code} — ${shown.name}? This cannot be undone.`}
+          title="Delete this service?"
+          message={DELETE_SERVICE_CONFIRMATION}
           confirmLabel="Delete"
           tone="danger"
           onConfirm={() => void commitDelete()}

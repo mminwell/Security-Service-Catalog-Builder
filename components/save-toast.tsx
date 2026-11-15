@@ -18,6 +18,13 @@ type SaveToastApi = {
 
 const SaveToastContext = createContext<SaveToastApi | null>(null);
 
+/** Success confirmations stay up long enough to read, then fade. Errors stay until dismissed. */
+export const SUCCESS_TOAST_MS = 5000;
+
+export function toastAutoDismissMs(tone: ToastTone): number | null {
+  return tone === "success" ? SUCCESS_TOAST_MS : null;
+}
+
 export function SaveToastProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<ToastState | null>(null);
   const hideTimer = useRef<number | null>(null);
@@ -44,8 +51,10 @@ export function SaveToastProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    if (!toast || toast.tone !== "success" || toast.leaving) return;
-    const timer = window.setTimeout(() => dismiss(), 2000);
+    if (!toast || toast.leaving) return;
+    const delay = toastAutoDismissMs(toast.tone);
+    if (delay == null) return;
+    const timer = window.setTimeout(() => dismiss(), delay);
     return () => window.clearTimeout(timer);
   }, [toast, dismiss]);
 
