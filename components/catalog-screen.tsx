@@ -223,7 +223,19 @@ export function CatalogScreen() {
         />
       ) : null}
 
-      {history ? <AuditDrawer title="Workspace history" entries={api.audit} fields={api.fields} onClose={() => setHistory(false)} /> : null}
+      {history ? (
+        <AuditDrawer
+          title="Workspace history"
+          entries={api.audit}
+          fields={api.fields}
+          people={api.members.map((member) => ({
+            email: member.email,
+            firstName: member.first_name,
+            lastName: member.last_name,
+          }))}
+          onClose={() => setHistory(false)}
+        />
+      ) : null}
     </>
   );
 }
