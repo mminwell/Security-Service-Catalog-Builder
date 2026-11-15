@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { AppLink } from "@/components/app-path";
 import { useState } from "react";
 import { ARTIFACT_STATUS_KEY, ARTIFACT_TYPE_KEY, artifactFlags, linksForArtifact, linksForService } from "@/lib/catalog/artifacts";
 import { optionLabel } from "@/lib/catalog/lookups";
@@ -34,7 +34,7 @@ export function ServiceArtifacts({ serviceId }: { serviceId: string }) {
           return (
             <div className="panel" key={link.id} style={{ padding: 12 }}>
               <div className="row-actions">
-                <Link href={`/artifacts/${artifact.id}`}>{artifact.name}</Link>
+                <AppLink href={`/artifacts/${artifact.id}`}>{artifact.name}</AppLink>
                 <span className="micro">{optionLabel(api.lookups, ARTIFACT_TYPE_KEY, artifact.artifact_type)}</span>
                 <span className="micro">{optionLabel(api.lookups, ARTIFACT_STATUS_KEY, artifact.status) || "No status"}</span>
                 {flags.overdue ? <Badge tone="warning">Overdue for review</Badge> : null}
@@ -84,9 +84,9 @@ export function ServiceArtifacts({ serviceId }: { serviceId: string }) {
             >
               Link artifact
             </button>
-            <Link className="btn btn-ghost" href={`/artifacts/new?service=${serviceId}`}>
+            <AppLink className="btn btn-ghost" href={`/artifacts/new?service=${serviceId}`}>
               Add artifact
-            </Link>
+            </AppLink>
           </div>
         </div>
       ) : null}

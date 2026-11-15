@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { AppLink } from "@/components/app-path";
 import { useState } from "react";
 import { visibleLookupGroups } from "@/lib/catalog/lookups";
 import type { LookupOption } from "@/lib/catalog/types";
@@ -41,7 +41,7 @@ export function LookupAdmin() {
             they live on their own page.
           </p>
           <p>
-            <Link href="/admin/owners">Open Service Owners</Link>
+            <AppLink href="/admin/owners">Open Service Owners</AppLink>
           </p>
         </div>
       </div>

@@ -2,11 +2,12 @@
 
 **Status: V5.** A multi-tenant catalog for the security services an organization delivers. Sign in with Supabase Auth, enter each service once, shop a blueprint instead of starting from a blank form, map services to NIST CSF 2.0 outcomes, keep the documents and tools those services depend on, and export the audience you choose.
 
-V1 includes the service form, the catalog list, dropdown and field administration, CSV export, workspace isolation, and an audit trail. V2 adds the CSF 2.0 core and workspace assessments. V3 adds saved audience profiles and Excel, Word, and PDF exports. V4 adds the artifact registry. V5 replaces the browser demo with real accounts, roles, and a production shell.
+V1 includes the service form, the catalog list, dropdown and field administration, CSV export, workspace isolation, and an audit trail. V2 adds the CSF 2.0 core and workspace assessments. V3 adds saved audience profiles and Excel, Word, and PDF exports. V4 adds the artifact registry. V5 replaces the old saved browser demo with real accounts, roles, and a production shell. V6 adds workspace administration and a separate Try the demo page that keeps its edits in the tab only.
 
 ## What you can do
 
-- Sign in, create an account, reset a password, and sign out. Create account asks for a first name, last name, and company. The first account on an empty project becomes **Admin** of a workspace named for that company. An account created before names existed can add them once after sign-in, or any time from Profile. The header shows the first name, or the email when the first name is still blank.
+- Sign in with email and password, or ask for a one-time sign-in link. The link confirmation is the same whether or not that email has an account. Create account asks for a first name, last name, and company. The first account on an empty project becomes **Admin** of a workspace named for that company. An account created before names existed can add them once after sign-in, or any time from Profile. The header shows the first name, or the email when the first name is still blank. A deactivated account cannot stay signed in.
+- Open **Try the demo** at `/demo` with no account. The sample catalog is fictional, edits last until you refresh or close the tab, and nothing is written to Supabase.
 - Invite a **Viewer**, **Editor**, **Service Manager**, or **Admin** from Workspace Settings. The admin chooses the role. If they already have an account they are added immediately. If they do not, the invite is stored for seven days and Supabase Auth emails a link to finish the account.
 - Create another workspace from the switcher. You become Admin of that workspace only. A member of workspace A cannot read or write workspace B.
 - Capture a service at three depths: **Core**, **Operations**, and **Governance**. Switching depth hides fields. It does not clear them. Only the six Core fields are required.
@@ -27,9 +28,9 @@ V1 includes the service form, the catalog list, dropdown and field administratio
 
 Navigation, in order: **Catalog**, **Fields**, **Lookups**, **Artifacts**, **CSF Mapping**, **Templates**. Fields and Lookups are Admin links. The header is a single row.
 
-## Why email and password
+## Why email and password, plus a sign-in link
 
-Email and password is the sign-in method. It works as soon as the Supabase project exists, including against local Inbucket, and it supports a password reset without asking someone to open a fresh email on every visit. Magic links are a reasonable later option. They are a poor default here because nobody can sign in until SMTP is reliable.
+Email and password remains the sign-in method. It works as soon as the Supabase project exists, including against local Inbucket, and it supports a password reset without asking someone to open a fresh email on every visit. **Email me a sign-in link** is an additional option on the same page. Supabase Auth sends that one-time link through the existing Resend SMTP setup. It does not replace the password.
 
 The anon key, or the newer publishable key, is public by design and is the only key the app uses. The service-role key is not read and must not be committed. Isolation is enforced twice: server actions check the caller’s membership before each write, and Postgres row-level security checks it again. Authorization does not use `user_metadata`.
 
@@ -43,7 +44,7 @@ The anon key, or the newer publishable key, is public by design and is the only 
 
 ## Preview without a database
 
-This repository is not connected to a live Supabase project, and preview deployments are not given one. A preview built without the two public variables shows **This deployment is not configured**. It does not invent a workspace, and it does not keep edits in the browser.
+This repository is not connected to a live Supabase project, and preview deployments are not given one. A preview built without the two public variables shows **This deployment is not configured**. It does not invent a signed-in workspace. **Try the demo** at `/demo` still opens, and those edits stay in the browser tab until refresh.
 
 To make a preview or a production deploy actually sign people in, Mike needs:
 

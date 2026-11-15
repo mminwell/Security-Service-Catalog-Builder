@@ -40,6 +40,8 @@ describe("auth credentials and redirects", () => {
     expect(isPublicPath("/auth/callback")).toBe(true);
     expect(isPublicPath("/auth/reset")).toBe(true);
     expect(isPublicPath("/catalog")).toBe(false);
+    expect(isPublicPath("/demo")).toBe(true);
+    expect(isPublicPath("/demo/services/example")).toBe(true);
   });
 
   it("turns rate-limit and duplicate-account errors into plain language", () => {

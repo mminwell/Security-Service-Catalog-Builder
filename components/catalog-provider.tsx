@@ -42,7 +42,10 @@ import {
   setTenantLogoAction,
 } from "@/app/actions/catalog";
 import { readableInviteError } from "@/lib/auth/invites";
+import { DEACTIVATED_MESSAGE } from "@/lib/auth/account-status";
 import { friendlyAuthError } from "@/lib/auth/messages";
+import { requestMagicLink as sendMagicLink } from "@/lib/auth/magic-link";
+import type { DemoCommand, DemoResult } from "@/lib/demo/store";
 import { normalizeEmail, validateEmail, validatePassword } from "@/lib/auth/credentials";
 import {
   browserPromptStore,
@@ -79,6 +82,7 @@ import type {
   Tenant,
 } from "@/lib/catalog/types";
 import {
+  emptyDb,
   importArtifacts as importArtifactRows,
   roleFor,
   saveExportProfile as saveExportProfileRow,
@@ -98,6 +102,9 @@ import type { ActionResult } from "@/lib/server/result";
 
 export type CatalogApi = {
   ready: boolean;
+  /** True only for the in-browser demo. Live sessions stay false and keep using Supabase. */
+  demo: boolean;
+  demoDispatch: (command: DemoCommand) => DemoResult;
   error: string | null;
   warning: string | null;
   clearError: () => void;
@@ -131,6 +138,7 @@ export type CatalogApi = {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (input: AccountProfileInput & { email: string; password: string }) => Promise<string | null>;
   requestPasswordReset: (email: string) => Promise<void>;
+  requestMagicLink: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
   saveProfile: (input: AccountProfileInput) => Promise<void>;
   signOut: () => Promise<void>;
@@ -194,7 +202,7 @@ export type CatalogApi = {
 
 type AuditEntryLike = CatalogDb["audit"][number];
 
-const CatalogContext = createContext<CatalogApi | null>(null);
+export const CatalogContext = createContext<CatalogApi | null>(null);
 
 export function CatalogFixture({ api, children }: { api: CatalogApi; children: ReactNode }) {
   return <CatalogContext.Provider value={api}>{children}</CatalogContext.Provider>;
@@ -212,10 +220,16 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
   const [warning, setWarning] = useState<string | null>(null);
   const supabaseRef = useRef<SupabaseClient | null>(null);
 
-  const reload = useCallback(async () => {
-    const supabase = supabaseRef.current;
-    if (!supabase) return;
-    const result = await hydrateFromSupabase(supabase);
+  const applyHydration = useCallback((result: Awaited<ReturnType<typeof hydrateFromSupabase>>) => {
+    if (result.deactivated) {
+      setDb(emptyDb());
+      setInvitations([]);
+      setOwners([]);
+      setOwnerHistory([]);
+      setOwnersReady(false);
+      setWarning(null);
+      return "deactivated" as const;
+    }
     setDb(result.db);
     setInvitations(result.invitations);
     setOwners(result.owners);
@@ -223,7 +237,14 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     setOwnersReady(result.ownersReady);
     setLoadedAt(Date.now());
     setWarning(result.warning);
+    return "ok" as const;
   }, []);
+
+  const reload = useCallback(async () => {
+    const supabase = supabaseRef.current;
+    if (!supabase) return "ok" as const;
+    return applyHydration(await hydrateFromSupabase(supabase));
+  }, [applyHydration]);
 
   useEffect(() => {
     let cancelled = false;
@@ -233,13 +254,12 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         supabaseRef.current = supabase;
         const result = await hydrateFromSupabase(supabase);
         if (!cancelled) {
-          setDb(result.db);
-          setInvitations(result.invitations);
-          setOwners(result.owners);
-          setOwnerHistory(result.ownerHistory);
-          setOwnersReady(result.ownersReady);
-          setLoadedAt(Date.now());
-          setWarning(result.warning);
+          const outcome = applyHydration(result);
+          if (outcome === "deactivated" && window.location.pathname !== "/login") {
+            window.location.replace("/login?error=deactivated");
+          } else if (outcome === "deactivated") {
+            setError(DEACTIVATED_MESSAGE);
+          }
         }
       } catch (err) {
         if (!cancelled) setError(messageOf(err));
@@ -251,7 +271,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [applyHydration]);
 
   const commit = useCallback((next: CatalogDb) => {
     setDb(next);
@@ -320,6 +340,8 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
 
     return {
       ready,
+      demo: false,
+      demoDispatch: () => ({ ok: false, error: "That action is only available in the demo." }),
       error,
       warning,
       clearError: () => setError(null),
@@ -374,7 +396,8 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
             password,
           });
           if (signError) throw new Error(friendlyAuthError(signError.message));
-          await reload();
+          const outcome = await reload();
+          if (outcome === "deactivated") throw new Error(DEACTIVATED_MESSAGE);
         }),
       signUp: ({ firstName, lastName, email, company, password }) =>
         guard(async () => {
@@ -412,6 +435,12 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         guardSave("Profile saved", async () => {
           await unwrap(saveProfileAction(input));
           await reload();
+        }),
+      requestMagicLink: (email) =>
+        guard(async () => {
+          const supabase = browserSupabase(supabaseRef);
+          const result = await sendMagicLink(supabase, email, window.location.origin);
+          if ("error" in result) throw new Error(result.error);
         }),
       requestPasswordReset: (email) =>
         guard(async () => {

@@ -154,6 +154,8 @@ function fixture(): CatalogApi {
   const asyncNoop = async () => undefined;
   return {
     ready: true,
+    demo: false,
+    demoDispatch: () => ({ ok: false, error: "That action is only available in the demo.", services: 0 }),
     error: null,
     warning: null,
     clearError: () => undefined,
@@ -199,6 +201,7 @@ function fixture(): CatalogApi {
     signIn: asyncNoop,
     signUp: async () => null,
     requestPasswordReset: asyncNoop,
+    requestMagicLink: asyncNoop,
     updatePassword: asyncNoop,
     saveProfile: asyncNoop,
     signOut: asyncNoop,

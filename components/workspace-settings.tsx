@@ -39,7 +39,19 @@ export function WorkspaceSettings() {
           <button
             type="button"
             className="btn btn-ghost"
-            onClick={() =>
+            onClick={() => {
+              if (api.demo) {
+                api.demoDispatch({
+                  type: "settings",
+                  distributionPublic: tenant.distribution_public ?? "",
+                  distributionInternal: tenant.distribution_internal ?? "",
+                  exportFormat: tenant.default_export_format ?? "",
+                  exportProfileId: tenant.default_export_profile_id ?? "",
+                  reminderEnabled: true,
+                  markReminderSeen: true,
+                });
+                return;
+              }
               void saveWorkspaceSettingsAction({
                 tenantId: tenant.id,
                 distributionPublic: tenant.distribution_public ?? "",
@@ -48,8 +60,8 @@ export function WorkspaceSettings() {
                 exportProfileId: tenant.default_export_profile_id ?? "",
                 reminderEnabled: true,
                 markReminderSeen: true,
-              }).then(() => api.refresh())
-            }
+              }).then(() => api.refresh());
+            }}
           >
             Dismiss for 30 days
           </button>
@@ -299,6 +311,19 @@ function SaveDefaults({
       type="button"
       className="btn btn-primary"
       onClick={() => {
+        if (api.demo) {
+          const result = api.demoDispatch({
+            type: "settings",
+            distributionPublic: publicMark,
+            distributionInternal: internalMark,
+            exportFormat: format,
+            exportProfileId: profileId,
+            reminderEnabled: reminder,
+          });
+          if (!result.ok) toast.error(result.error);
+          else toast.success("Settings saved");
+          return;
+        }
         void saveWorkspaceSettingsAction({
           tenantId: tenant.id,
           distributionPublic: publicMark,
@@ -357,6 +382,12 @@ function MembersSection() {
                     value={member.role}
                     onChange={(event) => {
                       const next = event.target.value as Role;
+                      if (api.demo) {
+                        const result = api.demoDispatch({ type: "member-role", userId: member.user_id, role: next });
+                        if (!result.ok) toast.error(result.error);
+                        else toast.success("Role saved");
+                        return;
+                      }
                       void setMemberRoleAction(member.tenant_id, member.user_id, next).then(async (result) => {
                         if (!result.ok) {
                           toast.error(result.error);
@@ -381,6 +412,12 @@ function MembersSection() {
                     className="btn btn-ghost"
                     disabled={lastAdmin}
                     onClick={() => {
+                      if (api.demo) {
+                        const result = api.demoDispatch({ type: "remove-member", userId: member.user_id });
+                        if (!result.ok) toast.error(result.error);
+                        else toast.success("Removed from workspace");
+                        return;
+                      }
                       void removeMemberAction(member.tenant_id, member.user_id).then(async (result) => {
                         if (!result.ok) {
                           toast.error(result.error);
@@ -454,6 +491,12 @@ function MembersSection() {
               type="button"
               className="btn btn-secondary"
               onClick={() => {
+                if (api.demo) {
+                  const result = api.demoDispatch({ type: "resend-invite", inviteId: invite.id });
+                  if (!result.ok) toast.error(result.error);
+                  else toast.success(result.notice);
+                  return;
+                }
                 void resendInviteAction(invite.id).then(async (result) => {
                   if (!result.ok) {
                     toast.error(result.error);
@@ -470,6 +513,12 @@ function MembersSection() {
               type="button"
               className="btn btn-ghost"
               onClick={() => {
+                if (api.demo) {
+                  const result = api.demoDispatch({ type: "cancel-invite", inviteId: invite.id });
+                  if (!result.ok) toast.error(result.error);
+                  else toast.success("Invite cancelled");
+                  return;
+                }
                 void cancelInviteAction(invite.id).then(async (result) => {
                   if (!result.ok) {
                     toast.error(result.error);

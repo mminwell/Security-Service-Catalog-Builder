@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useSyncExternalStore, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
+import { useAppHref } from "@/components/app-path";
 import {
   AISLES,
   BLUEPRINTS,
@@ -44,6 +45,7 @@ const CSF_SHORT: Record<string, string> = {
 export function BlueprintStore() {
   const api = useCatalog();
   const router = useRouter();
+  const to = useAppHref();
   const tenantId = api.activeTenant?.id ?? null;
   const [query, setQuery] = useState("");
   const [aisle, setAisle] = useState<AisleId | "all">("all");
@@ -101,7 +103,7 @@ export function BlueprintStore() {
       });
       persist([]);
       setDrawer(false);
-      router.push("/catalog");
+      router.push(to("/catalog"));
     } finally {
       setBusy(false);
     }

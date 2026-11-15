@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { AppLink } from "@/components/app-path";
 import { useMemo, useState } from "react";
 import {
   ARTIFACT_FILTER_LOOKUPS,
@@ -57,9 +57,9 @@ export function ArtifactsScreen() {
         <div className="row-actions">
           {api.canWrite ? <ArtifactImportControls /> : null}
           {api.canWrite ? (
-            <Link className="btn btn-primary" href="/artifacts/new">
+            <AppLink className="btn btn-primary" href="/artifacts/new">
               Add artifact
-            </Link>
+            </AppLink>
           ) : null}
         </div>
       </div>
@@ -142,7 +142,7 @@ export function ArtifactsScreen() {
                 return (
                   <tr key={artifact.id}>
                     <td>
-                      <Link href={`/artifacts/${artifact.id}`}>{artifact.name}</Link>
+                      <AppLink href={`/artifacts/${artifact.id}`}>{artifact.name}</AppLink>
                     </td>
                     <td>{optionLabel(api.lookups, ARTIFACT_TYPE_KEY, artifact.artifact_type) || artifact.artifact_type}</td>
                     <td>{optionLabel(api.lookups, "team", artifact.owner_team) || "—"}</td>

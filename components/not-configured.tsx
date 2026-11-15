@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export function NotConfigured() {
   return (
     <main className="auth">
@@ -19,6 +21,11 @@ export function NotConfigured() {
           Preview deployments behave this way until those two variables are present at build time. The setup steps are
           in the README.
         </p>
+        <div className="auth-links">
+          <Link className="btn btn-secondary" href="/demo">
+            Try the demo
+          </Link>
+        </div>
       </section>
     </main>
   );

@@ -27,6 +27,7 @@ export function SiteUsers({ previewAccounts }: { previewAccounts?: SiteAccount[]
   const toast = useSaveToast();
 
   async function load() {
+    if (api.demo) return;
     const result = await listSiteAccountsAction();
     if (!result.ok) {
       setError(result.error);
@@ -37,7 +38,7 @@ export function SiteUsers({ previewAccounts }: { previewAccounts?: SiteAccount[]
   }
 
   useEffect(() => {
-    if (previewAccounts) return;
+    if (previewAccounts || api.demo) return;
     let cancelled = false;
     void listSiteAccountsAction().then((result) => {
       if (cancelled) return;
@@ -51,7 +52,16 @@ export function SiteUsers({ previewAccounts }: { previewAccounts?: SiteAccount[]
     return () => {
       cancelled = true;
     };
-  }, [previewAccounts]);
+  }, [previewAccounts, api.demo]);
+
+  if (api.demo) {
+    return (
+      <section className="empty">
+        <h2>Site Admin is not part of the demo.</h2>
+        <p className="lede">The demo does not list or change real accounts.</p>
+      </section>
+    );
+  }
 
   if (api.role !== "platform_owner") {
     return (

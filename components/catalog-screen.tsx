@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AppLink, useAppHref } from "@/components/app-path";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { cartIdsFor, subscribeCart } from "@/lib/catalog/cart-store";
 import { columnLabel, formatCatalogCell } from "@/lib/catalog/columns";
@@ -22,6 +22,7 @@ import { WorkspaceMark } from "@/components/workspace-mark";
 export function CatalogScreen() {
   const api = useCatalog();
   const router = useRouter();
+  const to = useAppHref();
   const [filters, setFilters] = useState<CatalogFilters>(EMPTY_FILTERS);
   const [composer, setComposer] = useState<FilterComposer>(CLOSED_COMPOSER);
   const [history, setHistory] = useState(false);
@@ -60,15 +61,15 @@ export function CatalogScreen() {
           <button type="button" className="btn btn-secondary" onClick={() => setHistory(true)}>
             Change history
           </button>
-          <Link className="btn btn-secondary" href="/templates" aria-label={ADD_TEMPLATES_LABEL}>
+          <AppLink className="btn btn-secondary" href="/templates" aria-label={ADD_TEMPLATES_LABEL}>
             <CartIcon />
             {ADD_TEMPLATES_LABEL}
             {cartCount > 0 ? <span className="cart-badge">{cartCount}</span> : null}
-          </Link>
+          </AppLink>
           {api.canWrite ? (
-            <Link className="btn btn-primary" href="/services/new">
+            <AppLink className="btn btn-primary" href="/services/new">
               Add service
-            </Link>
+            </AppLink>
           ) : null}
         </div>
       </div>
@@ -136,14 +137,14 @@ export function CatalogScreen() {
               to your organization.
             </p>
             <div className="row-actions" style={{ marginTop: 16 }}>
-              <Link className="btn btn-primary" href="/templates">
+              <AppLink className="btn btn-primary" href="/templates">
                 <CartIcon />
                 Shop Pre-Built Security Services
-              </Link>
+              </AppLink>
               {api.canWrite ? (
-                <Link className="btn btn-secondary" href="/services/new">
+                <AppLink className="btn btn-secondary" href="/services/new">
                   Add a service from scratch
-                </Link>
+                </AppLink>
               ) : null}
               {api.canAdmin ? (
                 <button type="button" className="btn btn-secondary" onClick={() => void api.loadSampleServices()}>
@@ -180,7 +181,7 @@ export function CatalogScreen() {
             </thead>
             <tbody>
               {filtered.map((service) => (
-                <tr key={service.id} className="clickable" onClick={() => router.push(`/services/${service.id}`)}>
+                <tr key={service.id} className="clickable" onClick={() => router.push(to(`/services/${service.id}`))}>
                   {columns.keys.map((key) => (
                     <td key={key}>
                       <CatalogCell fieldKey={key} service={service} />
@@ -231,9 +232,9 @@ function CatalogCell({ fieldKey, service }: { fieldKey: string; service: import(
   if (fieldKey === "name") {
     return (
       <span className="name-cell">
-        <Link className="service-name" href={`/services/${service.id}`} onClick={(event) => event.stopPropagation()}>
+        <AppLink className="service-name" href={`/services/${service.id}`} onClick={(event) => event.stopPropagation()}>
           {service.name}
-        </Link>
+        </AppLink>
         {service.archived_at ? <Badge tone="neutral">Archived</Badge> : null}
         {service.owner_gap ? <Badge tone="warning">Owner needed</Badge> : null}
       </span>

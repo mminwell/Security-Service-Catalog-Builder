@@ -1,9 +1,16 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { isPublicPath, safeNextPath } from "@/lib/auth/redirect";
+import { isPublicPath, proxySkipsSupabase, safeNextPath } from "@/lib/auth/redirect";
 import { supabaseConfig } from "@/lib/supabase/env";
 
 export async function updateSession(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+  if (proxySkipsSupabase(path)) {
+    const response = NextResponse.next({ request });
+    response.headers.set("Cache-Control", "private, no-store");
+    return response;
+  }
+
   const config = supabaseConfig();
   if (!config) return NextResponse.next({ request });
 
@@ -32,7 +39,6 @@ export async function updateSession(request: NextRequest) {
   } catch {
     signedIn = false;
   }
-  const path = request.nextUrl.pathname;
   response.headers.set("Cache-Control", "private, no-store");
 
   if (!signedIn && !isPublicPath(path)) {

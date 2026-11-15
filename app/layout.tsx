@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { CatalogProvider } from "@/components/catalog-provider";
-import { NotConfigured } from "@/components/not-configured";
+import { AppState } from "@/components/app-state";
+import { HelpContentProvider } from "@/components/help-panel";
 import { SaveToastProvider } from "@/components/save-toast";
-import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { loadHelpArticles } from "@/lib/help/load";
 import "./globals.css";
 
 export const dynamic = "force-dynamic";
@@ -17,11 +17,14 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const articles = loadHelpArticles();
   return (
     <html lang="en">
       <body>
         <SaveToastProvider>
-          {isSupabaseConfigured() ? <CatalogProvider>{children}</CatalogProvider> : <NotConfigured />}
+          <HelpContentProvider articles={articles}>
+            <AppState>{children}</AppState>
+          </HelpContentProvider>
         </SaveToastProvider>
       </body>
     </html>

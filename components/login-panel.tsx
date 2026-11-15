@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
+import { DEACTIVATED_MESSAGE } from "@/lib/auth/account-status";
+import { MAGIC_LINK_NOTICE } from "@/lib/auth/magic-link";
 import { safeNextPath } from "@/lib/auth/redirect";
 import { useCatalog } from "@/components/catalog-provider";
 import { PasswordField } from "@/components/password-field";
@@ -14,7 +17,13 @@ export function LoginPanel() {
   const router = useRouter();
   const search = useSearchParams();
   const nextPath = safeNextPath(search.get("next"));
-  const linkError = search.get("error") === "auth";
+  const linkError = search.get("error");
+  const linkMessage =
+    linkError === "auth"
+      ? "That link expired or could not be verified. Request a new one."
+      : linkError === "deactivated"
+        ? DEACTIVATED_MESSAGE
+        : null;
   const [mode, setMode] = useState<AuthMode>("sign-in");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -66,9 +75,9 @@ export function LoginPanel() {
             ? "Your company name is used for the workspace created with the first account. That account is its Admin."
             : "One catalog for the security services you deliver. The first account creates a workspace and becomes its Admin."}
         </p>
-        {linkError ? (
+        {linkMessage ? (
           <p className="field-error" role="alert">
-            That link expired or could not be verified. Request a new one.
+            {linkMessage}
           </p>
         ) : null}
         <form className="stack" onSubmit={(event) => void submit(event)}>
@@ -138,10 +147,28 @@ export function LoginPanel() {
               {localError}
             </p>
           ) : null}
-          {notice ? <p className="hint">{notice}</p> : null}
-          <button type="submit" className="btn btn-primary">
-            {mode === "create" ? "Create account" : mode === "reset" ? "Send reset link" : "Sign in"}
-          </button>
+          {notice ? (
+            <p className="hint" role="status">
+              {notice}
+            </p>
+          ) : null}
+          {mode === "sign-in" ? (
+            <div className="auth-actions">
+              <button type="submit" className="btn btn-primary">
+                Sign in
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => void sendMagicLink()}>
+                Email me a sign-in link
+              </button>
+            </div>
+          ) : (
+            <button type="submit" className="btn btn-primary">
+              {mode === "create" ? "Create account" : "Send reset link"}
+            </button>
+          )}
+          {mode === "sign-in" ? (
+            <p className="hint">The link works once and then expires. Password sign-in stays available.</p>
+          ) : null}
         </form>
         <div className="auth-links">
           {mode === "sign-in" ? (
@@ -152,6 +179,9 @@ export function LoginPanel() {
               <button type="button" className="btn btn-ghost" onClick={() => switchMode("reset")}>
                 Forgot password
               </button>
+              <Link className="btn btn-ghost" href="/demo">
+                Try the demo
+              </Link>
             </>
           ) : (
             <button type="button" className="btn btn-ghost" onClick={() => switchMode("sign-in")}>
@@ -162,6 +192,17 @@ export function LoginPanel() {
       </section>
     </main>
   );
+
+  async function sendMagicLink() {
+    setLocalError(null);
+    setNotice(null);
+    try {
+      await api.requestMagicLink(email);
+      setNotice(MAGIC_LINK_NOTICE);
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : "The sign-in link could not be sent.");
+    }
+  }
 
   function switchMode(next: AuthMode) {
     setMode(next);
