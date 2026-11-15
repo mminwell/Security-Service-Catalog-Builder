@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Per-request nonce Content Security Policy. Production scripts are `'self'`, the nonce, and `'strict-dynamic'`, with no `'unsafe-inline'` or `'unsafe-eval'`. Styles keep `'unsafe-inline'` because style attributes cannot take a nonce. HSTS stays without preload.
+- Postgres rate limits for password sign-in, magic links, sign-up, password reset, invite sending, and invite acceptance (`0017_v6_rate_limits.sql`). The new table stores hashes. Existing catalog rows are not changed. Apply the file before expecting the limits to run.
+
 - Magic-link sign-in sits beside the password. The request uses the same calm confirmation for every email. A deactivated account is signed out on the callback.
 - The top bar has a help panel. Guide pages live in `content/help` and are searched in the browser. Contact support is `support@minwell.app`.
 - `/demo` is a public fictional catalog. Add, edit, delete, mapping, and export stay in the tab and reset on refresh. The demo does not call Supabase.

@@ -140,7 +140,7 @@ Signup confirmation and password reset both return to `/auth/callback`, which th
 
 Supabase’s built-in mailer is rate limited and is meant for trials. For a real workspace, add your SMTP host, port, username, and password in the dashboard, and set the sender name and address. You can edit the Confirm signup and Reset password templates there. The default templates work with this app’s callback. If you switch a template to `token_hash`, point it at `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email` (use `type=recovery` on the reset template).
 
-Auth rate limits live in **Authentication → Rate Limits**. The app does not add a second limiter. Sign-in, sign-up, and recovery already fail with a “too many attempts” message when Supabase throttles them. A shared edge limiter in front of the deployment is deferred; it needs a store this app does not have.
+Auth rate limits in the Supabase dashboard still apply. The app adds its own limiter in migration `0017_v6_rate_limits.sql`: 5 sign-in, magic-link, sign-up, and password-reset emails per address per 15 minutes, 20 of each per IP per 15 minutes, 20 invites per admin per hour, and a smaller cap on finishing or accepting an invite. The sign-in routes answer with HTTP 429 and “Too many attempts. Please wait a few minutes and try again.” Apply `0017` before relying on that limiter. Until the function exists, those routes keep working and the limit is not enforced.
 
 ### 4. Set Vercel environment variables
 
@@ -162,7 +162,7 @@ Open the deployment, choose **Create account**, and confirm the email if confirm
 ## Security notes
 
 - Cookies carry the session. Pages are rendered per request. `proxy.ts` refreshes the session and the response is `Cache-Control: private, no-store`, so a shared cache cannot replay `Set-Cookie`.
-- Response headers set a content security policy, `nosniff`, `DENY` framing, a strict referrer policy, an empty camera/microphone/geolocation policy, and HSTS. Script source allows inline scripts because the Next.js bootstrap uses them. Nonce-based CSP is deferred.
+- Response headers set `nosniff`, `DENY` framing, a strict referrer policy, an empty camera/microphone/geolocation policy, and HSTS (`max-age=63072000; includeSubDomains`, no preload). `proxy.ts` adds a per-request content security policy. Scripts allow `'self'`, that request’s nonce, and `'strict-dynamic'`. Production does not allow `'unsafe-inline'` or `'unsafe-eval'` for scripts. Development adds `'unsafe-eval'` so React can show server stack traces. Styles keep `'unsafe-inline'` because the interface sets style attributes, and a style nonce would make browsers ignore that. `connect-src` allows this origin, `https://*.supabase.co`, `wss://*.supabase.co`, and the configured project URL.
 - Links must be `http` or `https`, with no username or password in the URL. `javascript:` is not rendered. Logo SVG uploads are rejected when they contain a script or an event handler.
 - Public exports omit internal fields and internal artifacts, including their names and URLs. A file that still contains an internal field asks for confirmation, and the distribution line is marked in all capitals.
 - Server actions return their own error text. Postgres remains the backstop if someone calls the Data API with the anon key directly. Direct table writes still have to satisfy the same role policies.
@@ -171,9 +171,8 @@ Open the deployment, choose **Create account**, and confirm the email if confirm
 Deferred, and not done in this release:
 
 - Magic-link sign-in, and invite emails sent by the app. Invites are stored and accepted on signup. Password reset still uses Supabase email.
-- Moving security-definer functions out of the exposed `public` schema. The Data API has to call them, and `anon` cannot execute them.
-- An application rate limiter in front of Supabase Auth.
-- HSTS preload submission.
+- Moving security-definer functions out of the exposed `public` schema. The Data API has to call them, and `anon` cannot execute them except `enforce_rate_limit`, which signed-out auth requests need.
+- HSTS preload submission. The deployment stays on `vercel.app` until it has a custom domain.
 - A Word user guide. The runbook above is the operator doc.
 
 ## Tests

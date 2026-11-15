@@ -43,15 +43,14 @@ import {
 } from "@/app/actions/catalog";
 import { readableInviteError } from "@/lib/auth/invites";
 import { DEACTIVATED_MESSAGE } from "@/lib/auth/account-status";
+import { postAuthAttempt } from "@/lib/auth/browser-attempt";
 import { friendlyAuthError } from "@/lib/auth/messages";
-import { requestMagicLink as sendMagicLink } from "@/lib/auth/magic-link";
 import type { DemoCommand, DemoResult } from "@/lib/demo/store";
-import { normalizeEmail, validateEmail, validatePassword } from "@/lib/auth/credentials";
+import { validateEmail, validatePassword } from "@/lib/auth/credentials";
 import {
   browserPromptStore,
   clearProfilePromptDismissal,
   normalizeAccountProfile,
-  signupUserMetadata,
   type AccountProfileInput,
 } from "@/lib/auth/profile";
 import { canAdminister, canGrantPlatformOwner, canProvision, canWriteServices, roleLabel } from "@/lib/catalog/access";
@@ -390,12 +389,8 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           if (emailError) throw new Error(emailError);
           const passwordError = validatePassword(password);
           if (passwordError) throw new Error(passwordError);
-          const supabase = browserSupabase(supabaseRef);
-          const { error: signError } = await supabase.auth.signInWithPassword({
-            email: normalizeEmail(email),
-            password,
-          });
-          if (signError) throw new Error(friendlyAuthError(signError.message));
+          const result = await postAuthAttempt("/api/auth/sign-in", { email, password });
+          await adoptSession(supabaseRef, result.accessToken, result.refreshToken);
           const outcome = await reload();
           if (outcome === "deactivated") throw new Error(DEACTIVATED_MESSAGE);
         }),
@@ -406,18 +401,13 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           if (emailError) throw new Error(emailError);
           const passwordError = validatePassword(password);
           if (passwordError) throw new Error(passwordError);
-          const supabase = browserSupabase(supabaseRef);
-          const origin = window.location.origin;
-          const { data, error: signError } = await supabase.auth.signUp({
-            email: normalizeEmail(email),
-            password,
-            options: {
-              emailRedirectTo: `${origin}/auth/callback?next=/catalog`,
-              data: signupUserMetadata(profile),
-            },
-          });
-          if (signError) throw new Error(friendlyAuthError(signError.message));
-          if (!data.session || !data.user) return "Check your email to confirm the account, then sign in.";
+          const result = await postAuthAttempt("/api/auth/sign-up", { firstName, lastName, email, company, password });
+          if (!result.accessToken || !result.refreshToken) {
+            return result.notice ?? "Check your email to confirm the account, then sign in.";
+          }
+          const supabase = await adoptSession(supabaseRef, result.accessToken, result.refreshToken);
+          const { data } = await supabase.auth.getUser();
+          if (!data.user) throw new Error("The account was created, but the session did not start.");
           const { error: profileError } = await supabase.from("user_profiles").upsert({
             user_id: data.user.id,
             first_name: profile.firstName,
@@ -438,19 +428,14 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         }),
       requestMagicLink: (email) =>
         guard(async () => {
-          const supabase = browserSupabase(supabaseRef);
-          const result = await sendMagicLink(supabase, email, window.location.origin);
-          if ("error" in result) throw new Error(result.error);
+          const result = await postAuthAttempt("/api/auth/magic-link", { email });
+          if (!result.notice) throw new Error("The sign-in link could not be sent. Try again in a moment.");
         }),
       requestPasswordReset: (email) =>
         guard(async () => {
           const emailError = validateEmail(email);
           if (emailError) throw new Error(emailError);
-          const supabase = browserSupabase(supabaseRef);
-          const { error: resetError } = await supabase.auth.resetPasswordForEmail(normalizeEmail(email), {
-            redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset`,
-          });
-          if (resetError && /rate/i.test(resetError.message)) throw new Error(friendlyAuthError(resetError.message));
+          await postAuthAttempt("/api/auth/password-reset", { email });
         }),
       updatePassword: (password) =>
         guard(async () => {
@@ -750,6 +735,18 @@ function messageOf(err: unknown): string {
 function browserSupabase(ref: { current: SupabaseClient | null }): SupabaseClient {
   const supabase = ref.current ?? createBrowserSupabase();
   ref.current = supabase;
+  return supabase;
+}
+
+async function adoptSession(
+  ref: { current: SupabaseClient | null },
+  accessToken: string | null,
+  refreshToken: string | null,
+): Promise<SupabaseClient> {
+  const supabase = browserSupabase(ref);
+  if (!accessToken || !refreshToken) return supabase;
+  const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+  if (error) throw new Error(friendlyAuthError(error.message));
   return supabase;
 }
 

@@ -1,5 +1,7 @@
+import { RATE_LIMIT_MESSAGE } from "@/lib/security/copy";
+
 export function friendlyAuthError(message: string): string {
-  if (/rate limit/i.test(message)) return "Too many attempts. Wait a minute and try again.";
+  if (/rate_limited|rate limit|too many/i.test(message)) return RATE_LIMIT_MESSAGE;
   if (/already registered|already been registered/i.test(message)) {
     return "If this email is new, check your inbox to confirm it. If you already have an account, sign in.";
   }
