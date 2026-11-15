@@ -1,6 +1,6 @@
 # Install
 
-Self-hosting guide for the Security Service Catalog Builder. The license is [PolyForm Noncommercial 1.0.0](LICENSE). Personal, educational, research, and nonprofit use is free. Commercial use, including use by or for a business or in paid consulting, needs a separate license from the author: https://minwell.app.
+Self-hosting guide for the Security Service Catalog Builder. The license is [PolyForm Noncommercial 1.0.0](LICENSE). Personal, educational, research, and nonprofit use is free. Commercial use, including use by or for a business or in paid consulting, needs a separate license from the author: mikeminwell2002@protonmail.com.
 
 These steps do not change an existing hosted project until the SQL or the deploy settings are applied on purpose.
 

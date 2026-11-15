@@ -162,7 +162,6 @@ Deferred, and not done in this release:
 
 - Moving security-definer functions out of the exposed `public` schema. The Data API has to call them, and `anon` cannot execute them except `enforce_rate_limit`, which signed-out auth requests need.
 - HSTS preload submission. The deployment stays on `vercel.app` until it has a custom domain.
-- A Word user guide. The in-app help panel and [INSTALL.md](INSTALL.md) are the current guides.
 
 ## Tests
 
@@ -203,6 +202,6 @@ Rulesets are in **Settings → Rules → Rulesets**. Create one targeting `main`
 
 ## License
 
-Source available under PolyForm Noncommercial 1.0.0. Free for personal, educational, research, and nonprofit use. Commercial use, including use by or for a business or in paid consulting, requires a separate license from the author: contact via https://minwell.app.
+Source available under PolyForm Noncommercial 1.0.0. Free for personal, educational, research, and nonprofit use. Commercial use, including use by or for a business or in paid consulting, requires a separate license from the author: mikeminwell2002@protonmail.com.
 
 The license text is in `LICENSE`, including the required notice. Assisted drafting, if it comes, stays behind a person approving every save.
