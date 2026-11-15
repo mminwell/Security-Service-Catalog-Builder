@@ -10,6 +10,7 @@ import {
 } from "@/app/actions/workspace";
 import { roleLabel } from "@/lib/catalog/access";
 import { distributionWordingForEditor, distributionWordingToStore } from "@/lib/catalog/csv";
+import { FULL_PRESET_NAME, PUBLIC_PRESET_NAME, workspaceFieldSetChoice } from "@/lib/catalog/export-plan";
 import { ownerDisplayName } from "@/lib/catalog/owner-names";
 import { MAX_LOGO_FILE_BYTES } from "@/lib/catalog/logos";
 import { SERVICE_ID_STYLES } from "@/lib/catalog/service-code";
@@ -48,6 +49,7 @@ export function WorkspaceSettings() {
                 distributionInternal: tenant.distribution_internal ?? "",
                 exportFormat: tenant.default_export_format ?? "",
                 exportProfileId: tenant.default_export_profile_id ?? "",
+                exportFieldSet: storedFieldSet(tenant),
                 reminderEnabled: true,
                 markReminderSeen: true,
               })
@@ -185,6 +187,7 @@ function GeneralSection({ readOnly }: { readOnly: boolean }) {
                 distributionInternal: tenant.distribution_internal ?? "",
                 exportFormat: tenant.default_export_format ?? "",
                 exportProfileId: tenant.default_export_profile_id ?? "",
+                exportFieldSet: storedFieldSet(tenant),
                 reminderEnabled: enabled,
               });
             }}
@@ -234,6 +237,7 @@ function DistributionSection({ readOnly }: { readOnly: boolean }) {
               internalMark={distributionWordingToStore(tenant.name, "internal", internalMark)}
               format={tenant.default_export_format ?? ""}
               profileId={tenant.default_export_profile_id ?? ""}
+              fieldSet={storedFieldSet(tenant)}
               reminder={Boolean(tenant.owner_reminder_enabled)}
               label="Save wording"
             />
@@ -244,47 +248,81 @@ function DistributionSection({ readOnly }: { readOnly: boolean }) {
   );
 }
 
+const EXPORT_FORMATS = [
+  ["csv", "CSV"],
+  ["xlsx", "Excel"],
+  ["docx", "Word"],
+  ["pdf", "PDF"],
+  ["json", "JSON"],
+] as const;
+
 function ExportSection({ readOnly }: { readOnly: boolean }) {
   const api = useCatalog();
   const tenant = api.activeTenant;
-  const [format, setFormat] = useState(tenant?.default_export_format ?? "");
-  const [profileId, setProfileId] = useState(tenant?.default_export_profile_id ?? "");
+  const profileIds = api.exportProfiles.map((profile) => profile.id);
+  const [format, setFormat] = useState<string>(tenant?.default_export_format || "csv");
+  const [fieldChoice, setFieldChoice] = useState(() =>
+    workspaceFieldSetChoice({
+      profileId: tenant?.default_export_profile_id,
+      fieldSet: tenant?.default_export_field_set,
+      profileIds,
+    }),
+  );
   if (!tenant) return null;
+  const savedProfileId = fieldChoice === "public" || fieldChoice === "full" ? "" : fieldChoice;
+  const savedFieldSet = fieldChoice === "full" ? "full" : savedProfileId ? "" : "public";
   return (
-    <section className="panel settings-block">
+    <section className="panel settings-block settings-span">
       <h2>Export defaults</h2>
-      <div className="stack">
-        <label htmlFor="export-format">Format</label>
-        <select id="export-format" className="select" disabled={readOnly} value={format} onChange={(event) => setFormat(event.target.value)}>
-          <option value="">CSV</option>
-          <option value="csv">CSV</option>
-          <option value="xlsx">Excel</option>
-          <option value="docx">Word</option>
-          <option value="pdf">PDF</option>
-          <option value="json">JSON</option>
-        </select>
-        <label htmlFor="export-profile">Profile</label>
-        <select id="export-profile" className="select" disabled={readOnly} value={profileId} onChange={(event) => setProfileId(event.target.value)}>
-          <option value="">Marked default</option>
-          {api.exportProfiles.map((profile) => (
-            <option key={profile.id} value={profile.id}>
-              {profile.name}
-            </option>
-          ))}
-        </select>
+      <div className="export-defaults-row">
+        <div>
+          <label htmlFor="export-format">Default format</label>
+          <select id="export-format" className="select" disabled={readOnly} value={format || "csv"} onChange={(event) => setFormat(event.target.value)}>
+            {EXPORT_FORMATS.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="export-field-set">Default field set</label>
+          <select
+            id="export-field-set"
+            className="select"
+            disabled={readOnly}
+            value={fieldChoice}
+            onChange={(event) => setFieldChoice(event.target.value)}
+          >
+            <option value="public">{PUBLIC_PRESET_NAME}</option>
+            <option value="full">{FULL_PRESET_NAME}</option>
+            {api.exportProfiles.map((profile) => (
+              <option key={profile.id} value={profile.id}>
+                {profile.name}
+              </option>
+            ))}
+          </select>
+        </div>
         {readOnly ? null : (
           <SaveDefaults
             publicMark={tenant.distribution_public ?? ""}
             internalMark={tenant.distribution_internal ?? ""}
-            format={format}
-            profileId={profileId}
+            format={format || "csv"}
+            profileId={savedProfileId}
+            fieldSet={savedFieldSet}
             reminder={Boolean(tenant.owner_reminder_enabled)}
             label="Save export defaults"
           />
         )}
       </div>
+      <p className="hint export-defaults-note">Field sets are saved from the Export dialog.</p>
     </section>
   );
+}
+
+function storedFieldSet(tenant: { default_export_profile_id?: string | null; default_export_field_set?: string | null }): string {
+  if (tenant.default_export_profile_id) return "";
+  return tenant.default_export_field_set === "full" ? "full" : "public";
 }
 
 function SaveDefaults({
@@ -292,6 +330,7 @@ function SaveDefaults({
   internalMark,
   format,
   profileId,
+  fieldSet,
   reminder,
   label,
 }: {
@@ -299,6 +338,7 @@ function SaveDefaults({
   internalMark: string;
   format: string;
   profileId: string;
+  fieldSet: string;
   reminder: boolean;
   label: string;
 }) {
@@ -313,6 +353,7 @@ function SaveDefaults({
           distributionInternal: internalMark,
           exportFormat: format,
           exportProfileId: profileId,
+          exportFieldSet: fieldSet,
           reminderEnabled: reminder,
         })
       }
@@ -330,6 +371,7 @@ function usePersistSettings() {
     distributionInternal: string;
     exportFormat: string;
     exportProfileId: string;
+    exportFieldSet: string;
     reminderEnabled: boolean;
     markReminderSeen?: boolean;
   }) => {
@@ -342,6 +384,7 @@ function usePersistSettings() {
         distributionInternal: input.distributionInternal,
         exportFormat: input.exportFormat,
         exportProfileId: input.exportProfileId,
+        exportFieldSet: input.exportFieldSet,
         reminderEnabled: input.reminderEnabled,
         markReminderSeen: input.markReminderSeen,
       });
@@ -355,6 +398,7 @@ function usePersistSettings() {
       distributionInternal: input.distributionInternal,
       exportFormat: input.exportFormat,
       exportProfileId: input.exportProfileId,
+      exportFieldSet: input.exportFieldSet,
       reminderEnabled: input.reminderEnabled,
       markReminderSeen: input.markReminderSeen,
     }).then(async (result) => {

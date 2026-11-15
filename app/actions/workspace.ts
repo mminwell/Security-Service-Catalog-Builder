@@ -75,14 +75,17 @@ export async function saveWorkspaceSettingsAction(input: {
   distributionInternal: string;
   exportFormat: string;
   exportProfileId: string;
+  /** `public`, `full`, or blank when a saved profile is the default. */
+  exportFieldSet?: string;
   reminderEnabled: boolean;
   markReminderSeen?: boolean;
 }): Promise<ActionResult<null>> {
   try {
     if (!isUuid(input.tenantId)) throw new Error("That workspace is not valid.");
     if (input.exportProfileId && !isUuid(input.exportProfileId)) throw new Error("That export profile is not valid.");
+    const fieldSet = input.exportFieldSet === "full" ? "full" : input.exportFieldSet === "public" ? "public" : null;
     const { supabase } = await createAuthedClient();
-    const { error } = await supabase.rpc("save_workspace_settings", {
+    const args = {
       p_tenant: input.tenantId,
       p_distribution_public: input.distributionPublic,
       p_distribution_internal: input.distributionInternal,
@@ -90,8 +93,17 @@ export async function saveWorkspaceSettingsAction(input: {
       p_profile: input.exportProfileId || null,
       p_reminder: input.reminderEnabled,
       p_mark_reminder_seen: Boolean(input.markReminderSeen),
-    });
-    if (error) throw new Error(error.message);
+    };
+    const saved = await supabase.rpc("save_workspace_settings", { ...args, p_field_set: fieldSet });
+    if (saved.error && /schema cache|could not find the function|save_workspace_settings/i.test(saved.error.message)) {
+      if (fieldSet === "full") {
+        throw new Error("Apply the latest database update before saving Full catalog as the default.");
+      }
+      const retry = await supabase.rpc("save_workspace_settings", args);
+      if (retry.error) throw new Error(retry.error.message);
+      return ok(null);
+    }
+    if (saved.error) throw new Error(saved.error.message);
     return ok(null);
   } catch (error) {
     return fail(error);

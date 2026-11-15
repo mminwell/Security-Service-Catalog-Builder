@@ -625,6 +625,7 @@ function asTenant(row: Record<string, unknown>): Tenant {
     distribution_internal: textOrNull(row.distribution_internal),
     default_export_format: exportFormat(row.default_export_format),
     default_export_profile_id: textOrNull(row.default_export_profile_id),
+    default_export_field_set: row.default_export_field_set === "full" ? "full" : row.default_export_field_set === "public" ? "public" : null,
     owner_reminder_enabled: row.owner_reminder_enabled === true,
     owner_reminder_seen_at: textOrNull(row.owner_reminder_seen_at),
     is_active: Boolean(row.is_active),

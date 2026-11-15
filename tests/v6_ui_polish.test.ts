@@ -6,6 +6,7 @@ import {
   distributionWordingToStore,
 } from "@/lib/catalog/csv";
 import { SERVICE_ID_STYLES } from "@/lib/catalog/service-code";
+import { FULL_PRESET_NAME, PUBLIC_PRESET_NAME, workspaceFieldSetChoice } from "@/lib/catalog/export-plan";
 import {
   ARCHIVE_SERVICE_CONFIRMATION,
   DELETE_SERVICE_CONFIRMATION,
@@ -74,7 +75,26 @@ describe("workspace settings copy", () => {
     expect(settings).toContain("distributionWordingForEditor");
     expect(settings).toContain("id-style-copy");
     expect(settings).toContain("<h2>Export defaults</h2>");
+    expect(settings).toContain("settings-span");
+    expect(settings).toContain("Default format");
+    expect(settings).toContain("Default field set");
+    expect(settings).toContain("Field sets are saved from the Export dialog.");
+    expect(settings).not.toContain("Marked default");
     expect(help).toContain("company name");
     expect(help).not.toMatch(/workspace name/i);
+  });
+
+  it("treats the chosen field set as the only export default", () => {
+    const profileId = "11111111-1111-4111-8111-111111111111";
+    expect(PUBLIC_PRESET_NAME).toBe("Public catalog");
+    expect(FULL_PRESET_NAME).toBe("Full catalog");
+    expect(workspaceFieldSetChoice({ profileId: null, fieldSet: null })).toBe("public");
+    expect(workspaceFieldSetChoice({ profileId: null, fieldSet: "full" })).toBe("full");
+    expect(workspaceFieldSetChoice({ profileId, fieldSet: "full", profileIds: [profileId] })).toBe(profileId);
+    expect(workspaceFieldSetChoice({ profileId: "missing", fieldSet: "full", profileIds: [] })).toBe("full");
+    const dialog = readFileSync("components/export-dialog.tsx", "utf8");
+    expect(dialog).toContain("workspaceFieldSetChoice");
+    expect(dialog).not.toContain("Use as the workspace default");
+    expect(dialog).toContain("isDefault: false");
   });
 });

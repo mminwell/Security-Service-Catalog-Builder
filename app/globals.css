@@ -1171,9 +1171,19 @@ table.catalog tr.clickable:hover td { background: rgba(240, 238, 230, 0.55); }
 .settings-members { font-size: 13px; }
 .settings-members td, .settings-members th { padding: 4px 8px; }
 .settings-check { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+.export-defaults-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.8fr) minmax(220px, 1.2fr) auto;
+  gap: 8px 16px;
+  align-items: end;
+}
+.export-defaults-row label { display: block; margin: 0 0 4px; }
+.export-defaults-row .select { width: 100%; }
+.export-defaults-note { margin: 6px 0 0; }
 @media (max-width: 860px) {
   .settings-grid { grid-template-columns: 1fr; }
   .name-row, .invite-row, .id-style-row { flex-wrap: wrap; }
+  .export-defaults-row { grid-template-columns: 1fr; }
   .invite-row .select, .name-row .btn, .invite-row .btn { width: 100%; }
 }
 .save-toast-live { position: relative; }
