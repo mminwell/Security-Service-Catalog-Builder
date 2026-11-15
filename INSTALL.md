@@ -1,6 +1,6 @@
 # Install
 
-Self-hosting guide for the Security Service Catalog Builder. The license is [PolyForm Noncommercial 1.0.0](LICENSE). Personal, educational, research, and nonprofit use is free. Commercial use, including use by or for a business or in paid consulting, needs a separate license from the author: https://minwell.app.
+Self-hosting guide for the Security Service Catalog Builder. The license is [PolyForm Noncommercial 1.0.0](LICENSE). Personal, educational, research, and nonprofit use is free. Commercial use, including use by or for a business or in paid consulting, needs a separate license from the author: mikeminwell2002@protonmail.com.
 
 These steps do not change an existing hosted project until the SQL or the deploy settings are applied on purpose.
 
@@ -62,7 +62,7 @@ supabase db push
 
 Skip `supabase/seed.sql`. It inserts fictional workspaces that have no members, so nobody can open them. **Load sample catalog** on an empty workspace is the supported sample.
 
-`0012` stores a profile name and does not rename a workspace that already exists. `0015` only replaces invite functions so a token can be created when pgcrypto lives in the `extensions` schema. `0017` adds the app's rate limiter. `0018` names a new account's first workspace from the first name, writes the missing audit rows, and lets a platform owner (Site Admin) transfer or delete a workspace. Apply `0018` before relying on those behaviors.
+`0012` stores a profile name and does not rename a workspace that already exists. `0015` only replaces invite functions so a token can be created when pgcrypto lives in the `extensions` schema. `0017` adds the app's rate limiter. `0018` names a new account's first workspace from the first name, writes the missing audit rows, and lets a platform owner (Site Admin) transfer or delete a workspace. Apply `0018` before relying on those behaviors. Pull request #19 does not add a migration. It lets a signed-out person reach sign-in, magic link, sign-up, and password reset instead of being sent back to the login page.
 
 ## 4. Configure Auth
 
@@ -129,4 +129,4 @@ Add that deployment's origin to the Supabase redirect URLs, ending in `/auth/cal
 
 ## Updating
 
-Pull the latest code, run `npm install`, and apply any new files in `supabase/migrations` that are not on the database yet. Keep filename order. `supabase db push` does that against the linked project. Then restart `npm run dev`, or redeploy. Existing workspaces keep their current names. `0018` does not rename them.
+Pull the latest code, run `npm install`, and apply any new files in `supabase/migrations` that are not on the database yet. Keep filename order. `supabase db push` does that against the linked project. Then restart `npm run dev`, or redeploy. Existing workspaces keep their current names. `0018` does not rename them. Pull request #19 has no new migration. Redeploy it so signed-out sign-in is not sent back to the login page.

@@ -12,4 +12,4 @@ Admins can choose and save the columns. Everyone else can keep a column arrangem
 
 Services with an archived or missing owner can be filtered as Owner needed. Open a row to edit that service.
 
-Change history describes each change in plain language. It includes service edits, settings, role changes, people added or removed, and invitations. Open Change history on one service to see only that service.
+Change history describes each change in plain language. It includes service edits, settings, role changes, people added or removed, and invites sent, resent, or cancelled. Open Change history on one service to see only that service.

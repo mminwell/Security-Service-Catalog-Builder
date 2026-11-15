@@ -1,6 +1,6 @@
 import { isDemoPath, stripDemoPrefix } from "@/lib/demo/paths";
 
-export const SUPPORT_EMAIL = "support@minwell.app";
+export const SUPPORT_EMAIL = "mikeminwell2002@protonmail.com";
 
 export type HelpArticle = {
   slug: string;
