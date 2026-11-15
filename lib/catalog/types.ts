@@ -267,7 +267,8 @@ export type ExportProfile = {
 
 export type AuditEntry = {
   id: string;
-  tenant_id: string;
+  /** Null after the workspace is deleted. Only a Site Admin can read those rows. */
+  tenant_id: string | null;
   actor_user_id: string | null;
   actor_label: string;
   table_name: string;

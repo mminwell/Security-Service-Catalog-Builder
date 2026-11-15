@@ -16,4 +16,4 @@ Transfer ownership is in the Danger zone, and only the Site Admin can see that s
 
 Delete is in the same Danger zone. The Site Admin types the company name exactly, then the workspace and its data are removed. Members, services, and invites in that workspace go with it.
 
-Change history records these member and invite changes, along with edits to services and settings. Open it from the catalog, or from a single service for that service only.
+Change history describes those events in plain language, along with service and settings edits. Open it from the catalog, or from a single service for that service only. After a workspace is deleted, the remaining history is on the Site Admin page under Deleted workspaces.

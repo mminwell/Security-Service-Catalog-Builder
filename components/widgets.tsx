@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { labelMap, summarizeAudit } from "@/lib/catalog/audit";
+import { auditActorName, labelMap, summarizeAudit, type AuditPerson } from "@/lib/catalog/audit";
 import { activeOptions } from "@/lib/catalog/lookups";
 import { DEPTH_META, type AuditEntry, type DepthLevel, type FieldDefinition, type LookupOption, type Visibility } from "@/lib/catalog/types";
 import { visibilityLabel, type Tone } from "@/lib/catalog/present";
@@ -250,11 +250,13 @@ export function AuditDrawer({
   title,
   entries,
   fields,
+  people = [],
   onClose,
 }: {
   title: string;
   entries: AuditEntry[];
   fields: FieldDefinition[];
+  people?: AuditPerson[];
   onClose: () => void;
 }) {
   const labels = labelMap(fields);
@@ -280,12 +282,12 @@ export function AuditDrawer({
         ) : (
           <div>
             {entries.map((entry) => {
-              const summary = summarizeAudit(entry, labels);
+              const summary = summarizeAudit(entry, labels, people);
               return (
                 <article className="audit-item" key={entry.id}>
                   <p className="micro">{new Date(entry.created_at).toLocaleString()}</p>
                   <p>
-                    <strong>{entry.actor_label}</strong> · {summary.title}
+                    <strong>{auditActorName(entry, people)}</strong> · {summary.title}
                   </p>
                   {summary.changes.length > 0 ? (
                     <ul>
