@@ -3,13 +3,15 @@
 import { useEffect, useState } from "react";
 import {
   deleteAccountAction,
+  listDeletedWorkspaceHistoryAction,
   listSiteAccountsAction,
   reassignDeactivatedOwnersAction,
   setAccountActiveAction,
 } from "@/app/actions/workspace";
 import { roleLabel } from "@/lib/catalog/access";
+import { auditActorName, deletedWorkspaceName, labelMap, summarizeAudit } from "@/lib/catalog/audit";
 import { ownerDisplayName } from "@/lib/catalog/owner-names";
-import type { Role, SiteAccount } from "@/lib/catalog/types";
+import type { AuditEntry, Role, SiteAccount } from "@/lib/catalog/types";
 import { useCatalog } from "@/components/catalog-provider";
 import { useSaveToast } from "@/components/save-toast";
 import { OwnerSelect } from "@/components/owner-select";
@@ -17,6 +19,7 @@ import { OwnerSelect } from "@/components/owner-select";
 export function SiteUsers({ previewAccounts }: { previewAccounts?: SiteAccount[] }) {
   const api = useCatalog();
   const [accounts, setAccounts] = useState<SiteAccount[] | null>(previewAccounts ?? null);
+  const [history, setHistory] = useState<AuditEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [confirmEmail, setConfirmEmail] = useState("");
@@ -48,6 +51,10 @@ export function SiteUsers({ previewAccounts }: { previewAccounts?: SiteAccount[]
         return;
       }
       setAccounts(result.data as SiteAccount[]);
+    });
+    void listDeletedWorkspaceHistoryAction().then((result) => {
+      if (cancelled) return;
+      setHistory(result.ok ? result.data : []);
     });
     return () => {
       cancelled = true;
@@ -101,6 +108,7 @@ export function SiteUsers({ previewAccounts }: { previewAccounts?: SiteAccount[]
           ))}
         </ul>
       </section>
+      <DeletedWorkspaceHistory entries={history} />
       <label htmlFor="account-search">Search accounts</label>
       <input id="account-search" className="input" value={query} onChange={(event) => setQuery(event.target.value)} />
       {error ? <p className="field-error">{error}</p> : null}
@@ -227,5 +235,33 @@ export function SiteUsers({ previewAccounts }: { previewAccounts?: SiteAccount[]
         </section>
       ) : null}
     </>
+  );
+}
+
+function DeletedWorkspaceHistory({ entries }: { entries: AuditEntry[] | null }) {
+  if (!entries) return null;
+  const labels = labelMap([]);
+  return (
+    <section className="panel settings-block">
+      <h2>Deleted workspaces</h2>
+      <p className="hint">History that remains after a workspace is deleted. Only a Site Admin can see it.</p>
+      {entries.length === 0 ? <p className="lede">No deleted workspace history yet.</p> : null}
+      <ul className="stack">
+        {entries.map((entry) => {
+          const summary = summarizeAudit(entry, labels);
+          return (
+            <li key={entry.id}>
+              <span className="micro">{new Date(entry.created_at).toLocaleString()}</span>
+              {" · "}
+              <strong>{auditActorName(entry)}</strong>
+              {" · "}
+              {deletedWorkspaceName(entry, entries)}
+              {" · "}
+              {summary.title}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }

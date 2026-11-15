@@ -7,10 +7,10 @@ import { isWorkspaceRole, readableInviteError } from "@/lib/auth/invites";
 import { normalizeAccountProfile } from "@/lib/auth/profile";
 import { isUuid } from "@/lib/auth/ids";
 import type { PlannedOwnerImport } from "@/lib/catalog/owner-names";
-import type { Role } from "@/lib/catalog/types";
+import { auditFromRow, persistUserProfile } from "@/lib/data/remote";
+import type { AuditEntry, Role } from "@/lib/catalog/types";
 import { createAuthedClient, loadOwnMemberships } from "@/lib/server/guard";
 import { fail, ok, type ActionResult } from "@/lib/server/result";
-import { persistUserProfile } from "@/lib/data/remote";
 import { clientAddress, enforceRateLimits } from "@/lib/security/rate-limit";
 
 export async function cancelInviteAction(inviteId: string): Promise<ActionResult<null>> {
@@ -303,6 +303,26 @@ export async function reconcileOwnersAction(
     });
     if (error) throw new Error(error.message);
     return ok({ services: typeof data === "number" ? data : 0 });
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+export async function listDeletedWorkspaceHistoryAction(): Promise<ActionResult<AuditEntry[]>> {
+  try {
+    const { supabase, user } = await createAuthedClient();
+    const memberships = await loadOwnMemberships(supabase, user.id);
+    if (!memberships.some((row) => row.role === "platform_owner")) {
+      throw new Error("Only a platform owner can view deleted workspace history.");
+    }
+    const { data, error } = await supabase
+      .from("audit_log")
+      .select("*")
+      .is("tenant_id", null)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) throw new Error(error.message);
+    return ok((data ?? []).map((row) => auditFromRow(row as Record<string, unknown>)));
   } catch (error) {
     return fail(error);
   }

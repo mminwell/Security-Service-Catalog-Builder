@@ -156,7 +156,7 @@ export async function hydrateFromSupabase(supabase: SupabaseClient): Promise<Hyd
       elements: (elements.data ?? []).map(asElement),
       mappings: (mappings.data ?? []).map(asMapping),
       exportProfiles: (profiles.data ?? []).map(asExportProfile),
-      audit: (audit.data ?? []).map(asAudit),
+      audit: (audit.data ?? []).map(auditFromRow),
     },
     invitations,
     owners,
@@ -891,11 +891,11 @@ function exportFormat(value: unknown): Tenant["default_export_format"] {
   return null;
 }
 
-function asAudit(row: Record<string, unknown>): AuditEntry {
+export function auditFromRow(row: Record<string, unknown>): AuditEntry {
   const action = row.action === "delete" || row.action === "update" ? row.action : "insert";
   return {
     id: String(row.id),
-    tenant_id: String(row.tenant_id),
+    tenant_id: row.tenant_id == null ? null : String(row.tenant_id),
     actor_user_id: row.actor_user_id == null ? null : String(row.actor_user_id),
     actor_label: String(row.actor_label ?? "Unknown"),
     table_name: String(row.table_name),
