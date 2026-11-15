@@ -1,7 +1,6 @@
 export const MAX_PERSON_NAME_LENGTH = 80;
 export const MIN_COMPANY_LENGTH = 2;
 export const MAX_COMPANY_LENGTH = 80;
-export const STARTER_WORKSPACE_NAME = "Starter Workspace";
 export const PROFILE_PROMPT_DISMISS_KEY = "sscb.profilePrompt.dismissed";
 
 const CONTROL = /[\u0000-\u001F\u007F]/;
@@ -49,11 +48,24 @@ export function validateCompanyName(value: string): string | null {
 }
 
 export function validateAccountProfile(input: AccountProfileInput): string | null {
+  const company = collapse(input.company);
   return (
     validatePersonName(input.firstName, "first name") ??
     validatePersonName(input.lastName, "last name") ??
-    validateCompanyName(input.company)
+    (company ? validateCompanyName(input.company) : null)
   );
+}
+
+/** Create account collects a name only. Company stays optional on the profile. */
+export function normalizeSignupProfile(input: { firstName: string; lastName: string }): AccountProfile {
+  const error =
+    validatePersonName(input.firstName, "first name") ?? validatePersonName(input.lastName, "last name");
+  if (error) throw new Error(error);
+  return {
+    firstName: collapse(input.firstName),
+    lastName: collapse(input.lastName),
+    company: "",
+  };
 }
 
 export function normalizeAccountProfile(input: AccountProfileInput): AccountProfile {
@@ -70,31 +82,29 @@ export function normalizeAccountProfile(input: AccountProfileInput): AccountProf
 export function signupUserMetadata(profile: AccountProfile): {
   first_name: string;
   last_name: string;
-  company: string;
+  company?: string;
 } {
-  return {
+  const metadata: { first_name: string; last_name: string; company?: string } = {
     first_name: profile.firstName,
     last_name: profile.lastName,
-    company: profile.company,
   };
+  if (profile.company) metadata.company = profile.company;
+  return metadata;
 }
 
 export function accountProfileFromMetadata(metadata: unknown): AccountProfile | null {
   if (!metadata || typeof metadata !== "object") return null;
   const record = metadata as Record<string, unknown>;
-  const input = {
-    firstName: typeof record.first_name === "string" ? record.first_name : "",
-    lastName: typeof record.last_name === "string" ? record.last_name : "",
-    company: typeof record.company === "string" ? record.company : "",
+  const firstName = typeof record.first_name === "string" ? record.first_name : "";
+  const lastName = typeof record.last_name === "string" ? record.last_name : "";
+  const company = typeof record.company === "string" ? record.company : "";
+  if (validatePersonName(firstName, "first name") || validatePersonName(lastName, "last name")) return null;
+  if (collapse(company) && validateCompanyName(company)) return null;
+  return {
+    firstName: collapse(firstName),
+    lastName: collapse(lastName),
+    company: collapse(company),
   };
-  if (validateAccountProfile(input)) return null;
-  return normalizeAccountProfile(input);
-}
-
-/** Name used only when this account's first workspace is created automatically. */
-export function workspaceNameFromCompany(company: string | null | undefined): string {
-  if (!company || validateCompanyName(company)) return STARTER_WORKSPACE_NAME;
-  return collapse(company);
 }
 
 export function headerLabel(session: { email: string; firstName?: string | null }): string {

@@ -2,6 +2,7 @@
   "name": "security-service-catalog-builder",
   "version": "5.0.0",
   "private": true,
+  "license": "PolyForm-Noncommercial-1.0.0",
   "description": "Multi-tenant security service catalog with Supabase Auth, supporting artifacts, audience exports, and NIST CSF 2.0 coverage.",
   "scripts": {
     "dev": "next dev",

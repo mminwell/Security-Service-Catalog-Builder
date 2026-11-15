@@ -30,7 +30,7 @@ Open **SQL Editor → New query**. Paste and run each migration in order:
 11. `supabase/migrations/0011_v5_rename_workspace.sql`
 12. `supabase/migrations/0012_v6_user_profiles.sql`
 
-`0008` adds the artifact registry. `0009` adds invitations and makes the first account Admin of one workspace. `0010` revokes API execute on trigger functions and internal helpers. `0012` adds a profile row for first name, last name, and company. It does not fill in existing accounts and does not rename a workspace that already exists. When the first account is created after `0012`, that workspace uses the company name. Do not run `supabase/seed.sql` for a normal project. That file inserts fictional Acme Corp and Meridian Health workspaces with no members, so nobody can open them. Use **Load sample catalog** inside an empty workspace instead.
+`0008` adds the artifact registry. `0009` adds invitations and makes the first account Admin of one workspace. `0010` revokes API execute on trigger functions and internal helpers. `0012` adds a profile row for first name, last name, and an optional company. It does not fill in existing accounts and does not rename a workspace that already exists. When the first account is created after `0018`, that workspace uses a placeholder name from the first name. Rename it in Workspace Settings. Do not run `supabase/seed.sql` for a normal project. That file inserts fictional Acme Corp and Meridian Health workspaces with no members, so nobody can open them. Use **Load sample catalog** inside an empty workspace instead.
 
 ## 3. Auth
 
@@ -58,7 +58,7 @@ Framework preset: Next.js. Build command: `npm run build`.
 
 ## 5. Open the site
 
-Create an account with a first name, last name, and company. That first account becomes Admin of a workspace named for the company, which has the starter dropdowns and an empty catalog. From the workspace switcher an Admin can invite Viewer, Editor, and Admin members, create another workspace, and load the sample catalog while the workspace is empty. The account menu’s Profile editor changes the person’s name. It does not rename the workspace.
+Create an account with a first name, last name, and password. There is no Company box. That first account becomes Admin of a workspace named from the first name, which has the starter dropdowns and an empty catalog. Rename the workspace in Workspace Settings. From the workspace switcher an Admin can invite Viewer, Editor, and Admin members, create another workspace, and load the sample catalog while the workspace is empty. The account menu’s Profile editor changes the person’s name. It does not rename the workspace.
 
 ## What the policies do
 

@@ -89,7 +89,7 @@ export async function hydrateFromSupabase(supabase: SupabaseClient): Promise<Hyd
     supabase.from("artifact_service_links").select("*").in("tenant_id", ids),
     supabase
       .from("workspace_invitations")
-      .select("id, tenant_id, email, role, created_at, expires_at, cancelled_at")
+      .select("id, tenant_id, email, role, created_at, expires_at, cancelled_at, becomes_owner")
       .is("accepted_at", null)
       .is("cancelled_at", null)
       .in("tenant_id", ids),
@@ -102,6 +102,14 @@ export async function hydrateFromSupabase(supabase: SupabaseClient): Promise<Hyd
   if (members.error) throw new Error(members.error.message);
   if (audit.error) throw new Error(audit.error.message);
   let invitationRows: { data: InvitationRow[] | null; error: { message: string } | null } = invitationsQuery;
+  if (invitationRows.error && /becomes_owner/i.test(invitationRows.error.message)) {
+    invitationRows = await supabase
+      .from("workspace_invitations")
+      .select("id, tenant_id, email, role, created_at, expires_at, cancelled_at")
+      .is("accepted_at", null)
+      .is("cancelled_at", null)
+      .in("tenant_id", ids);
+  }
   if (invitationRows.error && /expires_at|cancelled_at|schema cache|column/i.test(invitationRows.error.message)) {
     invitationRows = await supabase
       .from("workspace_invitations")
@@ -186,7 +194,7 @@ export async function loadSessionProfile(supabase: SupabaseClient, user: User): 
     user_id: user.id,
     first_name: fromMetadata.firstName,
     last_name: fromMetadata.lastName,
-    company: fromMetadata.company,
+    company: fromMetadata.company ? fromMetadata.company : null,
     updated_at: new Date().toISOString(),
   });
   if (saved.error && !isMissingUserProfilesError(saved.error.message)) throw new Error(saved.error.message);
@@ -198,7 +206,7 @@ export async function persistUserProfile(supabase: SupabaseClient, userId: strin
     user_id: userId,
     first_name: profile.firstName,
     last_name: profile.lastName,
-    company: profile.company,
+    company: profile.company ? profile.company : null,
     updated_at: new Date().toISOString(),
   });
   if (error) throw new Error(error.message);
@@ -628,6 +636,7 @@ function asTenant(row: Record<string, unknown>): Tenant {
     default_export_field_set: row.default_export_field_set === "full" ? "full" : row.default_export_field_set === "public" ? "public" : null,
     owner_reminder_enabled: row.owner_reminder_enabled === true,
     owner_reminder_seen_at: textOrNull(row.owner_reminder_seen_at),
+    owner_user_id: textOrNull(row.owner_user_id),
     is_active: Boolean(row.is_active),
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
@@ -800,7 +809,7 @@ type InvitationRow = {
   created_at: string;
 };
 
-function asInvitation(row: InvitationRow & { expires_at?: string | null; cancelled_at?: string | null }): Invitation {
+function asInvitation(row: InvitationRow & { expires_at?: string | null; cancelled_at?: string | null; becomes_owner?: boolean | null }): Invitation {
   const role: Role =
     row.role === "platform_owner" ||
     row.role === "tenant_admin" ||
@@ -817,6 +826,7 @@ function asInvitation(row: InvitationRow & { expires_at?: string | null; cancell
     created_at: row.created_at,
     expires_at: row.expires_at ?? null,
     cancelled_at: row.cancelled_at ?? null,
+    becomes_owner: row.becomes_owner === true,
   };
 }
 

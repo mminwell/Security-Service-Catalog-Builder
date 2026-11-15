@@ -3,7 +3,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { normalizeEmail, validateEmail, validatePassword } from "@/lib/auth/credentials";
 import { interpretMagicLinkError, magicLinkRedirectTo, MAGIC_LINK_NOTICE } from "@/lib/auth/magic-link";
 import { friendlyAuthError } from "@/lib/auth/messages";
-import { normalizeAccountProfile, signupUserMetadata } from "@/lib/auth/profile";
+import { normalizeSignupProfile, signupUserMetadata } from "@/lib/auth/profile";
 import { RATE_LIMIT_MESSAGE } from "@/lib/security/copy";
 import { clientAddress, enforceRateLimits, isRateLimitedMessage, type RateLimitCaller } from "@/lib/security/rate-limit";
 import { supabaseConfig } from "@/lib/supabase/env";
@@ -23,7 +23,7 @@ export type AuthAttemptClient = RateLimitCaller & {
     signUp: (input: {
       email: string;
       password: string;
-      options: { emailRedirectTo: string; data: { first_name: string; last_name: string; company: string } };
+      options: { emailRedirectTo: string; data: { first_name: string; last_name: string; company?: string } };
     }) => Promise<{
       data: { session: { access_token: string; refresh_token: string } | null };
       error: { message: string } | null;
@@ -45,9 +45,9 @@ export async function runAuthAttempt(
   kind: AuthAttemptKind,
   client?: AuthAttemptClient,
 ): Promise<Response> {
+  if (!sameOrigin(request)) return json({ error: "That request was refused." }, 403);
   const body = await readBody(request);
   if (!body) return json({ error: "That request could not be read." }, 400);
-  if (!sameOrigin(request)) return json({ error: "That request was refused." }, 403);
 
   const email = typeof body.email === "string" ? body.email : "";
   const emailError = validateEmail(email);
@@ -60,16 +60,15 @@ export async function runAuthAttempt(
     if (passwordError) return json({ error: passwordError }, 400);
   }
 
-  let profile: ReturnType<typeof normalizeAccountProfile> | null = null;
+  let profile: ReturnType<typeof normalizeSignupProfile> | null = null;
   if (kind === "sign_up") {
     try {
-      profile = normalizeAccountProfile({
+      profile = normalizeSignupProfile({
         firstName: typeof body.firstName === "string" ? body.firstName : "",
         lastName: typeof body.lastName === "string" ? body.lastName : "",
-        company: typeof body.company === "string" ? body.company : "",
       });
     } catch (error) {
-      const message = error instanceof Error && error.message.trim() ? error.message : "Enter your name and company.";
+      const message = error instanceof Error && error.message.trim() ? error.message : "Enter your name.";
       return json({ error: message }, 400);
     }
   }
@@ -111,7 +110,7 @@ export async function runAuthAttempt(
   }
 
   if (kind === "sign_up") {
-    if (!profile) return json({ error: "Enter your name and company." }, 400);
+    if (!profile) return json({ error: "Enter your name." }, 400);
     const { data, error } = await supabase.auth.signUp({
       email: normalized,
       password: String(body.password),
@@ -155,11 +154,26 @@ export async function runAuthAttempt(
   );
 }
 
+/** Origin when the browser sent one, otherwise Referer. A missing or foreign value is refused. */
 export function sameOrigin(request: Request): boolean {
-  const origin = request.headers.get("origin");
-  if (!origin) return false;
+  let expected: string;
   try {
-    return new URL(origin).origin === new URL(requestOrigin(request)).origin;
+    expected = new URL(requestOrigin(request)).origin;
+  } catch {
+    return false;
+  }
+  const origin = request.headers.get("origin");
+  if (origin) {
+    try {
+      return new URL(origin).origin === expected;
+    } catch {
+      return false;
+    }
+  }
+  const referer = request.headers.get("referer");
+  if (!referer) return false;
+  try {
+    return new URL(referer).origin === expected;
   } catch {
     return false;
   }

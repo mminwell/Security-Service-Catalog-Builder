@@ -198,6 +198,7 @@ export function CoverageScreen() {
                 <span className="code">{group.fn?.code}</span> {group.fn?.title}
                 <span className="muted"> · </span>
                 <span className="code">{group.category.code}</span> {group.category.title}
+                <CategoryCountBadges outcomes={group.outcomes} />
               </h3>
               <ul>
                 {group.outcomes.map((outcome) => (
@@ -300,6 +301,7 @@ export function CoverageScreen() {
                 <span className="code">{group.fn?.code}</span> {group.fn?.title}
                 <span className="muted"> · </span>
                 <span className="code">{group.category.code}</span> {group.category.title}
+                <CategoryCountBadges outcomes={group.outcomes} />
               </h2>
               <p className="picker-statement">{group.category.statement}</p>
               <ul>
@@ -465,6 +467,18 @@ function Count({
 function statusLabel(lookups: ReturnType<typeof useCatalog>["lookups"], status: OutcomeStatus): string {
   if (status === "unmapped") return "Unmapped";
   return optionByCode(lookups, "outcome_coverage", status)?.label ?? status;
+}
+
+function CategoryCountBadges({ outcomes }: { outcomes: readonly OutcomeAssessment[] }) {
+  const counts = countsFor(outcomes);
+  return (
+    <span className="category-counts" aria-label="Category outcome counts">
+      <Badge tone={STATUS_TONE.full}>{counts.full} Full</Badge>
+      <Badge tone={STATUS_TONE.partial}>{counts.partial} Partial</Badge>
+      <Badge tone={STATUS_TONE.none}>{counts.none} None</Badge>
+      <Badge tone={STATUS_TONE.unmapped}>{counts.unmapped} Unmapped</Badge>
+    </span>
+  );
 }
 
 function groupVisible(outcomes: OutcomeAssessment[], elements: ReturnType<typeof useCatalog>["elements"]) {

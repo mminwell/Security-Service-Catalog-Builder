@@ -1118,6 +1118,14 @@ table.catalog tr.clickable:hover td { background: rgba(240, 238, 230, 0.55); }
 .outcome-groups { display: flex; flex-direction: column; gap: 10px; }
 .dashboard-panel-title { font-size: 22px; margin: 8px 0 0; }
 .outcome-group h2 { font-size: 20px; }
+.category-counts {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.category-counts .badge { height: 18px; padding: 0 7px; font-size: 11px; }
 .outcome-group ul { list-style: none; margin: 8px 0 0; padding: 0; }
 .outcome-row { padding: 10px 0; border-top: 1px solid var(--gray-100); }
 .outcome-main { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
