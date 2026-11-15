@@ -5,8 +5,8 @@ order: 12
 routes: []
 ---
 
-The question mark in the top bar opens this guide. Search looks through these pages in the browser. Section links stay in the panel.
+The question mark in the top bar opens this guide. Search looks through these pages in this browser. It does not send your search anywhere.
 
-Contact support sends an email. It does not leave the catalog unless you choose that link.
+Pages that belong to the screen you are on appear under On this page. The other pages are grouped below that.
 
-Page-specific notes can be attached to a route later. A page that has them shows them under On this page.
+Contact support opens an email to support@minwell.app. The catalog does not send that message for you.

@@ -85,6 +85,9 @@ describe("help search", () => {
   it("loads the markdown guide and finds a page without leaving the browser", () => {
     expect(articles.map((article) => article.slug)).toContain("sign-in");
     expect(searchHelp(articles, "magic link").some((article) => article.slug === "sign-in")).toBe(true);
+    expect(searchHelp(articles, "too many attempts").some((article) => article.slug === "sign-in")).toBe(true);
+    expect(searchHelp(articles, "danger zone").some((article) => article.slug === "workspace")).toBe(true);
+    expect(searchHelp(articles, "contact support").some((article) => article.slug === "help")).toBe(true);
     expect(searchHelp(articles, "nothing is written").some((article) => article.slug === "demo")).toBe(true);
     expect(searchHelp(articles, "zzzz-not-in-the-guide")).toEqual([]);
     expect(searchHelp(articles, "").length).toBe(articles.length);

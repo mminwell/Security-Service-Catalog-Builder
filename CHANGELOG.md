@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Pull request #19 lets a signed-out person reach password sign-in, magic link, sign-up, and password reset. Those requests are no longer sent back to the login page, which had surfaced the raw message "Auth session missing!" A missing session is treated as signed out, and that raw text is replaced with "Sign-in did not start a session. Try again." There is no new migration.
+- In-app help matches what shipped through #18 and #19: sign-in and its plain-language errors, signup without a Company box, workspace transfer and the Site Admin Danger zone, change history, CSF category counts, and the Templates list default.
+
 - Create account no longer asks for a company. The first workspace is named from the first name (`Ada's workspace`) or `My workspace`, and the owner renames it in Workspace Settings (`0018_v6_account_audit_workspace.sql`).
 - Role changes, member removal, invitation send, resend, and cancel, plus site-admin deactivate and delete, write an audit row. A platform owner (Site Admin) can delete a workspace or transfer ownership. The deletion audit row is kept after the workspace is gone.
 - State-changing auth POSTs, including `POST /auth/callback`, refuse a cross-origin Origin or Referer with HTTP 403.

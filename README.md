@@ -6,7 +6,7 @@ V1 includes the service form, the catalog list, dropdown and field administratio
 
 ## What you can do
 
-- Sign in with email and password, or ask for a one-time sign-in link. The link confirmation is the same whether or not that email has an account. Create account asks for a first name, last name, and password. The first account on an empty project becomes **Admin** of a workspace named from that first name, such as "Ada's workspace", or "My workspace" when no first name is available. Rename it later in Workspace Settings. An account created before names existed can add them once after sign-in, or any time from Profile. The header shows the first name, or the email when the first name is still blank. A deactivated account cannot stay signed in.
+- Sign in with email and password, or ask for a one-time sign-in link. The link confirmation is the same whether or not that email has an account. A wrong password says the email and password do not match. Too many tries in a short period asks you to wait a few minutes. If a session does not start, try again. Pull request #19 keeps signed-out sign-in, magic link, sign-up, and password reset from being sent back to the login page. Create account asks for a first name, last name, and password. There is no Company box. The first account on an empty project becomes **Admin** of a workspace named from that first name, such as "Ada's workspace", or "My workspace" when no first name is available. Rename it later in Workspace Settings. An account created before names existed can add them once after sign-in, or any time from Profile. The header shows the first name, or the email when the first name is still blank. A deactivated account cannot stay signed in.
 - Open **Try the demo** at `/demo` with no account. The sample catalog is fictional, edits last until you refresh or close the tab, and nothing is written to Supabase.
 - Invite a **Viewer**, **Editor**, **Service Manager**, or **Admin** from Workspace Settings. The admin chooses the role. If they already have an account they are added immediately. If they do not, the invite is stored for seven days and Supabase Auth emails a link to finish the account.
 - Create another workspace from the switcher. You become Admin of that workspace only. A member of workspace A cannot read or write workspace B.
@@ -19,11 +19,11 @@ V1 includes the service form, the catalog list, dropdown and field administratio
 - Set each field’s public or internal visibility and its Core / Operations / Governance depth per workspace. Retire a field without deleting stored values. Service code and name stay active.
 - Archive a service, restore it, or permanently delete it when you are an Admin. Add a company logo in the workspace switcher.
 - Open a change history for one service or for the whole workspace.
-- Shop pre-built security service blueprints, including company-size and industry packs, review them in a cart, and add them to the catalog in one checkout. On an empty catalog, an Admin can **Load sample catalog** instead. Those four services are fictional starter content, not a demo mode.
+- Shop pre-built security service blueprints, including company-size and industry packs, review them in a cart, and add them to the catalog in one checkout. The Templates page opens as a list until you choose Cards in that browser. On an empty catalog, an Admin can **Load sample catalog** instead. Those four services are fictional starter content, not a demo mode.
 - Choose and reorder the columns on the catalog table. Admins can save a workspace default. Everyone else can keep a browser override.
 - Import a lookup group from CSV, including a large roster, with a template download and a column-mapping preview.
 - Map an active service to NIST CSF 2.0 subcategory outcomes as full, partial, or none, with a rationale and notes. The Full, Partial, None, and Unmapped counts open the outcomes they count. Viewers can read the assessments. Editors and Admins can change them.
-- Open CSF Mapping to see the six Functions and drill into categories and outcomes. Counts are explicit assessments on active services. Archived services, blueprint hints, and the primary function dropdown are not coverage.
+- Open CSF Mapping to see the six Functions and drill into categories and outcomes. Each category heading shows that category's Full, Partial, None, and Unmapped counts. You still record coverage on each outcome. Counts are explicit assessments on active services. Archived services, blueprint hints, and the primary function dropdown are not coverage.
 - Keep a workspace registry of policies, standards, procedures, and tools. The catalog stores a link. It does not host the file. Public exports include only public artifacts and public columns.
 
 Navigation, in order: **Catalog**, **Fields**, **Lookups**, **Artifacts**, **CSF Mapping**, **Templates**. Fields and Lookups are Admin links. The header is a single row.
@@ -160,10 +160,9 @@ Open the deployment, choose **Create account**, and confirm the email if confirm
 
 Deferred, and not done in this release:
 
-- Magic-link sign-in, and invite emails sent by the app. Invites are stored and accepted on signup. Password reset still uses Supabase email.
 - Moving security-definer functions out of the exposed `public` schema. The Data API has to call them, and `anon` cannot execute them except `enforce_rate_limit`, which signed-out auth requests need.
 - HSTS preload submission. The deployment stays on `vercel.app` until it has a custom domain.
-- A Word user guide. The runbook above is the operator doc.
+- A Word user guide. The in-app help panel and [INSTALL.md](INSTALL.md) are the current guides.
 
 ## Tests
 
