@@ -168,7 +168,7 @@ export type ServiceRecord = {
   owner_gap?: boolean;
   delivery_model: string | null;
   target_audience: string[];
-  intake_method: string | null;
+  intake_method: string[];
   intake_url: string | null;
   approval_required: boolean;
   approver: string | null;

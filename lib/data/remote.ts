@@ -4,7 +4,7 @@ import { isAuthSessionMissing } from "@/lib/auth/messages";
 import { accountProfileFromMetadata, type AccountProfile } from "@/lib/auth/profile";
 import { parseColumnConfig } from "@/lib/catalog/columns";
 import { withArtifactComputed } from "@/lib/catalog/artifacts";
-import { withComputed } from "@/lib/catalog/service";
+import { codeList, withComputed } from "@/lib/catalog/service";
 import type { FrameworkElement, FrameworkRelease } from "@/lib/catalog/framework";
 import type {
   Artifact,
@@ -720,7 +720,7 @@ function asService(row: Record<string, unknown>): ServiceRecord {
     owner_review: textOrNull(row.owner_review),
     delivery_model: textOrNull(row.delivery_model),
     target_audience: audience,
-    intake_method: textOrNull(row.intake_method),
+    intake_method: codeList(row.intake_method),
     intake_url: textOrNull(row.intake_url),
     approval_required: Boolean(row.approval_required),
     approver: textOrNull(row.approver),

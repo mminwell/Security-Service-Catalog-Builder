@@ -21,7 +21,7 @@ export type ServiceSeed = {
   out_of_scope?: string | null;
   deliverables?: string | null;
   prerequisites?: string | null;
-  intake_method?: string | null;
+  intake_method?: string[];
   intake_url?: string | null;
   approval_required?: boolean;
   approver?: string | null;
@@ -58,7 +58,6 @@ const TEXT_KEYS = [
   "delivery_team",
   "business_unit",
   "delivery_model",
-  "intake_method",
   "intake_url",
   "approver",
   "lead_time",
@@ -107,7 +106,7 @@ export function blankService(tenantId: string, id: string, serviceCode = ""): Se
     owner_review: null,
     delivery_model: null,
     target_audience: [],
-    intake_method: null,
+    intake_method: [],
     intake_url: null,
     approval_required: false,
     approver: null,
@@ -157,6 +156,7 @@ export function buildService(
     summary: seed.summary,
     owner_team: seed.owner_team,
     target_audience: seed.target_audience ?? [],
+    intake_method: codeList(seed.intake_method),
     approval_required: seed.approval_required ?? false,
     current_maturity_cmmi: seed.current_maturity_cmmi ?? null,
     target_maturity_cmmi: seed.target_maturity_cmmi ?? null,
@@ -259,6 +259,9 @@ export function writeField(service: ServiceRecord, key: string, value: unknown):
   if (key === "target_audience") {
     return { ...service, target_audience: Array.isArray(value) ? value.map(String) : [] };
   }
+  if (key === "intake_method") {
+    return { ...service, intake_method: codeList(value) };
+  }
   if (typeof value === "string") {
     return { ...service, [key]: value };
   }
@@ -334,6 +337,7 @@ export function normalizeService(service: ServiceRecord): ServiceRecord {
     name: service.name.trim(),
     summary: service.summary?.trim() ?? "",
     target_audience: service.target_audience ?? [],
+    intake_method: codeList(service.intake_method),
     custom_fields: trimCustomFields(service.custom_fields),
     approval_required: Boolean(service.approval_required),
     archived_at: typeof service.archived_at === "string" && service.archived_at.trim() ? service.archived_at : null,
@@ -346,6 +350,18 @@ export function normalizeService(service: ServiceRecord): ServiceRecord {
     }
   }
   return withComputed(trimmed);
+}
+
+/** Lookup codes stored like Target Audience. A legacy single string becomes a one-element list. */
+export function codeList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter((item) => item.length > 0);
+  }
+  if (typeof value === "string") {
+    const text = value.trim();
+    return text.length > 0 ? [text] : [];
+  }
+  return [];
 }
 
 function trimCustomFields(value: Record<string, unknown> | null | undefined): Record<string, unknown> {

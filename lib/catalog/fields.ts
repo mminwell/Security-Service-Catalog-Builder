@@ -2,6 +2,12 @@ import type { DepthLevel, FieldDefinition, InputType, Visibility } from "@/lib/c
 
 export type FieldGroupId = "geography" | "privacy";
 
+/** Stock help before Intake Method became a multi-select. Kept so a saved copy can be recognized. */
+export const PREVIOUS_INTAKE_METHOD_HELP = "How a request for this service is submitted.";
+
+export const INTAKE_METHOD_HELP =
+  "How a request for this service is submitted. Select every method that applies.";
+
 export type FieldSeed = {
   field_key: string;
   label: string;
@@ -203,8 +209,8 @@ const RAW: Array<Omit<FieldSeed, "sort_order">> = [
   {
     field_key: "intake_method",
     label: "Intake Method",
-    help_text: "How a request for this service is submitted.",
-    input_type: "dropdown",
+    help_text: INTAKE_METHOD_HELP,
+    input_type: "multi_select",
     lookup_field_key: "intake_method",
     is_required: false,
     visibility: "public",

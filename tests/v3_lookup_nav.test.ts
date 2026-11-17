@@ -57,6 +57,7 @@ describe("lookup checkbox", () => {
     expect(lookupToggleFor(byKey("next_review_date")).disabled).toBe(true);
     expect(lookupToggleFor(byKey("current_maturity_cmmi"))).toMatchObject({ checked: true, disabled: true });
     expect(lookupToggleFor(byKey("target_audience"))).toMatchObject({ checked: true, disabled: true });
+    expect(lookupToggleFor(byKey("intake_method"))).toMatchObject({ checked: true, disabled: true });
     expect(lookupToggleFor(byKey("approval_required")).disabled).toBe(true);
     expect(lookupToggleFor(byKey("last_reviewed_date")).disabled).toBe(true);
     expect(lookupToggleFor(byKey("intake_url")).disabled).toBe(true);

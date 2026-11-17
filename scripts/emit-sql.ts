@@ -67,9 +67,10 @@ function contentLiterals(seed: ServiceSeed): string[] {
   const service = buildService("00000000-0000-4000-8000-000000000000", seed);
   return CONTENT_COLUMNS.map((column) => {
     if (column === "approval_required") return service.approval_required ? "true" : "false";
-    if (column === "target_audience") {
-      if (service.target_audience.length === 0) return "'{}'::text[]";
-      return `array[${service.target_audience.map((item) => quote(item)).join(", ")}]::text[]`;
+    if (column === "target_audience" || column === "intake_method") {
+      const list = service[column];
+      if (list.length === 0) return "'{}'::text[]";
+      return `array[${list.map((item) => quote(item)).join(", ")}]::text[]`;
     }
     if (column === "current_maturity_cmmi" || column === "target_maturity_cmmi") {
       const value = service[column];
