@@ -99,7 +99,7 @@ const RAW: Array<Omit<FieldSeed, "sort_order">> = [
   {
     field_key: "service_owner",
     label: "Service Owner",
-    help_text: "Named person or role accountable for keeping this entry true.",
+    help_text: "Person or role accountable for this service. A person is shown as Last, First.",
     input_type: "text",
     lookup_field_key: null,
     is_required: false,

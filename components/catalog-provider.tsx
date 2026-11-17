@@ -22,6 +22,7 @@ import {
   deleteServiceAction,
   importArtifactsAction,
   importFrameworkAction,
+  importServicesAction,
   importLookupsAction,
   insertLookupAction,
   inviteMemberAction,
@@ -54,7 +55,7 @@ import {
   type AccountProfileInput,
 } from "@/lib/auth/profile";
 import { canAdminister, canGrantPlatformOwner, canProvision, canWriteServices } from "@/lib/catalog/access";
-import { serviceHasOwnerGap } from "@/lib/catalog/owner-names";
+import { presentedServiceOwner, serviceHasOwnerGap } from "@/lib/catalog/owner-names";
 import { canEditServiceContent } from "@/lib/catalog/service-edit";
 import { planBlueprintCheckout } from "@/lib/catalog/checkout";
 import type { ExportLogMeta } from "@/lib/catalog/export-plan";
@@ -66,6 +67,7 @@ import { optionByCode } from "@/lib/catalog/lookups";
 import { localToday } from "@/lib/catalog/present";
 import type { FrameworkElement, FrameworkRelease } from "@/lib/catalog/framework";
 import type { PlannedArtifactImport } from "@/lib/catalog/artifacts";
+import type { PlannedServiceImport } from "@/lib/catalog/service-import";
 import type {
   Artifact,
   ArtifactLink,
@@ -83,6 +85,7 @@ import type {
 import {
   emptyDb,
   importArtifacts as importArtifactRows,
+  importServices as importServiceRows,
   roleFor,
   saveExportProfile as saveExportProfileRow,
   setFieldLookup as setFieldLookupRow,
@@ -151,6 +154,7 @@ export type CatalogApi = {
   saveArtifactLink: (input: { id?: string; artifactId: string; serviceId: string; relationshipNote?: string | null }) => Promise<void>;
   deleteArtifactLink: (linkId: string) => Promise<void>;
   importArtifacts: (rows: PlannedArtifactImport[]) => Promise<{ created: number; updated: number }>;
+  importServices: (rows: PlannedServiceImport[]) => Promise<{ created: number; updated: number }>;
   saveLookup: (option: LookupOption) => Promise<void>;
   addLookup: (input: {
     field_key: string;
@@ -310,8 +314,10 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     const role = db && session ? roleFor(db, tenantId, session.userId) : null;
     const fields = db?.fields.filter((field) => field.tenant_id === tenantId) ?? [];
     const lookups = db?.lookups.filter((option) => option.tenant_id === tenantId) ?? [];
+    const tenantOwners = owners.filter((owner) => owner.tenant_id === tenantId);
     const services = (db?.services.filter((service) => service.tenant_id === tenantId) ?? []).map((service) => ({
       ...service,
+      service_owner: presentedServiceOwner(service, tenantOwners),
       owner_gap: serviceHasOwnerGap(
         service,
         owners
@@ -327,7 +333,6 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     const audit = db?.audit.filter((entry) => entry.tenant_id === tenantId) ?? [];
     const members = db?.members.filter((member) => member.tenant_id === tenantId) ?? [];
     const pendingInvites = invitations.filter((invite) => invite.tenant_id === tenantId);
-    const tenantOwners = owners.filter((owner) => owner.tenant_id === tenantId);
     const seenAt = activeTenant?.owner_reminder_seen_at ? Date.parse(activeTenant.owner_reminder_seen_at) : Number.NaN;
     const reminderDue = Boolean(
       loadedAt != null &&
@@ -705,6 +710,14 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         guardSave("Artifact link removed", async () => {
           await unwrap(deleteArtifactLinkAction(linkId));
           await reload();
+        }),
+      importServices: (rows) =>
+        guardSave("Services saved", async () => {
+          if (!db || !tenantId) throw new Error("The catalog is still loading.");
+          const result = importServiceRows(db, rows);
+          await unwrap(importServicesAction(tenantId, result.services));
+          await reload();
+          return { created: result.created, updated: result.updated };
         }),
       importArtifacts: (rows) =>
         guardSave("Artifacts saved", async () => {

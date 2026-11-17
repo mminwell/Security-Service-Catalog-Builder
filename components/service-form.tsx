@@ -22,7 +22,7 @@ import {
   writeField,
 } from "@/lib/catalog/service";
 import { DEPTH_META, type DepthLevel, type FieldDefinition, type ServiceRecord } from "@/lib/catalog/types";
-import { ownerDisplayName } from "@/lib/catalog/owner-names";
+import { displayServiceOwner, ownerDisplayName } from "@/lib/catalog/owner-names";
 import { useCatalog } from "@/components/catalog-provider";
 import { OwnerSelect } from "@/components/owner-select";
 import { ServiceArtifacts } from "@/components/service-artifacts";
@@ -38,7 +38,9 @@ export function ServiceForm({ serviceId }: { serviceId: string }) {
   const [draft, setDraft] = useState<ServiceRecord | null>(() => {
     if (!api.activeTenant) return null;
     if (serviceId === "new") return blankService(api.activeTenant.id, crypto.randomUUID(), "");
-    return existing;
+    if (!existing) return null;
+    const owner = displayServiceOwner(existing.service_owner);
+    return { ...existing, service_owner: owner || null };
   });
   const [codeTouched, setCodeTouched] = useState(serviceId !== "new");
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -394,6 +396,7 @@ function FieldControl({
           id={inputId}
           owners={api.owners}
           value={draft.owner_id ?? null}
+          fallback={displayServiceOwner(typeof value === "string" ? value : draft.service_owner)}
           disabled={disabled || api.role === "service_manager"}
           onChange={onOwner}
         />

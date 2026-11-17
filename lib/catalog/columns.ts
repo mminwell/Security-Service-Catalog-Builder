@@ -1,4 +1,5 @@
 import { optionLabel } from "@/lib/catalog/lookups";
+import { displayServiceOwner } from "@/lib/catalog/owner-names";
 import {
   capabilityTone,
   cmmiTone,
@@ -164,6 +165,12 @@ export function formatCatalogCell(
     const lookupKey = field?.lookup_field_key ?? fieldKey;
     const pills = codes.map((code) => optionLabel(lookups, lookupKey, code) || code);
     return { kind: "pills", text: pills.join(", "), pills, title: pills.join(", ") };
+  }
+
+  if (fieldKey === "service_owner") {
+    const owner = displayServiceOwner(typeof value === "string" ? value : value == null ? "" : String(value));
+    if (!owner) return { kind: "text", text: "—" };
+    return clipText(owner);
   }
 
   if (value == null || (typeof value === "string" && value.trim() === "")) {

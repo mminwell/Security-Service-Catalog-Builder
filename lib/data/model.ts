@@ -11,7 +11,8 @@ import { builtinLogoForSlug, normalizeLogoInput } from "@/lib/catalog/logos";
 import { normalizeWorkspaceName } from "@/lib/catalog/workspace-name";
 import { sampleArtifactRecords } from "@/lib/catalog/artifact-samples";
 import { normalizeArtifact, type PlannedArtifactImport } from "@/lib/catalog/artifacts";
-import { STARTER_LOOKUPS } from "@/lib/catalog/lookups";
+import { optionByCode, STARTER_LOOKUPS } from "@/lib/catalog/lookups";
+import { materializeServiceImports, type PlannedServiceImport } from "@/lib/catalog/service-import";
 import { SAMPLE_TENANTS, STARTER_PACK } from "@/lib/catalog/samples";
 import { buildService, normalizeService, withComputed } from "@/lib/catalog/service";
 import { uniqueSlug } from "@/lib/catalog/service-code";
@@ -1210,6 +1211,38 @@ export function importArtifacts(
     else created += 1;
   }
   return { db: next, created, updated };
+}
+
+export function importServices(
+  db: CatalogDb,
+  planned: PlannedServiceImport[],
+  now = new Date().toISOString(),
+): { db: CatalogDb; created: number; updated: number; services: ServiceRecord[] } {
+  const actor = requireSession(db);
+  const tenantId = requireActive(db);
+  assertWrite(db, tenantId, actor.userId);
+  if (planned.length > 500) throw new Error("Import at most 500 services at a time.");
+  const tenant = db.tenants.find((item) => item.id === tenantId);
+  const lookups = db.lookups.filter((option) => option.tenant_id === tenantId);
+  const services = materializeServiceImports({
+    tenantId,
+    planned,
+    existing: db.services.filter((service) => service.tenant_id === tenantId),
+    mode: tenant?.service_code_mode ?? "sequential",
+    categoryPrefix: (category) => optionByCode(lookups, "category", category)?.code_prefix ?? null,
+    now,
+  });
+  let next = db;
+  let created = 0;
+  let updated = 0;
+  const before = new Set(db.services.map((service) => service.id));
+  for (const service of services) {
+    next = saveService(next, service, now);
+    if (before.has(service.id)) updated += 1;
+    else created += 1;
+  }
+  const saved = services.map((service) => next.services.find((item) => item.id === service.id) ?? service);
+  return { db: next, created, updated, services: saved };
 }
 
 export function resetDemo(db: CatalogDb): CatalogDb {

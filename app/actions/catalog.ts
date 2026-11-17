@@ -271,6 +271,24 @@ export async function deleteArtifactLinkAction(linkId: string): Promise<ActionRe
   }
 }
 
+export async function importServicesAction(tenantId: string, services: ServiceRecord[]): Promise<ActionResult<null>> {
+  const cleaned: ServiceRecord[] = [];
+  try {
+    if (services.length > 500) throw new Error("Import at most 500 services at a time.");
+    for (const service of services) {
+      const next = cleanService(service);
+      if (next.tenant_id !== tenantId) throw new Error("That service belongs to another workspace.");
+      cleaned.push(next);
+    }
+  } catch (error) {
+    return fail(error);
+  }
+  return runMutation(tenantId, "write", async (supabase) => {
+    for (const service of cleaned) await persistService(supabase, service);
+    return null;
+  });
+}
+
 export async function importArtifactsAction(tenantId: string, artifacts: Artifact[]): Promise<ActionResult<null>> {
   const cleaned: Artifact[] = [];
   try {

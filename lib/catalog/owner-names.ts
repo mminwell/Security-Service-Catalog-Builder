@@ -43,8 +43,72 @@ export type NameSplit =
   | { ok: true; firstName: string; lastName: string }
   | { ok: false; reason: string };
 
+/** Collapse runs of whitespace and trim. A blank string stays blank. */
+export function collapseName(value: string | null | undefined): string {
+  return (value ?? "").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Display form for a person. Both names become "Last, First".
+ * One name is shown alone, with no comma. Blank in, blank out.
+ */
 export function ownerDisplayName(firstName: string, lastName: string): string {
-  return `${lastName.trim()}, ${firstName.trim()}`;
+  const first = collapseName(firstName);
+  const last = collapseName(lastName);
+  if (last && first) return `${last}, ${first}`;
+  return last || first;
+}
+
+/**
+ * Service Owner text for lists, forms, and exports.
+ * A splittable person becomes "Last, First". A role or note stays as written.
+ * A stray comma around a single name is dropped.
+ */
+export function displayServiceOwner(raw: string | null | undefined): string {
+  const value = collapseName(raw);
+  if (!value) return "";
+  const split = splitPersonName(value);
+  if (split.ok) return ownerDisplayName(split.firstName, split.lastName);
+  const bare = collapseName(value.replace(/,/g, " "));
+  if (bare && !/\s/.test(bare) && bare !== value) return bare;
+  return value;
+}
+
+/**
+ * Build the stored Service Owner from mapped CSV columns.
+ * When a first-name or last-name column is mapped and either cell has text,
+ * those cells win. Otherwise a single full-name column is kept, and a
+ * splittable person in that column is still shown as "Last, First".
+ */
+/** Prefer the directory record when a service is linked, otherwise the stored text. */
+export function presentedServiceOwner(
+  service: { service_owner?: string | null; owner_id?: string | null },
+  owners: Array<{ id: string; first_name: string; last_name: string }>,
+): string | null {
+  const linked = service.owner_id ? owners.find((owner) => owner.id === service.owner_id) : undefined;
+  if (linked) {
+    const shown = ownerDisplayName(linked.first_name, linked.last_name);
+    return shown || null;
+  }
+  const shown = displayServiceOwner(service.service_owner);
+  return shown || null;
+}
+
+export function composeServiceOwner(input: {
+  firstName?: string | null;
+  lastName?: string | null;
+  fullName?: string | null;
+  useParts: boolean;
+}): string | null {
+  if (input.useParts) {
+    const first = collapseName(input.firstName);
+    const last = collapseName(input.lastName);
+    if (first || last) return ownerDisplayName(first, last);
+  }
+  const full = collapseName(input.fullName);
+  if (!full) return null;
+  const shown = displayServiceOwner(full);
+  return shown || null;
 }
 
 export function splitPersonName(raw: string): NameSplit {
