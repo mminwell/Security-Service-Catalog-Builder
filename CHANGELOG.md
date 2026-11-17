@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Finish account no longer shows a raw Postgres error when an invite cannot be loaded. A database error becomes "We could not load this invite. Try the link again or ask for a new invite." A different email, a cancelled invite, and an expired invite keep their existing sentences. `0019_v6_preview_invitation.sql` replaces `preview_invitation` so `email` is read from `auth.users` with a table alias. It does not change stored rows.
+- Sending an invite says "Invite sent to <email>." Adding someone who already has an account says "<email> was added to the workspace." Resend, cancel, and transfer ownership use the same plain wording and do not show a database field name or an invite token.
 - Pull request #19 lets a signed-out person reach password sign-in, magic link, sign-up, and password reset. Those requests are no longer sent back to the login page, which had surfaced the raw message "Auth session missing!" A missing session is treated as signed out, and that raw text is replaced with "Sign-in did not start a session. Try again." There is no new migration.
 - In-app help matches what shipped through #18 and #19: sign-in and its plain-language errors, signup without a Company box, workspace transfer and the Site Admin Danger zone, change history, CSF category counts, and the Templates list default.
 

@@ -114,6 +114,7 @@ describe("invite link arrival", () => {
     expect(mail).toContain("inviteEmailNextPath");
     const finish = readFileSync("components/finish-account.tsx", "utf8");
     expect(finish).toContain("acceptInviteAction");
+    expect(finish).toContain("readableFinishInviteError");
     expect(finish).toContain("profileIsIncomplete");
     expect(finish).toContain('aria-readonly="true"');
     expect(finish).toContain("PasswordField");

@@ -11,6 +11,7 @@ import {
   setMemberRoleAction,
   transferWorkspaceOwnerAction,
 } from "@/app/actions/workspace";
+import { inviteNoticeFailed } from "@/lib/auth/invites";
 import { roleLabel } from "@/lib/catalog/access";
 import { distributionWordingForEditor, distributionWordingToStore } from "@/lib/catalog/csv";
 import { FULL_PRESET_NAME, PUBLIC_PRESET_NAME, workspaceFieldSetChoice } from "@/lib/catalog/export-plan";
@@ -564,7 +565,7 @@ function MembersSection() {
                 if (api.demo) {
                   const result = api.demoDispatch({ type: "resend-invite", inviteId: invite.id });
                   if (!result.ok) toast.error(result.error);
-                  else toast.success(result.notice);
+                  else showInviteToast(toast, result.notice);
                   return;
                 }
                 void resendInviteAction(invite.id).then(async (result) => {
@@ -573,7 +574,7 @@ function MembersSection() {
                     return;
                   }
                   await api.refresh();
-                  toast.success(result.data.notice);
+                  showInviteToast(toast, result.data.notice);
                 });
               }}
             >
@@ -655,7 +656,7 @@ function DangerSection() {
                     return;
                   }
                   await api.refresh();
-                  toast.success(result.data.notice);
+                  showInviteToast(toast, result.data.notice);
                 });
               }}
             >
@@ -751,7 +752,7 @@ function DangerSection() {
                     setMemberId("");
                     setEmail("");
                     await api.refresh();
-                    toast.success(result.data.notice);
+                    showInviteToast(toast, result.data.notice);
                   });
                 }}
               >
@@ -818,5 +819,13 @@ function DangerSection() {
       ) : null}
     </section>
   );
+}
+
+function showInviteToast(
+  toast: { success: (message: string) => void; error: (message: string) => void },
+  notice: string,
+) {
+  if (inviteNoticeFailed(notice)) toast.error(notice);
+  else toast.success(notice);
 }
 

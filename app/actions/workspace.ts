@@ -3,7 +3,7 @@
 import { headers } from "next/headers";
 import { normalizeEmail, validateEmail, validatePassword } from "@/lib/auth/credentials";
 import { sendInviteNotice } from "@/lib/auth/invite-mail";
-import { isWorkspaceRole, readableInviteError } from "@/lib/auth/invites";
+import { isWorkspaceRole, plainDatabaseMessage, readableFinishInviteError, readableInviteError } from "@/lib/auth/invites";
 import { normalizeAccountProfile } from "@/lib/auth/profile";
 import { isUuid } from "@/lib/auth/ids";
 import type { PlannedOwnerImport } from "@/lib/catalog/owner-names";
@@ -18,7 +18,7 @@ export async function cancelInviteAction(inviteId: string): Promise<ActionResult
     if (!isUuid(inviteId)) throw new Error("That invite is not valid.");
     const { supabase } = await createAuthedClient();
     const { error } = await supabase.rpc("cancel_workspace_invitation", { p_invite: inviteId });
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(plainDatabaseMessage(error.message, "The invite could not be cancelled. Try again."));
     return ok(null);
   } catch (error) {
     return fail(error);
@@ -39,6 +39,7 @@ export async function resendInviteAction(inviteId: string): Promise<ActionResult
       workspaceName: typeof record.workspace_name === "string" ? record.workspace_name : "your workspace",
       role,
       kind: "invited",
+      resent: true,
     });
     return ok({ notice: mailed.detail });
   } catch (error) {
@@ -128,7 +129,7 @@ export async function transferWorkspaceOwnerAction(input: {
       if (migrationMissing(error.message)) {
         throw new Error("Apply the latest database update before transferring ownership.");
       }
-      throw new Error(error.message);
+      throw new Error(plainDatabaseMessage(error.message, "Ownership could not be transferred. Try again."));
     }
     const record = data && typeof data === "object" ? (data as Record<string, unknown>) : {};
     const status = record.status === "invited" ? "invited" : "owner";
@@ -452,7 +453,7 @@ export async function previewInviteAction(token: string): Promise<
       company,
     });
   } catch (error) {
-    return fail(error);
+    return finishFailure(error);
   }
 }
 
@@ -466,7 +467,7 @@ export async function acceptInviteAction(token: string): Promise<ActionResult<{ 
     if (typeof accepted.data !== "string") throw new Error("The invite could not be accepted.");
     return ok({ tenantId: accepted.data });
   } catch (error) {
-    return fail(error);
+    return finishFailure(error);
   }
 }
 
@@ -504,7 +505,7 @@ export async function completeInvitedAccountAction(input: {
     await persistUserProfile(supabase, user.id, profile);
     return ok(null);
   } catch (error) {
-    return fail(error);
+    return finishFailure(error);
   }
 }
 
@@ -540,7 +541,12 @@ export async function finishInviteAction(input: {
     if (typeof accepted.data !== "string") throw new Error("The invite could not be accepted.");
     return ok({ tenantId: accepted.data });
   } catch (error) {
-    return fail(error);
+    return finishFailure(error);
   }
+}
+
+function finishFailure(error: unknown): ActionResult<never> {
+  const result = fail(error);
+  return result.ok ? result : { ok: false, error: readableFinishInviteError(result.error) };
 }
 
