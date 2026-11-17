@@ -411,7 +411,7 @@ function FieldControl({
           <span className="micro">Computed</span>
         </div>
       ) : null}
-      {fieldUsesLookup(field) && field.lookup_field_key ? (
+      {fieldUsesLookup(field) && field.lookup_field_key && !(field.field_key === "service_owner" && api.ownersReady) ? (
         <LookupSelect
           id={inputId}
           value={typeof value === "number" ? String(value) : typeof value === "string" ? value : null}
