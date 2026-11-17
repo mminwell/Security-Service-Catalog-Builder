@@ -1,5 +1,5 @@
 import { parseColumnConfig } from "@/lib/catalog/columns";
-import { materializeFields, STARTER_FIELDS, type FieldGroupId } from "@/lib/catalog/fields";
+import { INTAKE_METHOD_HELP, materializeFields, PREVIOUS_INTAKE_METHOD_HELP, STARTER_FIELDS, type FieldGroupId } from "@/lib/catalog/fields";
 import { migrateStockField } from "@/lib/catalog/stock-fields";
 import { FRAMEWORK_CATALOG } from "@/lib/catalog/framework-catalog";
 import { CSF_ELEMENTS, CSF_FRAMEWORK, type FrameworkElement } from "@/lib/catalog/framework";
@@ -7,7 +7,8 @@ import { sampleArtifactsForTenants } from "@/lib/catalog/artifact-samples";
 import { ARTIFACT_STATUS_KEY, ARTIFACT_TYPE_KEY, withArtifactComputed } from "@/lib/catalog/artifacts";
 import { STARTER_LOOKUPS } from "@/lib/catalog/lookups";
 import { builtinLogoForSlug } from "@/lib/catalog/logos";
-import type { Artifact, ArtifactLink, ExportProfile, FieldDefinition, LookupOption, OutcomeMapping, ServiceRecord, Tenant, Visibility } from "@/lib/catalog/types";
+import { codeList } from "@/lib/catalog/service";
+import type { Artifact, ArtifactLink, AuditEntry, ExportProfile, FieldDefinition, LookupOption, OutcomeMapping, ServiceRecord, Tenant, Visibility } from "@/lib/catalog/types";
 import { freshDemo, type CatalogDb } from "@/lib/data/model";
 
 const PREVIOUS_CSF_HELP = "Primary NIST CSF 2.0 function. Detailed control mapping comes in a later version.";
@@ -93,7 +94,7 @@ export function migrateDemoState(raw: unknown): CatalogDb | null {
       elements: library.elements,
       mappings: normalizeStoredMappings(parsed.mappings),
       exportProfiles: normalizeProfiles(parsed.exportProfiles, tenantIds),
-      audit: Array.isArray(parsed.audit) ? parsed.audit : [],
+      audit: Array.isArray(parsed.audit) ? parsed.audit.map(migrateStoredAudit) : [],
     };
   } catch {
     return null;
@@ -163,6 +164,15 @@ function normalizeStoredField(input: unknown): FieldDefinition {
   };
   if (next.field_key === "primary_csf_function" && next.help_text === PREVIOUS_CSF_HELP) {
     next.help_text = CURRENT_CSF_HELP;
+  }
+  if (next.field_key === "intake_method") {
+    if (next.input_type !== "multi_select") {
+      next.input_type = "multi_select";
+      next.lookup_field_key = next.lookup_field_key || "intake_method";
+      next.lookup_bound = false;
+      next.lookup_restore = null;
+    }
+    if (next.help_text === PREVIOUS_INTAKE_METHOD_HELP) next.help_text = INTAKE_METHOD_HELP;
   }
   const known = STARTER_FIELDS.find((field) => field.field_key === next.field_key);
   if (known?.field_group && !next.field_group) next.field_group = known.field_group;
@@ -435,6 +445,22 @@ function normalizeStoredMappings(input: unknown): OutcomeMapping[] {
   return mappings;
 }
 
+function migrateStoredAudit(input: unknown): AuditEntry {
+  const row = (input && typeof input === "object" ? input : {}) as AuditEntry;
+  return {
+    ...row,
+    before_data: migrateIntakeSnapshot(row.before_data),
+    after_data: migrateIntakeSnapshot(row.after_data),
+  };
+}
+
+/** History rows store the service snapshot. A leftover single code becomes a one-element list. */
+function migrateIntakeSnapshot(data: Record<string, unknown> | null | undefined): Record<string, unknown> | null {
+  if (!data || !Object.prototype.hasOwnProperty.call(data, "intake_method")) return data ?? null;
+  if (typeof data.intake_method !== "string") return data;
+  return { ...data, intake_method: codeList(data.intake_method) };
+}
+
 function normalizeStoredService(input: unknown): ServiceRecord {
   const row = (input && typeof input === "object" ? input : {}) as Partial<ServiceRecord>;
   const archived = row.archived_at;
@@ -445,6 +471,7 @@ function normalizeStoredService(input: unknown): ServiceRecord {
     service_code: typeof row.service_code === "string" ? row.service_code : "",
     name: typeof row.name === "string" ? row.name : "",
     target_audience: Array.isArray(row.target_audience) ? row.target_audience.map(String) : [],
+    intake_method: codeList(row.intake_method),
     custom_fields:
       row.custom_fields && typeof row.custom_fields === "object" && !Array.isArray(row.custom_fields)
         ? row.custom_fields

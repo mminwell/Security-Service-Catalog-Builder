@@ -564,7 +564,7 @@ function previewValue(
     case "target_audience":
       return blueprint.target_audience.map((code) => optionLabel(lookups, "target_audience", code)).join(", ");
     case "intake_method":
-      return optionLabel(lookups, "intake_method", blueprint.intake_method);
+      return blueprint.intake_method.map((code) => optionLabel(lookups, "intake_method", code)).join(", ");
     case "approval_required":
       return blueprint.approval_required ? "Yes" : "No";
     case "approver":
