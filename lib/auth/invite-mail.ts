@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { headers } from "next/headers";
+import { inviteNoticeText } from "@/lib/auth/invites";
 import { roleLabel } from "@/lib/catalog/access";
 import type { Role } from "@/lib/catalog/types";
 import { supabaseConfig } from "@/lib/supabase/env";
@@ -21,10 +22,13 @@ export async function sendInviteNotice(input: {
   workspaceName: string;
   role: Role;
   kind: "invited" | "member";
+  resent?: boolean;
 }): Promise<InviteNotice> {
+  const notice = (sent: boolean) =>
+    inviteNoticeText({ email: input.email, kind: input.kind, sent, resent: input.resent });
   const config = supabaseConfig();
   if (!config) {
-    return { sent: false, detail: "Supabase is not configured, so no email was sent. The invite is saved." };
+    return { sent: false, detail: notice(false) };
   }
   const origin = await requestOrigin();
   const next = inviteEmailNextPath(input.kind, input.token);
@@ -46,7 +50,7 @@ export async function sendInviteNotice(input: {
       },
     });
     if (!invited.error) {
-      return { sent: true, detail: `Invite email sent for ${roleLabel(input.role)} in ${input.workspaceName}.` };
+      return { sent: true, detail: notice(true) };
     }
   }
 
@@ -58,23 +62,9 @@ export async function sendInviteNotice(input: {
     options: { shouldCreateUser: input.kind === "invited", emailRedirectTo: redirectTo },
   });
   if (otp.error) {
-    const needsKey = serviceKey ? "" : " Naming the role inside the email needs SUPABASE_SERVICE_ROLE_KEY, which is not configured.";
-    return {
-      sent: false,
-      detail: `The ${input.kind === "invited" ? "invite is saved" : "person was added"}, but the email was not sent (${otp.error.message}).${needsKey}`,
-    };
+    return { sent: false, detail: notice(false) };
   }
-  const roleText = roleLabel(input.role);
-  if (input.kind === "member") {
-    return {
-      sent: true,
-      detail: `Added as ${roleText}. A sign-in email was sent through Supabase Auth. The Auth template does not include the role name unless SUPABASE_SERVICE_ROLE_KEY is configured.`,
-    };
-  }
-  return {
-    sent: true,
-    detail: `Invite saved as ${roleText}. A link was sent through Supabase Auth to finish the account. The Auth template does not include the role name unless SUPABASE_SERVICE_ROLE_KEY is configured.`,
-  };
+  return { sent: true, detail: notice(true) };
 }
 
 export function inviteEmailNextPath(kind: "invited" | "member", token: string | null): string {

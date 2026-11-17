@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { decideInvite, inviteExpiry, readableInviteError } from "@/lib/auth/invites";
+import { readFileSync } from "node:fs";
+import {
+  FINISH_INVITE_LOAD_ERROR,
+  decideInvite,
+  inviteExpiry,
+  inviteNoticeText,
+  plainDatabaseMessage,
+  readableFinishInviteError,
+  readableInviteError,
+} from "@/lib/auth/invites";
 import { allows } from "@/lib/auth/permissions";
 import { canAdminister, canWriteServices, roleLabel } from "@/lib/catalog/access";
 import {
@@ -145,5 +154,79 @@ describe("invites keep the admin's role", () => {
   it("explains a missing invite-token function instead of hiding the failure", () => {
     expect(readableInviteError("function gen_random_bytes(integer) does not exist")).toMatch(/was not saved/i);
     expect(readableInviteError("Only an Admin can invite members")).toMatch(/Only an Admin/);
+    expect(readableInviteError('column reference "email" is ambiguous')).toBe(
+      "The invite was not saved. Try again in a moment.",
+    );
+    expect(plainDatabaseMessage('relation "workspace_invitations" does not exist', "The invite could not be cancelled. Try again.")).toBe(
+      "The invite could not be cancelled. Try again.",
+    );
+    expect(plainDatabaseMessage("That invite is no longer pending", "The invite could not be cancelled. Try again.")).toBe(
+      "That invite is no longer pending",
+    );
+  });
+
+  it("keeps a known finish-account sentence and hides a raw database error", () => {
+    expect(readableFinishInviteError('column reference "email" is ambiguous')).toBe(FINISH_INVITE_LOAD_ERROR);
+    expect(readableFinishInviteError('ERROR: column reference "email" is ambiguous')).toBe(FINISH_INVITE_LOAD_ERROR);
+    expect(readableFinishInviteError("This invite is for a different email address.")).toBe(
+      "This invite is for a different email address.",
+    );
+    expect(readableFinishInviteError("This invite was cancelled.")).toBe("This invite was cancelled.");
+    expect(readableFinishInviteError("This invite has expired.")).toBe("This invite has expired.");
+    expect(readableFinishInviteError("Use a password of at least 8 characters.")).toBe(
+      "Use a password of at least 8 characters.",
+    );
+  });
+
+  it("confirms an invite in plain language and does not include a token", () => {
+    expect(inviteNoticeText({ email: "ada@example.com", kind: "invited", sent: true })).toBe(
+      "Invite sent to ada@example.com.",
+    );
+    expect(inviteNoticeText({ email: "ada@example.com", kind: "member", sent: true })).toBe(
+      "ada@example.com was added to the workspace.",
+    );
+    expect(inviteNoticeText({ email: "ada@example.com", kind: "invited", sent: true, resent: true })).toBe(
+      "Invite resent to ada@example.com.",
+    );
+    expect(inviteNoticeText({ email: "ada@example.com", kind: "invited", sent: false })).toBe(
+      "The invite was saved, but the email was not sent.",
+    );
+    expect(inviteNoticeText({ email: "ada@example.com", kind: "member", sent: false })).toBe(
+      "ada@example.com was added to the workspace, but the email was not sent.",
+    );
+    for (const notice of [
+      inviteNoticeText({ email: "ada@example.com", kind: "invited", sent: true }),
+      inviteNoticeText({ email: "ada@example.com", kind: "member", sent: true }),
+      inviteNoticeText({ email: "ada@example.com", kind: "invited", sent: true, resent: true }),
+      inviteNoticeText({ email: "ada@example.com", kind: "invited", sent: false }),
+    ]) {
+      expect(notice).not.toMatch(/token|workspace_invitations|auth\.users|SUPABASE_SERVICE_ROLE/i);
+    }
+    const mail = readFileSync("lib/auth/invite-mail.ts", "utf8");
+    expect(mail).toContain("inviteNoticeText");
+    expect(mail).not.toContain("otp.error.message");
+    expect(mail).not.toContain("Auth template does not include");
+    expect(mail).not.toContain("${input.token}");
+    const settings = readFileSync("components/workspace-settings.tsx", "utf8");
+    expect(settings).toContain('toast.success("Invite cancelled")');
+    const transfer = readFileSync("app/actions/workspace.ts", "utf8");
+    expect(transfer).toContain("Ownership transferred. The previous owner is now an Admin.");
+  });
+});
+
+describe("preview_invitation qualifies columns that match its return table", () => {
+  const sql = readFileSync("supabase/migrations/0019_v6_preview_invitation.sql", "utf8");
+
+  it("replaces only preview_invitation and restates its grants", () => {
+    expect(sql).toMatch(/create or replace function public\.preview_invitation\(p_token text\)/i);
+    expect(sql).toContain("select lower(u.email) into v_email from auth.users u where u.id = auth.uid();");
+    expect(sql).toContain("select * into v_row from public.workspace_invitations wi where wi.token = p_token;");
+    expect(sql).toContain("select t.name into v_name from public.tenants t where t.id = v_row.tenant_id;");
+    expect(sql).not.toContain("select lower(email) into v_email from auth.users where id = auth.uid();");
+    expect(sql).toMatch(/security definer/i);
+    expect(sql).toMatch(/set search_path = public/);
+    expect(sql).toMatch(/revoke all on function public\.preview_invitation\(text\) from public, anon;/i);
+    expect(sql).toMatch(/grant execute on function public\.preview_invitation\(text\) to authenticated;/i);
+    expect(sql).not.toMatch(/function public\.list_visible_members|function public\.list_site_accounts/);
   });
 });

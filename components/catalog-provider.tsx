@@ -41,7 +41,7 @@ import {
   setServiceCodeModeAction,
   setTenantLogoAction,
 } from "@/app/actions/catalog";
-import { readableInviteError } from "@/lib/auth/invites";
+import { inviteNoticeFailed, inviteNoticeText, readableInviteError } from "@/lib/auth/invites";
 import { DEACTIVATED_MESSAGE } from "@/lib/auth/account-status";
 import { postAuthAttempt } from "@/lib/auth/browser-attempt";
 import { friendlyAuthError } from "@/lib/auth/messages";
@@ -53,7 +53,7 @@ import {
   normalizeSignupProfile,
   type AccountProfileInput,
 } from "@/lib/auth/profile";
-import { canAdminister, canGrantPlatformOwner, canProvision, canWriteServices, roleLabel } from "@/lib/catalog/access";
+import { canAdminister, canGrantPlatformOwner, canProvision, canWriteServices } from "@/lib/catalog/access";
 import { serviceHasOwnerGap } from "@/lib/catalog/owner-names";
 import { canEditServiceContent } from "@/lib/catalog/service-edit";
 import { planBlueprintCheckout } from "@/lib/catalog/checkout";
@@ -536,10 +536,12 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
             await reload();
             const notice =
               result.notice ||
-              (result.status === "invited"
-                ? `Invitation saved as ${roleLabel(memberRole)}.`
-                : `Added as ${roleLabel(memberRole)}.`);
-            if (/was not sent|could not be saved|not saved/i.test(notice)) toast.error(notice);
+              inviteNoticeText({
+                email,
+                kind: result.status === "invited" ? "invited" : "member",
+                sent: true,
+              });
+            if (inviteNoticeFailed(notice)) toast.error(notice);
             else toast.success(notice);
             return notice;
           } catch (err) {

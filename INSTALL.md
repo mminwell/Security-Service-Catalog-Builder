@@ -50,6 +50,7 @@ In **SQL Editor → New query**, paste and run each file:
 16. `supabase/migrations/0016_v6_export_field_set.sql`
 17. `supabase/migrations/0017_v6_rate_limits.sql`
 18. `supabase/migrations/0018_v6_account_audit_workspace.sql`
+19. `supabase/migrations/0019_v6_preview_invitation.sql`
 
 With the CLI, from this directory:
 
@@ -62,7 +63,7 @@ supabase db push
 
 Skip `supabase/seed.sql`. It inserts fictional workspaces that have no members, so nobody can open them. **Load sample catalog** on an empty workspace is the supported sample.
 
-`0012` stores a profile name and does not rename a workspace that already exists. `0015` only replaces invite functions so a token can be created when pgcrypto lives in the `extensions` schema. `0017` adds the app's rate limiter. `0018` names a new account's first workspace from the first name, writes the missing audit rows, and lets a platform owner (Site Admin) transfer or delete a workspace. Apply `0018` before relying on those behaviors. Pull request #19 does not add a migration. It lets a signed-out person reach sign-in, magic link, sign-up, and password reset instead of being sent back to the login page.
+`0012` stores a profile name and does not rename a workspace that already exists. `0015` only replaces invite functions so a token can be created when pgcrypto lives in the `extensions` schema. `0017` adds the app's rate limiter. `0018` names a new account's first workspace from the first name, writes the missing audit rows, and lets a platform owner (Site Admin) transfer or delete a workspace. Apply `0018` before relying on those behaviors. `0019` replaces `preview_invitation` so the email lookup is qualified. It does not change rows, and running it again is safe. Pull request #19 does not add a migration. It lets a signed-out person reach sign-in, magic link, sign-up, and password reset instead of being sent back to the login page.
 
 ## 4. Configure Auth
 
