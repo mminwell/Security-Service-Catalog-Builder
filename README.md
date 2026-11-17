@@ -46,7 +46,7 @@ The anon key, or the newer publishable key, is public by design and is the only 
 
 This repository is not connected to a live Supabase project, and preview deployments are not given one. A preview built without the two public variables shows **This deployment is not configured**. It does not invent a signed-in workspace. **Try the demo** at `/demo` still opens, and those edits stay in the browser tab until refresh.
 
-To make a preview or a production deploy actually sign people in, follow [INSTALL.md](INSTALL.md): a Supabase project, migrations `0001` through `0018` in filename order, the two public environment variables, and an Auth redirect URL ending in `/auth/callback`. Nothing in this repository changes a hosted Supabase project or Vercel settings on its own.
+To make a preview or a production deploy actually sign people in, follow [INSTALL.md](INSTALL.md): a Supabase project, migrations `0001` through `0019` in filename order, the two public environment variables, and an Auth redirect URL ending in `/auth/callback`. Nothing in this repository changes a hosted Supabase project or Vercel settings on its own.
 
 ## Local setup
 
@@ -104,6 +104,7 @@ In **SQL Editor → New query**, paste and run each file in [INSTALL.md](INSTALL
 16. `supabase/migrations/0016_v6_export_field_set.sql`
 17. `supabase/migrations/0017_v6_rate_limits.sql`
 18. `supabase/migrations/0018_v6_account_audit_workspace.sql`
+19. `supabase/migrations/0019_v6_preview_invitation.sql`
 
 With the CLI, `supabase link` and `supabase db push` apply the same files. Do that against the project you intend to use. Skip `supabase/seed.sql`. It inserts fictional workspaces that have no members. **Load sample catalog** on an empty workspace is the supported sample.
 
@@ -179,7 +180,7 @@ Deferred, and not done in this release:
 - `lib/catalog/` — fields, starter lookups, computed values, service IDs, exports, blueprints, artifacts
 - `lib/auth/` — the role matrix, email and password checks, profile names, and safe redirects
 - `lib/data/` — the in-memory catalog model used by unit tests, and the Supabase adapter
-- `supabase/migrations/` — `0001` through `0018`
+- `supabase/migrations/` — `0001` through `0019`
 - `e2e/` — Playwright
 - `docs/byo-supabase-vercel.md` — the short deploy note
 - `docs/nist-csf-2.0-provenance.md` — source, version, and content hash for the CSF core

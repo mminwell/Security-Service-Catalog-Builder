@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { acceptInviteAction, completeInvitedAccountAction, finishInviteAction, previewInviteAction } from "@/app/actions/workspace";
+import { readableFinishInviteError } from "@/lib/auth/invites";
 import { roleLabel } from "@/lib/catalog/access";
 import { profileIsIncomplete } from "@/lib/auth/profile";
 import { useCatalog } from "@/components/catalog-provider";
@@ -42,7 +43,7 @@ export function FinishAccount({ token }: { token: string | null }) {
       }
       void acceptInviteAction(token).then(async (result) => {
         if (!result.ok) {
-          setError(result.error);
+          setError(readableFinishInviteError(result.error));
           setReady(true);
           return;
         }
@@ -58,7 +59,7 @@ export function FinishAccount({ token }: { token: string | null }) {
     started.current = true;
     void previewInviteAction(token).then((result) => {
       if (!result.ok) {
-        setError(result.error);
+        setError(readableFinishInviteError(result.error));
         setReady(true);
         return;
       }
@@ -107,7 +108,7 @@ export function FinishAccount({ token }: { token: string | null }) {
               const submit = token ? finishInviteAction({ token, ...fields }) : completeInvitedAccountAction(fields);
               void submit.then(async (result) => {
                 if (!result.ok) {
-                  setError(result.error);
+                  setError(readableFinishInviteError(result.error));
                   return;
                 }
                 await api.refresh();
