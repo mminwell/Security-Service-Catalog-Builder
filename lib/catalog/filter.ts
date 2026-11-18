@@ -1,4 +1,5 @@
 import { optionLabel } from "@/lib/catalog/lookups";
+import { displayServiceOwner } from "@/lib/catalog/owner-names";
 import { readField, withComputed } from "@/lib/catalog/service";
 import type {
   CatalogFilters,
@@ -163,7 +164,14 @@ export function filterServices(
       if (!ruleMatches(shown, rule, field)) return false;
     }
     if (!query) return true;
-    const haystack = [shown.service_code, shown.name, shown.internal_name, shown.summary, shown.service_owner]
+    const haystack = [
+      shown.service_code,
+      shown.name,
+      shown.internal_name,
+      shown.summary,
+      shown.service_owner,
+      displayServiceOwner(shown.service_owner),
+    ]
       .filter(Boolean)
       .join(" ")
       .toLowerCase();

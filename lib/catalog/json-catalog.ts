@@ -3,6 +3,7 @@ import { exportFileName } from "@/lib/catalog/export-plan";
 import { fieldUsesLookup } from "@/lib/catalog/lookup-toggle";
 import { optionByCode } from "@/lib/catalog/lookups";
 import { localToday } from "@/lib/catalog/present";
+import { displayServiceOwner } from "@/lib/catalog/owner-names";
 import { readField, withComputed } from "@/lib/catalog/service";
 import { elementsInScope } from "@/lib/catalog/framework-catalog";
 import type { FrameworkElement, FrameworkRelease } from "@/lib/catalog/framework";
@@ -336,6 +337,10 @@ function fieldValue(service: ServiceRecord, field: FieldDefinition, lookups: Loo
     return lookupRef(lookups, field.lookup_field_key, String(value));
   }
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (field.field_key === "service_owner") {
+    const shown = displayServiceOwner(String(value));
+    return shown || null;
+  }
   return String(value);
 }
 

@@ -1,5 +1,6 @@
 import { fieldUsesLookup } from "@/lib/catalog/lookup-toggle";
 import { optionLabel } from "@/lib/catalog/lookups";
+import { displayServiceOwner } from "@/lib/catalog/owner-names";
 import { readField, withComputed } from "@/lib/catalog/service";
 import type { FieldDefinition, LookupOption, ServiceRecord } from "@/lib/catalog/types";
 
@@ -23,6 +24,7 @@ export function formatExportValue(
   if (fieldUsesLookup(field) && field.lookup_field_key) {
     return optionLabel(lookups, field.lookup_field_key, String(value));
   }
+  if (field.field_key === "service_owner" && typeof value === "string") return displayServiceOwner(value);
   if (typeof value === "number") return String(value);
   return String(value);
 }

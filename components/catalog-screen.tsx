@@ -14,6 +14,7 @@ import { BlueprintCartArt } from "@/components/blueprint-art";
 import { ExportDialog } from "@/components/export-dialog";
 import { FilterChipRow, FilterControl } from "@/components/catalog-tools";
 import { ColumnPicker, useCatalogColumns } from "@/components/column-picker";
+import { ServiceImportControls } from "@/components/service-import";
 import { useCatalog } from "@/components/catalog-provider";
 import { CartIcon } from "@/components/icons";
 import { AuditDrawer, Badge } from "@/components/widgets";
@@ -66,6 +67,7 @@ export function CatalogScreen() {
             {ADD_TEMPLATES_LABEL}
             {cartCount > 0 ? <span className="cart-badge">{cartCount}</span> : null}
           </AppLink>
+          {api.canWrite ? <ServiceImportControls /> : null}
           {api.canWrite ? (
             <AppLink className="btn btn-primary" href="/services/new">
               Add service

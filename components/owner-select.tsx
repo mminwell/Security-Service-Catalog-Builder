@@ -8,12 +8,15 @@ export function OwnerSelect({
   id,
   owners,
   value,
+  fallback = "",
   disabled,
   onChange,
 }: {
   id: string;
   owners: ServiceOwner[];
   value: string | null;
+  /** Shown when no directory owner is selected, such as a name just imported from CSV. */
+  fallback?: string;
   disabled?: boolean;
   onChange: (ownerId: string | null) => void;
 }) {
@@ -43,7 +46,7 @@ export function OwnerSelect({
         aria-autocomplete="list"
         disabled={disabled}
         placeholder="Search active owners"
-        value={open ? query : selected ? ownerDisplayName(selected.first_name, selected.last_name) : ""}
+        value={open ? query : selected ? ownerDisplayName(selected.first_name, selected.last_name) : fallback}
         onFocus={() => {
           setOpen(true);
           setQuery("");

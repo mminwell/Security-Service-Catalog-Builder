@@ -1,4 +1,5 @@
 import { maturityGap, nextReviewDate } from "@/lib/catalog/compute";
+import { displayServiceOwner } from "@/lib/catalog/owner-names";
 import type { FieldDefinition, InputType, ServiceRecord } from "@/lib/catalog/types";
 
 export type ServiceSeed = {
@@ -348,6 +349,10 @@ export function normalizeService(service: ServiceRecord): ServiceRecord {
       const next = value.trim();
       trimmed[key] = next.length === 0 ? null : next;
     }
+  }
+  if (typeof trimmed.service_owner === "string") {
+    const shown = displayServiceOwner(trimmed.service_owner);
+    trimmed.service_owner = shown || null;
   }
   return withComputed(trimmed);
 }

@@ -9,7 +9,7 @@ import { canAdminister, canGrantPlatformOwner, canProvision, canWriteServices, r
 import { planBlueprintCheckout } from "@/lib/catalog/checkout";
 import { isIdentityField } from "@/lib/catalog/fields";
 import { optionByCode } from "@/lib/catalog/lookups";
-import { serviceHasOwnerGap } from "@/lib/catalog/owner-names";
+import { presentedServiceOwner, serviceHasOwnerGap } from "@/lib/catalog/owner-names";
 import { localToday } from "@/lib/catalog/present";
 import { canEditServiceContent } from "@/lib/catalog/service-edit";
 import type { ExportLogMeta } from "@/lib/catalog/export-plan";
@@ -35,6 +35,7 @@ import {
   deleteService as deleteServiceRow,
   importArtifacts as importArtifactRows,
   importFrameworkRows,
+  importServices as importServiceRows,
   importLookups as importLookupRows,
   loadSampleServices as loadSampleServicesRow,
   recordExport as recordExportRow,
@@ -123,6 +124,7 @@ export function DemoCatalogProvider({ children }: { children: ReactNode }) {
       .filter((service) => service.tenant_id === tenantId)
       .map((service) => ({
         ...service,
+        service_owner: presentedServiceOwner(service, tenantOwners),
         owner_gap: serviceHasOwnerGap(
           service,
           tenantOwners.map((owner) => ({ id: owner.id, isActive: owner.is_active, deactivatedUser: owner.deactivated_user })),
@@ -390,6 +392,12 @@ export function DemoCatalogProvider({ children }: { children: ReactNode }) {
       importArtifacts: (rows: PlannedArtifactImport[]) =>
         guardSave("Artifacts saved", async () => {
           const result = importArtifactRows(snapshotRef.current.db, rows);
+          commitDb(result.db);
+          return { created: result.created, updated: result.updated };
+        }),
+      importServices: (rows) =>
+        guardSave("Services saved", async () => {
+          const result = importServiceRows(snapshotRef.current.db, rows);
           commitDb(result.db);
           return { created: result.created, updated: result.updated };
         }),

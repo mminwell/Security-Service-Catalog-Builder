@@ -215,6 +215,7 @@ function fixture(): CatalogApi {
     saveArtifactLink: asyncNoop,
     deleteArtifactLink: asyncNoop,
     importArtifacts: async () => ({ created: 0, updated: 0 }),
+    importServices: async () => ({ created: 0, updated: 0 }),
     saveLookup: asyncNoop,
     addLookup: asyncNoop,
     saveField: asyncNoop,

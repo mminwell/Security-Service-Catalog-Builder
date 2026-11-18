@@ -97,6 +97,7 @@ export type DemoCommand =
   | { type: "cancel-invite"; inviteId: string }
   | {
       type: "save-owner";
+      id?: string;
       firstName: string;
       lastName: string;
       email: string;
@@ -372,6 +373,30 @@ function saveOwner(
   if (command.userId && !email) {
     return { state, result: { ok: false, error: "An owner linked to a member needs an email." } };
   }
+  if (command.id) {
+    const current = state.owners.find((owner) => owner.id === command.id && owner.tenant_id === tenantId);
+    if (!current) return { state, result: { ok: false, error: "That owner is not in this workspace." } };
+    return {
+      state: {
+        ...state,
+        owners: state.owners.map((owner) =>
+          owner.id === command.id
+            ? {
+                ...owner,
+                first_name: firstName,
+                last_name: lastName,
+                email: email || null,
+                title: command.title.trim() || null,
+                team_code: command.teamCode.trim() || null,
+                user_id: command.userId.trim() || null,
+                updated_at: now,
+              }
+            : owner,
+        ),
+      },
+      result: { ok: true, notice: "Owner saved", services: 0 },
+    };
+  }
   const owner: ServiceOwner = {
     id: crypto.randomUUID(),
     tenant_id: tenantId,
@@ -412,23 +437,46 @@ function importOwners(state: DemoSnapshot, tenantId: string, rows: PlannedOwnerI
   result: DemoResult;
 } {
   const ready = rows.filter((row) => row.status === "ready" && row.firstName && row.lastName);
-  const created: ServiceOwner[] = ready.map((row) => ({
-    id: crypto.randomUUID(),
-    tenant_id: tenantId,
-    first_name: row.firstName ?? "",
-    last_name: row.lastName ?? "",
-    email: row.email,
-    title: row.title,
-    team_code: row.teamCode,
-    is_active: true,
-    user_id: null,
-    deactivated_user: false,
-    created_at: now,
-    updated_at: now,
-  }));
+  let owners = state.owners.slice();
+  let createdCount = 0;
+  for (const row of ready) {
+    const firstName = row.firstName ?? "";
+    const lastName = row.lastName ?? "";
+    const email = row.email;
+    const match = owners.find(
+      (owner) =>
+        owner.tenant_id === tenantId &&
+        owner.first_name.toLowerCase() === firstName.toLowerCase() &&
+        owner.last_name.toLowerCase() === lastName.toLowerCase() &&
+        (owner.email ?? "") === (email ?? ""),
+    );
+    if (match) {
+      owners = owners.map((owner) =>
+        owner.id === match.id
+          ? { ...owner, first_name: firstName, last_name: lastName, is_active: true, updated_at: now }
+          : owner,
+      );
+      continue;
+    }
+    createdCount += 1;
+    owners.push({
+      id: crypto.randomUUID(),
+      tenant_id: tenantId,
+      first_name: firstName,
+      last_name: lastName,
+      email,
+      title: row.title,
+      team_code: row.teamCode,
+      is_active: true,
+      user_id: null,
+      deactivated_user: false,
+      created_at: now,
+      updated_at: now,
+    });
+  }
   return {
-    state: { ...state, owners: [...state.owners, ...created] },
-    result: { ok: true, notice: `Imported ${created.length} owners.`, services: 0 },
+    state: { ...state, owners },
+    result: { ok: true, notice: `Imported ${createdCount} owners.`, services: 0 },
   };
 }
 
