@@ -16,7 +16,7 @@ test("keeps the primary nav on one line at 1280px", async ({ page }) => {
         <a class="brand" href="/catalog"><strong>Security Service Catalog</strong><span>Catalog builder</span></a>
         <nav class="nav" aria-label="Primary">${links}</nav>
         <button type="button" class="btn btn-secondary switcher-trigger">Northwind Traders</button>
-        <button type="button" class="btn btn-secondary user-trigger"><span class="who">Ada · Admin</span></button>
+        <button type="button" class="btn user-trigger" aria-label="Ada Lovelace · Admin">AL</button>
         <button type="button" class="btn btn-secondary">Sign out</button>
       </div>`;
     document.body.prepend(header);
