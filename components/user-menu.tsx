@@ -1,9 +1,9 @@
 "use client";
 
 import { AppLink } from "@/components/app-path";
-import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { createPortal } from "react-dom";
-import { headerLabel } from "@/lib/auth/profile";
+import { accountMenuLabel, avatarInitials, fullName } from "@/lib/auth/profile";
 import { roleLabel } from "@/lib/catalog/access";
 import { placeAnchoredPanel } from "@/lib/catalog/popup-placement";
 import { useCatalog } from "@/components/catalog-provider";
@@ -14,10 +14,15 @@ export function UserMenu() {
   const api = useCatalog();
   const session = api.session;
   const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<{ firstName: string; lastName: string } | null>(null);
   const [panelStyle, setPanelStyle] = useState<CSSProperties>({});
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const ref = useDismiss(open, () => setOpen(false), panelRef);
+  const closeMenu = useCallback(() => {
+    setOpen(false);
+    setDraft(null);
+  }, []);
+  const ref = useDismiss(open, closeMenu, panelRef);
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -49,25 +54,46 @@ export function UserMenu() {
 
   if (!session) return null;
 
-  const label = headerLabel(session);
+  const shown = {
+    email: session.email,
+    firstName: draft ? draft.firstName : session.firstName,
+    lastName: draft ? draft.lastName : session.lastName,
+  };
   const role = api.role ? roleLabel(api.role) : "";
+  const name = fullName(shown);
+  const accessible = accountMenuLabel(shown, role);
+
+  function onProfileInput(event: FormEvent<HTMLDivElement>) {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    if (target.name !== "firstName" && target.name !== "lastName") return;
+    const form = target.form;
+    if (!form) return;
+    const firstField = form.elements.namedItem("firstName");
+    const lastField = form.elements.namedItem("lastName");
+    setDraft({
+      firstName: firstField instanceof HTMLInputElement ? firstField.value : "",
+      lastName: lastField instanceof HTMLInputElement ? lastField.value : "",
+    });
+  }
 
   return (
     <div className="user-menu" ref={ref}>
       <button
         ref={buttonRef}
         type="button"
-        className="btn btn-secondary user-trigger"
+        className="btn user-trigger"
         aria-expanded={open}
         aria-haspopup="dialog"
         aria-controls="account-menu"
-        title={session.email}
-        onClick={() => setOpen((value) => !value)}
+        aria-label={accessible}
+        title={accessible}
+        onClick={() => {
+          setOpen((value) => !value);
+          setDraft(null);
+        }}
       >
-        <span className="who">
-          {label}
-          {role ? ` · ${role}` : ""}
-        </span>
+        {avatarInitials(shown)}
       </button>
       {open && typeof document !== "undefined"
         ? createPortal(
@@ -80,31 +106,41 @@ export function UserMenu() {
               style={panelStyle}
             >
               <p className="micro">Profile</p>
-              <p className="hint">{session.email}</p>
+              <div className="account-head">
+                {name || role ? (
+                  <div className="account-name-row">
+                    {name ? <strong>{name}</strong> : null}
+                    {role ? <span className="badge badge-neutral">{role}</span> : null}
+                  </div>
+                ) : null}
+                <p className="hint">{session.email}</p>
+              </div>
               {api.canAdmin ? (
-                <AppLink href="/admin/owners" onClick={() => setOpen(false)}>
+                <AppLink href="/admin/owners" onClick={closeMenu}>
                   Service Owners
                 </AppLink>
               ) : null}
               {api.role === "platform_owner" ? (
-                <AppLink href="/admin/users" onClick={() => setOpen(false)}>
+                <AppLink href="/admin/users" onClick={closeMenu}>
                   Site Admin
                 </AppLink>
               ) : null}
-              <ProfileForm
-                key={`${session.userId}:${session.firstName ?? ""}:${session.lastName ?? ""}:${session.company ?? ""}`}
-                idPrefix="account"
-                initial={{
-                  firstName: session.firstName ?? "",
-                  lastName: session.lastName ?? "",
-                  company: session.company ?? "",
-                }}
-                submitLabel="Save profile"
-                onSubmit={async (profile) => {
-                  await api.saveProfile(profile);
-                  setOpen(false);
-                }}
-              />
+              <div onInput={onProfileInput}>
+                <ProfileForm
+                  key={`${session.userId}:${session.firstName ?? ""}:${session.lastName ?? ""}:${session.company ?? ""}`}
+                  idPrefix="account"
+                  initial={{
+                    firstName: session.firstName ?? "",
+                    lastName: session.lastName ?? "",
+                    company: session.company ?? "",
+                  }}
+                  submitLabel="Save profile"
+                  onSubmit={async (profile) => {
+                    await api.saveProfile(profile);
+                    closeMenu();
+                  }}
+                />
+              </div>
             </div>,
             document.body,
           )

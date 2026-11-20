@@ -127,24 +127,7 @@ p { margin: 0; }
 
 .top-spacer { flex: 0 0 0; width: 0; }
 
-.who {
-  font-size: 13px;
-  color: var(--gray-700);
-  max-width: 160px;
-  min-width: 0;
-  flex-shrink: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.user-menu { position: relative; }
-.user-trigger {
-  max-width: 188px;
-  min-width: 0;
-  padding: 0 10px;
-}
-.user-trigger .who { display: block; }
+.user-menu { position: relative; flex-shrink: 0; }
 
 @media (min-width: 1280px) {
   .brand { min-width: 156px; }
@@ -217,10 +200,65 @@ p { margin: 0; }
 .btn-primary:hover:not(:disabled) { background: var(--clay-hover); }
 .btn-secondary { background: var(--white); color: var(--slate); border-color: var(--gray-300); }
 .btn-secondary:hover:not(:disabled) { background: var(--gray-100); }
+
+.btn.user-trigger {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background: var(--oat);
+  color: var(--slate);
+  border: 1.5px solid var(--gray-300);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.btn.user-trigger:hover:not(:disabled) {
+  border-color: var(--gray-500);
+  background: color-mix(in srgb, var(--oat) 86%, var(--slate));
+}
+.btn.user-trigger:focus-visible,
+.btn.user-trigger[aria-expanded="true"] {
+  outline: none;
+  border-color: var(--clay);
+  box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.25);
+}
+.btn.user-trigger:focus-visible:hover:not(:disabled),
+.btn.user-trigger[aria-expanded="true"]:hover:not(:disabled) {
+  border-color: var(--clay);
+  background: color-mix(in srgb, var(--oat) 86%, var(--slate));
+}
 .btn-ghost { background: transparent; color: var(--gray-700); }
 .btn-ghost:hover:not(:disabled) { background: var(--gray-100); }
 .btn-danger { background: var(--danger); color: var(--white); }
 .btn-danger:hover:not(:disabled) { background: #9a3f3f; }
+
+.account-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin: 2px 0 12px;
+}
+.account-name-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.account-name-row strong {
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--slate);
+}
+.account-head .hint { margin-top: 0; }
 
 .panel {
   background: var(--white);

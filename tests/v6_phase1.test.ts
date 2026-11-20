@@ -4,9 +4,12 @@ import { describe, expect, it } from "vitest";
 import { validateEmail, validatePassword } from "@/lib/auth/credentials";
 import { passwordFieldState } from "@/lib/auth/password-field";
 import {
+  accountMenuLabel,
   accountProfileFromMetadata,
+  avatarInitials,
   clearProfilePromptDismissal,
   dismissProfilePrompt,
+  fullName,
   headerLabel,
   isProfilePromptDismissed,
   normalizeAccountProfile,
@@ -112,6 +115,68 @@ describe("signup profile", () => {
   });
 });
 
+describe("avatar initials and account menu label", () => {
+  it("builds initials from both names, one name, or the email", () => {
+    expect(avatarInitials({ email: "mike@example.com", firstName: "Mike", lastName: "Minwell" })).toBe("MM");
+    expect(avatarInitials({ email: "mary@example.com", firstName: "Mary Jane", lastName: "Watson" })).toBe("MW");
+    expect(avatarInitials({ email: "mary@example.com", firstName: "  Mary Jane  ", lastName: "  Watson " })).toBe("MW");
+    expect(avatarInitials({ email: "grace@example.com", firstName: "Grace", lastName: "  " })).toBe("G");
+    expect(avatarInitials({ email: "grace@example.com", firstName: " Grace " })).toBe("G");
+    expect(avatarInitials({ email: "hopper@example.com", firstName: null, lastName: "Hopper" })).toBe("H");
+    expect(avatarInitials({ email: "hopper@example.com", firstName: "   ", lastName: " Hopper " })).toBe("H");
+    expect(avatarInitials({ email: "jordan@example.com" })).toBe("J");
+    expect(avatarInitials({ email: "  +jordan@example.com ", firstName: "", lastName: "" })).toBe("J");
+    expect(avatarInitials({ email: "___", firstName: " ", lastName: " " })).toBe("_");
+    expect(avatarInitials({ email: "" })).toBe("?");
+    expect(avatarInitials({ email: "   ", firstName: null, lastName: null })).toBe("?");
+    const boldM = "\u{1D40C}";
+    const boldW = "\u{1D416}";
+    expect(
+      avatarInitials({ email: "a@example.com", firstName: `${boldM}ary`, lastName: `${boldW}atson` }),
+    ).toBe(`${boldM}${boldW}`);
+    expect(fullName({ firstName: " Mike ", lastName: " Minwell " })).toBe("Mike Minwell");
+    expect(fullName({ firstName: "Mary Jane", lastName: "Watson" })).toBe("Mary Jane Watson");
+    expect(fullName({ firstName: "Grace" })).toBe("Grace");
+    expect(fullName({ lastName: " Hopper " })).toBe("Hopper");
+    expect(fullName({ firstName: "  ", lastName: "" })).toBe("");
+  });
+
+  it("formats the tooltip from the full name, or the email, and the role", () => {
+    const mike = { email: "mike@example.com", firstName: "Mike", lastName: "Minwell" };
+    expect(accountMenuLabel(mike, "Site Admin")).toBe("Mike Minwell · Site Admin");
+    expect(accountMenuLabel(mike, "  Site Admin  ")).toBe("Mike Minwell · Site Admin");
+    expect(accountMenuLabel(mike)).toBe("Mike Minwell");
+    expect(accountMenuLabel(mike, null)).toBe("Mike Minwell");
+    expect(accountMenuLabel(mike, "   ")).toBe("Mike Minwell");
+    expect(accountMenuLabel({ email: "jordan@example.com", firstName: " ", lastName: "" }, "Viewer")).toBe(
+      "jordan@example.com · Viewer",
+    );
+    expect(accountMenuLabel({ email: "jordan@example.com" })).toBe("jordan@example.com");
+    expect(accountMenuLabel({ email: "  ", firstName: "", lastName: "" }, "Admin")).toBe("? · Admin");
+    expect(headerLabel({ email: "ada@example.com", firstName: " Ada " })).toBe("Ada");
+    const css = readFileSync("app/globals.css", "utf8");
+    const trigger = css.slice(css.indexOf(".btn.user-trigger {"), css.indexOf(".btn-ghost"));
+    expect(trigger).toContain("width: 36px");
+    expect(trigger).toContain("height: 36px");
+    expect(trigger).toContain("padding: 0");
+    expect(trigger).toContain("flex-shrink: 0");
+    expect(trigger).toContain("border-radius: 9999px");
+    expect(trigger).toContain("background: var(--oat)");
+    expect(trigger).toContain("color: var(--slate)");
+    expect(trigger).toContain("font-family: var(--sans)");
+    expect(trigger).toContain("font-size: 13px");
+    expect(trigger).toContain("font-weight: 600");
+    expect(trigger).toContain("letter-spacing: 0.02em");
+    expect(trigger).toContain("line-height: 1");
+    expect(trigger).toContain("text-transform: uppercase");
+    expect(trigger).toContain("border: 1.5px solid var(--gray-300)");
+    expect(trigger).toContain("border-color: var(--gray-500)");
+    expect(trigger).toContain("border-color: var(--clay)");
+    expect(trigger).toContain("box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.25)");
+    expect(trigger).toContain('aria-expanded="true"');
+  });
+});
+
 describe("header name and the one-time profile prompt", () => {
   it("shows the first name and falls back to email when it is missing", () => {
     expect(headerLabel({ email: "ada@example.com", firstName: " Ada " })).toBe("Ada");
@@ -135,6 +200,11 @@ describe("header name and the one-time profile prompt", () => {
     expect(prompt).toContain("Complete your profile");
     expect(prompt).toContain("Not now");
     expect(menu).toContain('aria-label="Profile"');
+    expect(menu).toContain("avatarInitials");
+    expect(menu).toContain("accountMenuLabel");
+    expect(menu).toContain("fullName");
+    expect(menu).toContain("onInput={onProfileInput}");
+    expect(menu).not.toContain('className="who"');
     expect(shell).toContain("<UserMenu />");
     expect(shell).toContain("<CompleteProfilePrompt />");
     expect(shell).toContain("primaryNavFor");

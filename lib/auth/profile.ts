@@ -107,9 +107,63 @@ export function accountProfileFromMetadata(metadata: unknown): AccountProfile | 
   };
 }
 
+type NamedAccount = {
+  email: string;
+  firstName?: string | null;
+  lastName?: string | null;
+};
+
+function presentName(value: string | null | undefined): string {
+  return value?.trim() ?? "";
+}
+
+/** First Unicode code point, so a surrogate pair stays one character. */
+function firstGlyph(value: string): string {
+  return Array.from(value)[0] ?? "";
+}
+
+function upperGlyph(value: string): string {
+  const glyph = firstGlyph(value);
+  return glyph ? glyph.toUpperCase() : "";
+}
+
+function isLetterOrNumber(glyph: string): boolean {
+  if (/^[0-9]$/.test(glyph)) return true;
+  return glyph.toLowerCase() !== glyph.toUpperCase();
+}
+
+function emailInitial(email: string): string {
+  const glyphs = Array.from(email).filter((glyph) => glyph.trim().length > 0);
+  if (glyphs.length === 0) return "?";
+  const preferred = glyphs.find(isLetterOrNumber);
+  return (preferred ?? glyphs[0]).toUpperCase();
+}
+
 export function headerLabel(session: { email: string; firstName?: string | null }): string {
-  const first = session.firstName?.trim() ?? "";
+  const first = presentName(session.firstName);
   return first.length > 0 ? first : session.email;
+}
+
+/** First + last initials, one initial when only one name is saved, otherwise an email mark. */
+export function avatarInitials(session: NamedAccount): string {
+  const first = presentName(session.firstName);
+  const last = presentName(session.lastName);
+  if (first && last) return `${upperGlyph(first)}${upperGlyph(last)}`;
+  if (first) return upperGlyph(first);
+  if (last) return upperGlyph(last);
+  return emailInitial(session.email);
+}
+
+/** Trimmed first and last name. Empty when neither name is saved. */
+export function fullName(session: { firstName?: string | null; lastName?: string | null }): string {
+  return [presentName(session.firstName), presentName(session.lastName)].filter((part) => part.length > 0).join(" ");
+}
+
+/** Tooltip and accessible name: full name, or email when no name is saved, plus the role label. */
+export function accountMenuLabel(session: NamedAccount, role?: string | null): string {
+  const name = fullName(session) || session.email.trim() || "?";
+  const roleText = role?.trim() ?? "";
+  return roleText.length > 0 ? `${name} · ${roleText}` : name;
 }
 
 export function profileIsIncomplete(session: { firstName?: string | null; lastName?: string | null }): boolean {
