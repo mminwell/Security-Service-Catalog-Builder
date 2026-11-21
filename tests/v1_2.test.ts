@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { blueprintIdsInCatalog, blueprintIssues, BLUEPRINTS, BUNDLES } from "@/lib/catalog/blueprints";
+import { AISLES } from "@/lib/catalog/aisles";
+import {
+  EXPECTED_EXTENDED_TEMPLATE_COUNT,
+  importWorkbookBlueprints,
+  isExcludedTemplateOrigin,
+} from "@/lib/catalog/blueprint-workbook";
+import { blueprintIdsInCatalog, blueprintIssues, BLUEPRINT_COUNT_MAX, BLUEPRINT_COUNT_MIN, BLUEPRINTS, BUNDLES } from "@/lib/catalog/blueprints";
+import extendedRows from "../data/templates/extended-blueprints.json";
 import { addPackToCart } from "@/lib/catalog/cart";
 import { planBlueprintCheckout } from "@/lib/catalog/checkout";
 import {
@@ -76,12 +83,101 @@ describe("inline catalog filters", () => {
 describe("blueprint catalog", () => {
   it("ships a valid practitioner catalog and sized bundles", () => {
     expect(blueprintIssues(STARTER_LOOKUPS)).toEqual([]);
-    expect(BLUEPRINTS.length).toBeGreaterThanOrEqual(48);
-    expect(BLUEPRINTS.length).toBeLessThanOrEqual(55);
+    expect(BLUEPRINTS.length).toBe(54 + EXPECTED_EXTENDED_TEMPLATE_COUNT);
+    expect(BLUEPRINTS.length).toBeGreaterThanOrEqual(BLUEPRINT_COUNT_MIN);
+    expect(BLUEPRINTS.length).toBeLessThanOrEqual(BLUEPRINT_COUNT_MAX);
     expect(BUNDLES.map((bundle) => bundle.blueprintIds.length)).toEqual([12, 24, 42, 12, 12, 8]);
+    const coreIds = [
+      "soc-monitoring",
+      "soc-hunting",
+      "soc-intel",
+      "soc-logging",
+      "soc-detection",
+      "soc-phishing-triage",
+      "iam-lifecycle",
+      "iam-pam",
+      "iam-mfa",
+      "iam-recert",
+      "iam-ciam",
+      "iam-secrets",
+      "end-edr",
+      "end-baseline",
+      "end-mobile",
+      "end-email",
+      "net-firewall",
+      "net-segmentation",
+      "net-waf",
+      "net-remote",
+      "cld-cspm",
+      "cld-guardrails",
+      "cld-k8s",
+      "app-testing",
+      "app-ssdlc",
+      "app-api",
+      "arc-review",
+      "app-consult",
+      "vul-mgmt",
+      "vul-asm",
+      "vul-pentest",
+      "vul-patch",
+      "ir-retainer",
+      "ir-forensics",
+      "ir-exec",
+      "ir-tabletop",
+      "grc-policy",
+      "grc-risk",
+      "grc-assurance",
+      "grc-tprm",
+      "grc-metrics",
+      "grc-bcdr",
+      "grc-exceptions",
+      "prv-program",
+      "prv-dlp",
+      "prv-classification",
+      "prv-pia",
+      "ai-review",
+      "ai-model",
+      "ai-data",
+      "sat-training",
+      "sat-phish",
+      "sat-vciso",
+      "sat-onboarding",
+    ];
+    expect(BLUEPRINTS.slice(0, coreIds.length).map((blueprint) => blueprint.id)).toEqual(coreIds);
+    const bundled = new Set(BUNDLES.flatMap((bundle) => bundle.blueprintIds));
+    expect(BLUEPRINTS.slice(coreIds.length).some((blueprint) => bundled.has(blueprint.id))).toBe(false);
     const small = new Set(BUNDLES[0]?.blueprintIds);
     const medium = new Set(BUNDLES[1]?.blueprintIds);
     for (const id of small) expect(medium.has(id)).toBe(true);
+  });
+
+  it("maps workbook labels exactly and leaves new templates out of the packs", () => {
+    expect(isExcludedTemplateOrigin("Template store")).toBe(true);
+    expect(isExcludedTemplateOrigin("Starter")).toBe(true);
+    expect(isExcludedTemplateOrigin("Starter pack")).toBe(true);
+    expect(isExcludedTemplateOrigin("Taxonomy v3")).toBe(false);
+
+    const imported = importWorkbookBlueprints(extendedRows, AISLES);
+    expect(imported.blueprints).toHaveLength(EXPECTED_EXTENDED_TEMPLATE_COUNT);
+    expect(imported.membership).toEqual({});
+
+    const sample = extendedRows[0];
+    expect(sample).toBeTruthy();
+    if (!sample) return;
+    expect(() => importWorkbookBlueprints([{ ...sample, Category: "Not a category" }], AISLES)).toThrow(
+      /Unknown category label "Not a category"/,
+    );
+    expect(() => importWorkbookBlueprints([{ ...sample, "Size Packs": "Regional" }], AISLES)).toThrow(
+      /Unknown Size Packs label "Regional"/,
+    );
+    const packed = importWorkbookBlueprints(
+      [{ ...sample, "Size Packs": "Small;Large", "Industry Packs": "Healthcare / HIPAA" }],
+      AISLES,
+    );
+    expect(packed.membership["size-small"]).toEqual([sample["Template ID"]]);
+    expect(packed.membership["size-large"]).toEqual([sample["Template ID"]]);
+    expect(packed.membership["industry-healthcare"]).toEqual([sample["Template ID"]]);
+    expect(packed.membership["size-medium"]).toBeUndefined();
   });
 
   it("detects catalog duplicates and numbers checkout codes in both styles", () => {

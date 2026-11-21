@@ -6,7 +6,8 @@
   "description": "Multi-tenant security service catalog with Supabase Auth, supporting artifacts, audience exports, and NIST CSF 2.0 coverage.",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "tsx scripts/import-service-templates.ts --check && next build",
+    "templates:import": "tsx scripts/import-service-templates.ts --write",
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
