@@ -42,6 +42,8 @@ const CSF_SHORT: Record<string, string> = {
   recover: "RC",
 };
 
+const TEMPLATE_PAGE_SIZE = 24;
+
 export function BlueprintStore() {
   const api = useCatalog();
   const router = useRouter();
@@ -72,8 +74,18 @@ export function BlueprintStore() {
 
   const inCatalog = useMemo(() => blueprintIdsInCatalog(api.services), [api.services]);
   const visible = useMemo(() => filterBlueprints({ query, aisle, bundleId }), [query, aisle, bundleId]);
+  const filterKey = `${aisle}\u0000${bundleId}\u0000${query}`;
+  const [pageState, setPageState] = useState({ key: filterKey, page: 1 });
+  const pageCount = Math.max(1, Math.ceil(visible.length / TEMPLATE_PAGE_SIZE));
+  const currentPage = Math.min(pageState.key === filterKey ? pageState.page : 1, pageCount);
+  const pageStart = (currentPage - 1) * TEMPLATE_PAGE_SIZE;
+  const paged = visible.slice(pageStart, pageStart + TEMPLATE_PAGE_SIZE);
   const sizePacks = BUNDLES.filter((bundle) => bundle.kind === "size");
   const industryPacks = BUNDLES.filter((bundle) => bundle.kind === "industry");
+
+  function setPage(next: number) {
+    setPageState({ key: filterKey, page: next });
+  }
 
   function persist(next: string[]) {
     if (!tenantId) return;
@@ -165,9 +177,18 @@ export function BlueprintStore() {
       </div>
 
       <div data-section="results" data-view={view}>
+        {visible.length > 0 ? (
+          <TemplatePager
+            pageStart={pageStart}
+            pageCount={pageCount}
+            currentPage={currentPage}
+            total={visible.length}
+            onPage={setPage}
+          />
+        ) : null}
         {view === "list" ? (
           <ul className="blueprint-list">
-            {visible.map((blueprint) => (
+            {paged.map((blueprint) => (
               <BlueprintListRow
                 key={blueprint.id}
                 blueprint={blueprint}
@@ -181,7 +202,7 @@ export function BlueprintStore() {
           </ul>
         ) : (
           <div className="blueprint-grid">
-            {visible.map((blueprint) => (
+            {paged.map((blueprint) => (
               <BlueprintCard
                 key={blueprint.id}
                 blueprint={blueprint}
@@ -198,6 +219,14 @@ export function BlueprintStore() {
           <section className="empty">
             <h2>No templates match.</h2>
           </section>
+        ) : pageCount > 1 ? (
+          <TemplatePager
+            pageStart={pageStart}
+            pageCount={pageCount}
+            currentPage={currentPage}
+            total={visible.length}
+            onPage={setPage}
+          />
         ) : null}
       </div>
 
@@ -321,6 +350,52 @@ export function BlueprintStore() {
         </div>
       ) : null}
     </>
+  );
+}
+
+function TemplatePager({
+  pageStart,
+  pageCount,
+  currentPage,
+  total,
+  onPage,
+}: {
+  pageStart: number;
+  pageCount: number;
+  currentPage: number;
+  total: number;
+  onPage: (page: number) => void;
+}) {
+  const end = Math.min(pageStart + TEMPLATE_PAGE_SIZE, total);
+  return (
+    <div className="store-pager">
+      <p className="micro" aria-live="polite">
+        {pageCount > 1 ? `Showing ${pageStart + 1}–${end} of ${total}` : `${total} template${total === 1 ? "" : "s"}`}
+      </p>
+      {pageCount > 1 ? (
+        <div className="aisle-row store-pages" role="navigation" aria-label="Template pages">
+          <button type="button" disabled={currentPage === 1} onClick={() => onPage(currentPage - 1)}>
+            Previous
+          </button>
+          {Array.from({ length: pageCount }, (_, index) => {
+            const number = index + 1;
+            return (
+              <button
+                key={number}
+                type="button"
+                aria-current={number === currentPage ? "page" : undefined}
+                onClick={() => onPage(number)}
+              >
+                {number}
+              </button>
+            );
+          })}
+          <button type="button" disabled={currentPage === pageCount} onClick={() => onPage(currentPage + 1)}>
+            Next
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

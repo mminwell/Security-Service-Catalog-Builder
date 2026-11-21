@@ -1,18 +1,10 @@
 import type { LookupSeed } from "@/lib/catalog/lookups";
 import type { ServiceRecord } from "@/lib/catalog/types";
+import { AISLES, type AisleId } from "@/lib/catalog/aisles";
+import { EXTENDED_BLUEPRINTS, EXTENDED_BUNDLE_MEMBERSHIP } from "@/lib/catalog/blueprints-extended";
 
-export type AisleId =
-  | "soc"
-  | "iam"
-  | "endpoint"
-  | "network"
-  | "cloud_app"
-  | "vuln"
-  | "ir"
-  | "grc"
-  | "privacy"
-  | "ai"
-  | "advisory";
+export type { AisleId } from "@/lib/catalog/aisles";
+export { AISLES };
 
 export type Blueprint = {
   id: string;
@@ -56,20 +48,6 @@ export type BlueprintBundle = {
   summary: string;
   blueprintIds: string[];
 };
-
-export const AISLES: Array<{ id: AisleId; label: string }> = [
-  { id: "soc", label: "SOC & Threat Detection" },
-  { id: "iam", label: "Identity & Access Management" },
-  { id: "endpoint", label: "Endpoint Security" },
-  { id: "network", label: "Network Security" },
-  { id: "cloud_app", label: "Cloud & Application Security" },
-  { id: "vuln", label: "Vulnerability Management" },
-  { id: "ir", label: "Incident Response & Forensics" },
-  { id: "grc", label: "Governance, Risk & Compliance" },
-  { id: "privacy", label: "Data Protection & Privacy" },
-  { id: "ai", label: "AI Security" },
-  { id: "advisory", label: "Security Awareness & Advisory" },
-];
 
 const SMALL_IDS = [
   "soc-monitoring",
@@ -128,7 +106,7 @@ function bp(entry: Blueprint): Blueprint {
   return entry;
 }
 
-export const BLUEPRINTS: Blueprint[] = [
+const CORE_BLUEPRINTS: Blueprint[] = [
   bp({
     id: "soc-monitoring",
     name: "Enterprise Security Monitoring",
@@ -1805,7 +1783,12 @@ export const BLUEPRINTS: Blueprint[] = [
   }),
 ];
 
-export const BUNDLES: BlueprintBundle[] = [
+export const BLUEPRINT_COUNT_MIN = 360;
+export const BLUEPRINT_COUNT_MAX = 390;
+
+export const BLUEPRINTS: Blueprint[] = [...CORE_BLUEPRINTS, ...EXTENDED_BLUEPRINTS];
+
+const CORE_BUNDLES: BlueprintBundle[] = [
   {
     id: "size-small",
     kind: "size",
@@ -1891,6 +1874,22 @@ export const BUNDLES: BlueprintBundle[] = [
   },
 ];
 
+export const BUNDLES: BlueprintBundle[] = bundlesWithExtendedMembership(CORE_BUNDLES);
+
+function bundlesWithExtendedMembership(bundles: BlueprintBundle[]): BlueprintBundle[] {
+  const entries = Object.entries(EXTENDED_BUNDLE_MEMBERSHIP);
+  if (entries.length === 0) return bundles;
+  const known = new Set(bundles.map((bundle) => bundle.id));
+  for (const [bundleId] of entries) {
+    if (!known.has(bundleId)) throw new Error(`Unknown bundle ${bundleId} on an extended template.`);
+  }
+  return bundles.map((bundle) => {
+    const extra = EXTENDED_BUNDLE_MEMBERSHIP[bundle.id];
+    if (!extra || extra.length === 0) return bundle;
+    return { ...bundle, blueprintIds: [...bundle.blueprintIds, ...extra] };
+  });
+}
+
 const COMPANY_BLANKS = [
   "internal_name",
   "support_contact",
@@ -1957,8 +1956,8 @@ export function blueprintIssues(lookups: LookupSeed[]): string[] {
   const has = (field: string, code: string) => codes.get(field)?.has(code) ?? false;
   const ids = new Set<string>();
   const names = new Set<string>();
-  if (BLUEPRINTS.length < 48 || BLUEPRINTS.length > 55) {
-    issues.push(`Expected 48–55 blueprints, found ${BLUEPRINTS.length}.`);
+  if (BLUEPRINTS.length < BLUEPRINT_COUNT_MIN || BLUEPRINTS.length > BLUEPRINT_COUNT_MAX) {
+    issues.push(`Expected ${BLUEPRINT_COUNT_MIN}–${BLUEPRINT_COUNT_MAX} blueprints, found ${BLUEPRINTS.length}.`);
   }
   for (const blueprint of BLUEPRINTS) {
     if (ids.has(blueprint.id)) issues.push(`Duplicate id ${blueprint.id}.`);

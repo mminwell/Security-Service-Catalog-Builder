@@ -1007,6 +1007,17 @@ table.catalog tr.clickable:hover td { background: rgba(240, 238, 230, 0.55); }
   cursor: pointer;
 }
 .aisle-row button[aria-selected="true"] { background: var(--clay); color: var(--white); border-color: var(--clay); }
+.aisle-row button:disabled { opacity: 0.5; cursor: not-allowed; }
+.store-pager {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 10px;
+}
+.store-pages { margin-bottom: 0; }
+.store-pages button[aria-current="page"] { background: var(--clay); color: var(--white); border-color: var(--clay); }
 .cart-sticky {
   position: sticky;
   bottom: 12px;
