@@ -60,6 +60,7 @@ export function BlueprintStore() {
   const [skipExisting, setSkipExisting] = useState(true);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [confirmAll, setConfirmAll] = useState(false);
   const view = useSyncExternalStore(subscribeBlueprintView, readBlueprintView, () => "list" as const);
 
   const cart = useSyncExternalStore(
@@ -92,15 +93,26 @@ export function BlueprintStore() {
     setCartIdsFor(tenantId, next);
   }
 
-  function addPack(bundle: BlueprintBundle) {
-    const result = addPackToCart(cart, bundle.blueprintIds, { skip: skipExisting ? inCatalog : undefined });
+  function addIds(ids: readonly string[]) {
+    const result = addPackToCart(cart, ids, { skip: skipExisting ? inCatalog : undefined });
     persist(result.cart);
     setNote(
       result.added.length === 0
         ? "Those templates are already in the cart or in this catalog."
-        : `Added ${result.added.length} to the cart${result.skipped.length ? `. Skipped ${result.skipped.length} already selected or already in the catalog.` : "."}`,
+        : result.skipped.length
+          ? `Added ${result.added.length}. Skipped ${result.skipped.length} already selected or in the catalog.`
+          : `Added ${result.added.length} to the cart.`,
     );
     setDrawer(true);
+  }
+
+  function addPack(bundle: BlueprintBundle) {
+    addIds(bundle.blueprintIds);
+  }
+
+  function addEntireStore() {
+    addIds(BLUEPRINTS.map((blueprint) => blueprint.id));
+    setConfirmAll(false);
   }
 
   async function checkout() {
@@ -128,8 +140,8 @@ export function BlueprintStore() {
           <p className="micro">Templates</p>
           <h1>Templates</h1>
           <p className="lede">
-            {BLUEPRINTS.length} practitioner-grade security services. Add a pack or a single template to the cart, then
-            review every item before it lands in the catalog.
+            {BLUEPRINTS.length} practitioner-grade security services. Add a pack, one template, or every template in the
+            store to the cart, then review every item before it lands in the catalog.
           </p>
         </div>
         <div className="store-head-actions">
@@ -228,6 +240,11 @@ export function BlueprintStore() {
             onPage={setPage}
           />
         ) : null}
+        <div className="store-add-all">
+          <button type="button" className="btn btn-secondary" onClick={() => setConfirmAll(true)}>
+            Add all {BLUEPRINTS.length} to cart
+          </button>
+        </div>
       </div>
 
       <section className="pack-shelf" aria-label="Starter packs" data-section="starter-packs">
@@ -249,6 +266,11 @@ export function BlueprintStore() {
           {industryPacks.map((bundle) => (
             <PackCard key={bundle.id} bundle={bundle} onAdd={() => addPack(bundle)} />
           ))}
+        </div>
+        <div className="store-add-all store-add-all-shelf">
+          <button type="button" className="btn btn-ghost btn-compact" onClick={() => setConfirmAll(true)}>
+            Add all {BLUEPRINTS.length} to cart
+          </button>
         </div>
         {note ? <p className="hint">{note}</p> : null}
       </section>
@@ -287,11 +309,48 @@ export function BlueprintStore() {
         </div>
       ) : null}
 
+      {confirmAll ? (
+        <div className="modal-backdrop confirm-layer" role="presentation" onMouseDown={() => setConfirmAll(false)}>
+          <div
+            className="modal-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-all-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <h2 id="add-all-title">Add all {BLUEPRINTS.length} to cart</h2>
+            <p>
+              Add {BLUEPRINTS.length} templates to the cart? This adds the whole store, not only the current page.
+              You can remove any of them before checkout.
+            </p>
+            <p className="hint">
+              Templates already in the cart are skipped.
+              {skipExisting ? " Templates already in this catalog are skipped too." : ""}
+            </p>
+            <div className="row-actions" style={{ marginTop: 16 }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setConfirmAll(false)}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-primary" onClick={addEntireStore}>
+                Add all
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {drawer ? (
         <div className="overlay" role="presentation" onMouseDown={() => setDrawer(false)}>
           <aside className="drawer cart-drawer" role="dialog" aria-modal="true" aria-label="Shopping cart" onMouseDown={(event) => event.stopPropagation()}>
             <p className="micro">Cart</p>
-            <h2>Cart · {cart.length}</h2>
+            <div className="cart-heading">
+              <h2>Cart · {cart.length}</h2>
+              {cart.length > 0 ? (
+                <button type="button" className="text-link" onClick={() => persist([])}>
+                  Clear cart
+                </button>
+              ) : null}
+            </div>
             {cart.length === 0 ? <p className="lede">The cart is empty. Add a pack or a template first.</p> : null}
             <ul className="cart-list">
               {cart.map((id) => {
@@ -310,11 +369,6 @@ export function BlueprintStore() {
                 );
               })}
             </ul>
-            {cart.length > 0 ? (
-              <button type="button" className="btn btn-ghost" onClick={() => persist([])}>
-                Clear cart
-              </button>
-            ) : null}
             <label className="field-label" htmlFor="cart-status">Initial status</label>
             <select id="cart-status" className="select" value={status} onChange={(event) => setStatus(event.target.value)}>
               {statuses.map((item) => (

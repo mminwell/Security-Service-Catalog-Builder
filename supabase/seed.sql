@@ -90,6 +90,7 @@ insert into public.lookup_options (
   (null, $sscb$category$sscb$, $sscb$sec_architecture$sscb$, $sscb$Security Architecture & Engineering$sscb$, $sscb$Reference architectures, security engineering, and design review.$sscb$, $sscb$ARC$sscb$, 120, true),
   (null, $sscb$category$sscb$, $sscb$third_party$sscb$, $sscb$Third-Party & Vendor Risk$sscb$, $sscb$Assessment and oversight of suppliers and other outside parties.$sscb$, $sscb$TPR$sscb$, 130, true),
   (null, $sscb$category$sscb$, $sscb$awareness$sscb$, $sscb$Security Awareness & Training$sscb$, $sscb$Education, phishing exercises, and workforce security behavior.$sscb$, $sscb$SAT$sscb$, 140, true),
+  (null, $sscb$category$sscb$, $sscb$physical_security$sscb$, $sscb$Physical Security$sscb$, $sscb$Protection of sites, people, and physical assets: entry and visitor control, badges and keys, video and alarm monitoring, guard operations, physical incidents and investigations, and the design, testing, and maintenance of physical security systems.$sscb$, $sscb$PHY$sscb$, 150, true),
   (null, $sscb$status$sscb$, $sscb$draft$sscb$, $sscb$Draft$sscb$, $sscb$Work in progress; not published to clients.$sscb$, null, 10, true),
   (null, $sscb$status$sscb$, $sscb$planned$sscb$, $sscb$Planned$sscb$, $sscb$Committed on the roadmap; not yet live.$sscb$, null, 20, true),
   (null, $sscb$status$sscb$, $sscb$pilot$sscb$, $sscb$Pilot$sscb$, $sscb$Limited rollout / soft launch.$sscb$, null, 30, true),

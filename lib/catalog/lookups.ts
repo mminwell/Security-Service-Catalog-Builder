@@ -67,7 +67,7 @@ export const LOOKUP_GROUPS: LookupGroup[] = [
   {
     field_key: "category",
     title: "Security Categories",
-    blurb: "Fourteen domains. The three-letter prefix is used for category-prefixed service IDs.",
+    blurb: "Fifteen domains. The three-letter prefix is used for category-prefixed service IDs.",
   },
   {
     field_key: "status",
@@ -285,6 +285,13 @@ export const STARTER_LOOKUPS: LookupSeed[] = [
       label: "Security Awareness & Training",
       code_prefix: "SAT",
       description: "Education, phishing exercises, and workforce security behavior.",
+    },
+    {
+      code: "physical_security",
+      label: "Physical Security",
+      code_prefix: "PHY",
+      description:
+        "Protection of sites, people, and physical assets: entry and visitor control, badges and keys, video and alarm monitoring, guard operations, physical incidents and investigations, and the design, testing, and maintenance of physical security systems.",
     },
   ]),
   ...rows("status", [
