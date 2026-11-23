@@ -5,7 +5,7 @@ import {
   importWorkbookBlueprints,
   isExcludedTemplateOrigin,
 } from "@/lib/catalog/blueprint-workbook";
-import { blueprintIdsInCatalog, blueprintIssues, BLUEPRINT_COUNT_MAX, BLUEPRINT_COUNT_MIN, BLUEPRINTS, BUNDLES } from "@/lib/catalog/blueprints";
+import { blueprintById, blueprintIdsInCatalog, blueprintIssues, BLUEPRINT_COUNT_MAX, BLUEPRINT_COUNT_MIN, BLUEPRINTS, BUNDLES } from "@/lib/catalog/blueprints";
 import extendedRows from "../data/templates/extended-blueprints.json";
 import { addPackToCart } from "@/lib/catalog/cart";
 import { planBlueprintCheckout } from "@/lib/catalog/checkout";
@@ -86,7 +86,18 @@ describe("blueprint catalog", () => {
     expect(BLUEPRINTS.length).toBe(54 + EXPECTED_EXTENDED_TEMPLATE_COUNT);
     expect(BLUEPRINTS.length).toBeGreaterThanOrEqual(BLUEPRINT_COUNT_MIN);
     expect(BLUEPRINTS.length).toBeLessThanOrEqual(BLUEPRINT_COUNT_MAX);
-    expect(BUNDLES.map((bundle) => bundle.blueprintIds.length)).toEqual([12, 24, 42, 12, 12, 8]);
+    expect(BUNDLES.map((bundle) => bundle.id)).toEqual([
+      "size-small",
+      "size-medium",
+      "size-large",
+      "industry-healthcare",
+      "industry-fintech",
+      "industry-ai",
+      "industry-product",
+      "industry-physical",
+    ]);
+    expect(BUNDLES.map((bundle) => bundle.blueprintIds.length)).toEqual([21, 48, 111, 32, 30, 24, 14, 24]);
+    expect(BUNDLES.some((bundle) => bundle.id === "industry-ot")).toBe(false);
     const coreIds = [
       "soc-monitoring",
       "soc-hunting",
@@ -145,13 +156,40 @@ describe("blueprint catalog", () => {
     ];
     expect(BLUEPRINTS.slice(0, coreIds.length).map((blueprint) => blueprint.id)).toEqual(coreIds);
     const bundled = new Set(BUNDLES.flatMap((bundle) => bundle.blueprintIds));
-    expect(BLUEPRINTS.slice(coreIds.length).some((blueprint) => bundled.has(blueprint.id))).toBe(false);
+    expect(BLUEPRINTS.slice(coreIds.length).some((blueprint) => bundled.has(blueprint.id))).toBe(true);
     const small = new Set(BUNDLES[0]?.blueprintIds);
     const medium = new Set(BUNDLES[1]?.blueprintIds);
+    const large = new Set(BUNDLES[2]?.blueprintIds);
     for (const id of small) expect(medium.has(id)).toBe(true);
+    for (const id of medium) expect(large.has(id)).toBe(true);
+    for (const id of ORIGINAL_SMALL) expect(small.has(id)).toBe(true);
+    for (const id of ORIGINAL_MEDIUM) expect(medium.has(id)).toBe(true);
+    for (const id of ORIGINAL_LARGE) expect(large.has(id)).toBe(true);
+    for (const id of ORIGINAL_HEALTH) expect(BUNDLES[3]?.blueprintIds).toContain(id);
+    for (const id of ORIGINAL_FINTECH) expect(BUNDLES[4]?.blueprintIds).toContain(id);
+    for (const id of ORIGINAL_AI) expect(BUNDLES[5]?.blueprintIds).toContain(id);
+
+    const physical = BLUEPRINTS.filter((blueprint) => blueprint.category === "physical_security");
+    expect(physical).toHaveLength(65);
+    expect(physical.every((blueprint) => blueprint.aisle === "physical")).toBe(true);
+    expect(AISLES.findIndex((aisle) => aisle.id === "physical")).toBe(AISLES.findIndex((aisle) => aisle.id === "ir") + 1);
+    const moved = new Set(physical.map((blueprint) => blueprint.id));
+    expect(BLUEPRINTS.filter((blueprint) => blueprint.id.startsWith("phy-")).every((blueprint) => moved.has(blueprint.id))).toBe(true);
+    expect(moved.has("ot-control-room-security")).toBe(true);
+    expect(moved.has("ot-field-device-tamper-protection")).toBe(true);
+    expect(blueprintByCategory("ot-building-automation-system-security")).toEqual(["cloud_app", "cloud_infra"]);
+    expect(blueprintByCategory("ot-building-systems-network-separation")).toEqual(["cloud_app", "cloud_infra"]);
+    expect(blueprintByCategory("end-connected-device-inventory")).toEqual(["endpoint", "endpoint"]);
+    expect(blueprintByCategory("prv-media-sanitization")).toEqual(["privacy", "data_privacy"]);
+    expect(blueprintByCategory("prv-paper-record-destruction")).toEqual(["privacy", "data_privacy"]);
+    expect(blueprintByCategory("prv-archive-protection")).toEqual(["privacy", "data_privacy"]);
+    expect(blueprintByCategory("pe-leaver-asset-return-recovery")).toEqual(["iam", "iam"]);
+    expect(blueprintByCategory("sat-social-engineering-testing")).toEqual(["advisory", "awareness"]);
+    expect(blueprintByCategory("dr-recovery-site-management")).toEqual(["cloud_app", "cloud_infra"]);
+    expect(blueprintByCategory("bc-alternate-work-site-arrangements")).toEqual(["grc", "grc"]);
   });
 
-  it("maps workbook labels exactly and leaves new templates out of the packs", () => {
+  it("maps workbook labels exactly and keeps pack columns optional", () => {
     expect(isExcludedTemplateOrigin("Template store")).toBe(true);
     expect(isExcludedTemplateOrigin("Starter")).toBe(true);
     expect(isExcludedTemplateOrigin("Starter pack")).toBe(true);
@@ -178,6 +216,80 @@ describe("blueprint catalog", () => {
     expect(packed.membership["size-large"]).toEqual([sample["Template ID"]]);
     expect(packed.membership["industry-healthcare"]).toEqual([sample["Template ID"]]);
     expect(packed.membership["size-medium"]).toBeUndefined();
+    const named = importWorkbookBlueprints(
+      [
+        {
+          ...sample,
+          "Industry Packs": "Connected Products & Devices;Physical Security & Facilities",
+        },
+      ],
+      AISLES,
+    );
+    expect(named.membership["industry-product"]).toEqual([sample["Template ID"]]);
+    expect(named.membership["industry-physical"]).toEqual([sample["Template ID"]]);
+    expect(() =>
+      importWorkbookBlueprints([{ ...sample, "Industry Packs": "Manufacturing, Energy & OT" }], AISLES),
+    ).toThrow(/Unknown Industry Packs label/);
+  });
+
+  it("checks out the whole store once, including Physical Security codes", () => {
+    const ids = BLUEPRINTS.map((blueprint) => blueprint.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    const skippedCatalog = addPackToCart([], ids, { skip: new Set(["soc-monitoring"]) });
+    expect(skippedCatalog.added).toHaveLength(ids.length - 1);
+    expect(skippedCatalog.skipped).toEqual(["soc-monitoring"]);
+    expect(skippedCatalog.cart).not.toContain("soc-monitoring");
+    const first = addPackToCart([], ids);
+    expect(first.added).toHaveLength(ids.length);
+    expect(new Set(first.cart).size).toBe(ids.length);
+    const again = addPackToCart(first.cart, ids);
+    expect(again.added).toEqual([]);
+    expect(again.skipped).toHaveLength(ids.length);
+    expect(again.cart).toEqual(first.cart);
+
+    const prefixForCategory = (category: string) =>
+      STARTER_LOOKUPS.find((row) => row.field_key === "category" && row.code === category)?.code_prefix ?? null;
+    const planned = planBlueprintCheckout({
+      tenantId: "tenant",
+      blueprintIds: ids,
+      mode: "category_prefix",
+      status: "draft",
+      ownerTeam: "corp_security_grc",
+      deliveryTeam: null,
+      existingCodes: ["SEC-PHY-002", "SVC-001"],
+      prefixForCategory,
+      reviewedOn: "2026-11-06",
+      now: "2026-11-06T12:00:00.000Z",
+      idFor: (_id, index) => `svc-${index}`,
+    });
+    expect(planned).toHaveLength(BLUEPRINTS.length);
+    expect(new Set(planned.map((service) => service.service_code)).size).toBe(planned.length);
+    const physicalCodes = planned.filter((service) => service.category === "physical_security").map((service) => service.service_code);
+    expect(physicalCodes).toHaveLength(65);
+    expect(physicalCodes.every((code) => code.startsWith("SEC-PHY-"))).toBe(true);
+    expect(physicalCodes).toContain("SEC-PHY-003");
+    expect(physicalCodes).not.toContain("SEC-PHY-002");
+
+    let db = signInDemo(freshDemo(), "demo.practitioner@example.com");
+    const tenantId = db.activeTenantId!;
+    const sequential = planBlueprintCheckout({
+      tenantId,
+      blueprintIds: ids,
+      mode: "sequential",
+      status: "draft",
+      ownerTeam: "vciso_leadership",
+      deliveryTeam: null,
+      existingCodes: db.services.filter((service) => service.tenant_id === tenantId).map((service) => service.service_code),
+      prefixForCategory: () => null,
+      reviewedOn: "2026-11-06",
+      now: "2026-11-06T12:00:00.000Z",
+    }) as ServiceRecord[];
+    expect(sequential).toHaveLength(BLUEPRINTS.length);
+    db = checkoutServices(db, sequential, "2026-11-06T12:00:00.000Z");
+    const checkoutAudits = db.audit.filter((entry) => entry.after_data?.kind === "blueprint_checkout");
+    expect(checkoutAudits.at(-1)?.after_data?.count).toBe(BLUEPRINTS.length);
+    expect(db.services.filter((service) => service.tenant_id === tenantId).length).toBeGreaterThan(BLUEPRINTS.length);
+    expect(JSON.stringify(db).length).toBeLessThan(4_500_000);
   });
 
   it("detects catalog duplicates and numbers checkout codes in both styles", () => {
@@ -474,6 +586,92 @@ describe("demo migration and checkout audit", () => {
     expect(db.services.filter((service) => service.tenant_id === tenantId).length).toBeGreaterThan(2);
   });
 });
+
+const ORIGINAL_SMALL = [
+  "soc-monitoring",
+  "iam-lifecycle",
+  "iam-pam",
+  "iam-mfa",
+  "end-edr",
+  "end-email",
+  "vul-mgmt",
+  "ir-retainer",
+  "grc-policy",
+  "grc-risk",
+  "grc-tprm",
+  "sat-training",
+];
+const ORIGINAL_MEDIUM = [
+  ...ORIGINAL_SMALL,
+  "soc-hunting",
+  "soc-logging",
+  "iam-recert",
+  "end-baseline",
+  "net-firewall",
+  "net-waf",
+  "cld-cspm",
+  "app-testing",
+  "vul-pentest",
+  "ir-tabletop",
+  "grc-bcdr",
+  "prv-dlp",
+];
+const ORIGINAL_LARGE = [
+  ...ORIGINAL_MEDIUM,
+  "soc-intel",
+  "soc-detection",
+  "soc-phishing-triage",
+  "iam-ciam",
+  "iam-secrets",
+  "end-mobile",
+  "net-segmentation",
+  "net-remote",
+  "cld-guardrails",
+  "cld-k8s",
+  "app-ssdlc",
+  "app-api",
+  "arc-review",
+  "vul-asm",
+  "vul-patch",
+  "ir-forensics",
+  "grc-assurance",
+  "grc-metrics",
+];
+const ORIGINAL_HEALTH = [
+  "iam-lifecycle",
+  "iam-recert",
+  "end-edr",
+  "soc-logging",
+  "vul-mgmt",
+  "ir-retainer",
+  "grc-tprm",
+  "grc-bcdr",
+  "prv-program",
+  "prv-dlp",
+  "prv-classification",
+  "prv-pia",
+];
+const ORIGINAL_FINTECH = [
+  "iam-pam",
+  "iam-secrets",
+  "iam-recert",
+  "soc-logging",
+  "net-firewall",
+  "net-waf",
+  "cld-cspm",
+  "app-testing",
+  "vul-mgmt",
+  "vul-pentest",
+  "grc-assurance",
+  "grc-tprm",
+];
+const ORIGINAL_AI = ["ai-review", "ai-model", "ai-data", "prv-program", "prv-classification", "prv-dlp", "app-ssdlc", "app-api"];
+
+function blueprintByCategory(id: string): [string, string] {
+  const blueprint = blueprintById(id);
+  if (!blueprint) throw new Error(id);
+  return [blueprint.aisle, blueprint.category];
+}
 
 function field(key: string) {
   const found = fields.find((item) => item.field_key === key);

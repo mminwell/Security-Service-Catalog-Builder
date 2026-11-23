@@ -47,7 +47,7 @@ describe("starter catalog contract", () => {
       "None",
     ]);
     const categories = STARTER_LOOKUPS.filter((row) => row.field_key === "category");
-    expect(categories).toHaveLength(14);
+    expect(categories).toHaveLength(15);
     expect(categories.map((row) => row.code_prefix)).toEqual([
       "GRC",
       "SOC",
@@ -63,7 +63,9 @@ describe("starter catalog contract", () => {
       "ARC",
       "TPR",
       "SAT",
+      "PHY",
     ]);
+    expect(categories.at(-1)?.code).toBe("physical_security");
     expect(STARTER_LOOKUPS.filter((row) => row.field_key === "status")).toHaveLength(6);
   });
 
@@ -82,5 +84,17 @@ describe("starter catalog contract", () => {
     expect(sql).toContain("checkout_blueprint_services");
     expect(sql).toContain("data:image/svg+xml");
     expect(sql).not.toMatch(/mminwell|supabase\.co|service_role/i);
+  });
+
+  it("adds Physical Security without rewriting services that already exist", () => {
+    const migration = readFileSync("supabase/migrations/0021_physical_security_category.sql", "utf8");
+    expect(migration).toContain("physical_security");
+    expect(migration).toContain("$sscb$PHY$sscb$");
+    expect(migration).toContain("on conflict (field_key, code) where tenant_id is null do nothing");
+    expect(migration).toContain("on conflict (tenant_id, field_key, code) where tenant_id is not null do nothing");
+    expect(migration).not.toMatch(/update\s+public\.services/i);
+    expect(migration).not.toMatch(/insert\s+into\s+public\.services/i);
+    expect(sql).toContain("physical_security");
+    expect(sql).toContain("Protection of sites, people, and physical assets:");
   });
 });

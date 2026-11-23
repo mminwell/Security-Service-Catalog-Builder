@@ -64,6 +64,11 @@ const INDUSTRY_PACKS: Record<string, string> = {
   "industry-ai": "industry-ai",
   AI: "industry-ai",
   "AI Security & Privacy": "industry-ai",
+  "industry-product": "industry-product",
+  "Connected Products": "industry-product",
+  "Connected Products & Devices": "industry-product",
+  "industry-physical": "industry-physical",
+  "Physical Security & Facilities": "industry-physical",
 };
 
 const LOOKUP_FIELDS = {

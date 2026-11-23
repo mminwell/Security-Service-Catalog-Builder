@@ -6,6 +6,7 @@ export type AisleId =
   | "cloud_app"
   | "vuln"
   | "ir"
+  | "physical"
   | "grc"
   | "privacy"
   | "ai"
@@ -19,6 +20,7 @@ export const AISLES: Array<{ id: AisleId; label: string }> = [
   { id: "cloud_app", label: "Cloud & Application Security" },
   { id: "vuln", label: "Vulnerability Management" },
   { id: "ir", label: "Incident Response & Forensics" },
+  { id: "physical", label: "Physical Security" },
   { id: "grc", label: "Governance, Risk & Compliance" },
   { id: "privacy", label: "Data Protection & Privacy" },
   { id: "ai", label: "AI Security" },
